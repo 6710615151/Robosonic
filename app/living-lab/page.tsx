@@ -21,20 +21,29 @@ export default async function LivingLabPage() {
   let stats: LabStats | null = null;
   let robots: LabRobot[] = [];
   try {
-    const [passports, sessionCount, meetings, robotRows, sessions] = await Promise.all([
+    const [passports, sessionCount, meetings, robotRows, sessions, stations] = await Promise.all([
       prisma.hriPassport.findMany({ select: { comfortDistance: true, gaze: true, voice: true, speed: true } }),
       prisma.hriSession.count(),
       prisma.hriSession.count({ where: { protocol: "passport_meeting" } }),
       prisma.robotModel.findMany({ select: { id: true, canonicalName: true, robotType: true, developerOrg: true, manufacturer: true }, orderBy: { canonicalName: "asc" } }),
-      prisma.hriSession.findMany({ where: { protocol: "wai_first_calibration" }, select: { summaryJson: true, inputMode: true }, orderBy: { startedAt: "desc" }, take: 500 })
+      prisma.hriSession.findMany({ where: { protocol: "wai_first_calibration" }, select: { summaryJson: true, inputMode: true }, orderBy: { startedAt: "desc" }, take: 500 }),
+      prisma.hriSession.findMany({ where: { protocol: "care_journey_station" }, select: { summaryJson: true }, orderBy: { startedAt: "desc" }, take: 2000 })
     ]);
+    // Comfort ratings (1-5) given after each hospital-journey station, split by whether the robot used the passport.
+    const rated = stations
+      .map((s) => s.summaryJson as Record<string, unknown>)
+      .filter((s) => typeof s?.comfort === "number" && s.comfort >= 1 && s.comfort <= 5);
+    const comfortOf = (mode: string) => rated.filter((s) => s.mode === mode).map((s) => s.comfort as number);
     const n = passports.length;
     const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
     const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
     stats = {
+      comfortWithPassport: avg(comfortOf("passport")),
+      comfortWithout: avg(comfortOf("default")),
+      ratings: rated.length,
       passports: n,
       sessions: sessionCount,
-      meetings,
+      meetings: meetings + stations.length,
       avgDistance: avg(passports.map((p) => p.comfortDistance)),
       softGazeShare: n ? passports.filter((p) => p.gaze === "soft").length / n : null,
       voiceShare: n ? passports.filter((p) => p.voice).length / n : null,

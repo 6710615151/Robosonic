@@ -12,6 +12,9 @@ import { createPassportAction } from "./actions";
 import { copy, type Lang } from "./copy";
 
 export type LabStats = {
+  comfortWithPassport: number | null;
+  comfortWithout: number | null;
+  ratings: number;
   passports: number;
   sessions: number;
   meetings: number;
@@ -25,7 +28,7 @@ export type LabStats = {
 };
 export type LabRobot = { id: string; name: string; type: string; org: string | null };
 
-type Phase = "intro" | "greet" | "approach" | "gaze" | "voice" | "saving" | "done";
+type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "saving" | "done";
 type LogEvent = { t: number; src: "robot" | "human"; type: string; [key: string]: unknown };
 
 // Distances the robot steps through while approaching (higher = closer to the person).
@@ -46,6 +49,9 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const [comfort, setComfort] = useState<number | null>(null);
   const [gaze, setGaze] = useState<"direct" | "soft">("direct");
   const [voice, setVoice] = useState(false);
+  const [anxiety, setAnxiety] = useState<"low" | "medium" | "high">("low");
+  const [accessible, setAccessible] = useState(false);
+  const [noReach, setNoReach] = useState(false);
   const [log, setLog] = useState<LogEvent[]>([]);
   const [passportCode, setPassportCode] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
@@ -195,12 +201,43 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     robot.expression("happy");
     robot.setGlow(0.9, "teal");
     human("distance_set", { distance: +distance.toFixed(2), reason });
-    setPhase("gaze");
+    setPhase("care");
     later(900, () => {
       robot.lookAt(0, 0);
-      say(t.askGaze);
-      setStatus(t.statusGaze);
+      say(t.askCare);
+      setStatus(t.statusCare);
     });
+  }
+
+  // Care needs: shown to the robot immediately so the person sees the effect of each answer.
+  function chooseAnxiety(level: "low" | "medium" | "high") {
+    const robot = robotRef.current;
+    setAnxiety(level);
+    human("anxiety", { level });
+    if (!robot) return;
+    if (level === "high") { robot.setSpeed(Math.min(robot.state.speed, 0.5)); robot.setGlow(0.35, "blue"); robot.expression("calm"); say(t.anxietyHigh); }
+    else if (level === "medium") { robot.setSpeed(Math.min(robot.state.speed, 0.75)); robot.setGlow(0.5, "blue"); robot.expression("neutral"); say(t.anxietyMedium); }
+    else { robot.setGlow(0.8, "teal"); robot.expression("happy"); say(t.anxietyLow); }
+    setSpeed(robot.state.speed);
+  }
+  function chooseAccessible(on: boolean) {
+    setAccessible(on);
+    human("communication", { accessible: on });
+    say(on ? t.accessibleOn : t.accessibleOff);
+  }
+  function chooseReach(avoid: boolean) {
+    const robot = robotRef.current;
+    setNoReach(avoid);
+    human("reach", { noReach: avoid });
+    if (!robot) return;
+    if (avoid) { robot.moveArm("R", "relaxed"); say(t.reachNo); }
+    else { robot.moveArm("R", "offer"); later(1500, () => robot.moveArm("R", "relaxed")); say(t.reachYes); }
+  }
+  function careDone() {
+    human("care_needs_set", { anxiety, accessible, noReach });
+    setPhase("gaze");
+    say(t.askGaze);
+    setStatus(t.statusGaze);
   }
 
   function chooseGaze(choice: "direct" | "soft") {
@@ -227,7 +264,10 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     try {
       const robotEvents = log.slice(-250);
       const { code } = await createPassportAction(
-        { greeting: "wai", comfortDistance: comfort ?? robot.state.distanceTarget, speed: robot.state.speed, gaze, voice: on, language: lang },
+        {
+          greeting: "wai", comfortDistance: comfort ?? robot.state.distanceTarget, speed: robot.state.speed, gaze, voice: on, language: lang,
+          anxiety, captions: accessible ? "large" : "normal", speechPace: accessible ? "slow" : "normal", noReach
+        },
         {
           protocol: "wai_first_calibration",
           inputMode,
@@ -359,6 +399,29 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
             </div>
           )}
 
+          {phase === "care" && (
+            <div className="ll-step">
+              <h2>{t.careTitle}</h2>
+              <p className="ll-q">{t.qAnxiety}</p>
+              <div className="ll-seg" role="group" aria-label={t.qAnxiety}>
+                {(["low", "medium", "high"] as const).map((lvl) => (
+                  <button key={lvl} className={`ll-btn ${anxiety === lvl ? "sel" : ""}`} aria-pressed={anxiety === lvl} onClick={() => chooseAnxiety(lvl)}>{t.anxietyLabels[lvl]}</button>
+                ))}
+              </div>
+              <p className="ll-q">{t.qComm}</p>
+              <div className="ll-seg" role="group" aria-label={t.qComm}>
+                <button className={`ll-btn ${!accessible ? "sel" : ""}`} aria-pressed={!accessible} onClick={() => chooseAccessible(false)}>{t.commNormal}</button>
+                <button className={`ll-btn ${accessible ? "sel" : ""}`} aria-pressed={accessible} onClick={() => chooseAccessible(true)}>{t.commAccessible}</button>
+              </div>
+              <p className="ll-q">{t.qReach}</p>
+              <div className="ll-seg" role="group" aria-label={t.qReach}>
+                <button className={`ll-btn ${!noReach ? "sel" : ""}`} aria-pressed={!noReach} onClick={() => chooseReach(false)}>{t.reachOk}</button>
+                <button className={`ll-btn ${noReach ? "sel" : ""}`} aria-pressed={noReach} onClick={() => chooseReach(true)}>{t.reachAvoid}</button>
+              </div>
+              <button className="ll-btn primary big" style={{ width: "100%", marginTop: 12 }} onClick={careDone}><Play size={18} aria-hidden="true" /> {t.next}</button>
+            </div>
+          )}
+
           {phase === "gaze" && (
             <div className="ll-step">
               <h2>{t.gazeTitle}</h2>
@@ -393,12 +456,15 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
                     <li>{t.factSpeed}: {speed < 1 ? t.slow : t.normal}</li>
                     <li>{t.factGaze}: {gaze === "soft" ? t.soft : t.direct}</li>
                     <li>{t.factVoice}: {voice ? t.on : t.off}</li>
+                    <li>{t.factAnxiety}: {t.anxietyLabels[anxiety]}</li>
+                    <li>{t.factComm}: {accessible ? t.commAccessible : t.commNormal}</li>
+                    <li>{t.factReach}: {noReach ? t.reachAvoid : t.reachOk}</li>
                   </ul>
                 </div>
               </div>
               <p className="ll-note">{t.scanHint}</p>
               <div className="ll-row">
-                <Link className="ll-btn primary" href={`/living-lab/meet/${passportCode}`}>{t.meetNow}</Link>
+                <Link className="ll-btn primary" href={`/living-lab/meet/${passportCode}`}>🏥 {t.meetNow}</Link>
                 <button className="ll-btn" onClick={() => { setPhase("intro"); setStatus(t.statusIdle); setSpeech(t.introSpeech); }}><Pause size={18} aria-hidden="true" /> {t.again}</button>
               </div>
             </div>
@@ -418,6 +484,9 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
         <p className="ll-sub">{t.findingsSub}</p>
         {stats ? (
           <div className="ll-stats">
+            <div className="ll-hero"><strong>{stats.comfortWithPassport === null ? "–" : stats.comfortWithPassport.toFixed(1)}<small>/5</small></strong><span>{t.statComfortWith}</span></div>
+            <div className="ll-hero muted"><strong>{stats.comfortWithout === null ? "–" : stats.comfortWithout.toFixed(1)}<small>/5</small></strong><span>{t.statComfortWithout}</span></div>
+            <div><strong>{stats.ratings}</strong><span>{t.statRatings}</span></div>
             <div><strong>{stats.passports}</strong><span>{t.statPassports}</span></div>
             <div><strong>{stats.meetings}</strong><span>{t.statMeetings}</span></div>
             <div><strong>{stats.avgDistance === null ? "–" : describeDistance(stats.avgDistance)[lang]}</strong><span>{t.statDistance}</span></div>
@@ -487,6 +556,13 @@ const styles = `
 .ll-code { font-size: 34px; font-weight: 900; letter-spacing: 6px; margin: 0 0 6px; font-variant-numeric: tabular-nums; }
 .ll-facts { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 14px; }
 .ll-error { color: var(--danger); font-size: 14px; }
+.ll-q { margin: 12px 0 6px !important; font-weight: 700; }
+.ll-seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.ll-seg .ll-btn { flex: 1 1 120px; min-height: 48px; }
+.ll-btn.sel { background: #e8f5ec; border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.ll-hero { background: #f2faf5; border-color: #9cc9aa !important; }
+.ll-hero.muted { background: #faf7f2; border-color: var(--border) !important; }
+.ll-hero small { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-left: 2px; }
 .ll-log-wrap summary { cursor: pointer; font-weight: 700; font-size: 14px; }
 .ll-log { margin-top: 8px; max-height: 160px; overflow: auto; background: #0b1511; color: #cfe; border-radius: 8px; padding: 8px; font: 12px ui-monospace, monospace; }
 .ll-log b.robot { color: #7fd6ff; } .ll-log b.human { color: #ffd27f; }

@@ -9,7 +9,12 @@ export const passportSchema = z.object({
   speed: z.number().min(0.25).max(2),
   gaze: z.enum(["direct", "soft"]),
   voice: z.boolean(),
-  language: z.enum(["th", "en"])
+  language: z.enum(["th", "en"]),
+  // Care needs
+  anxiety: z.enum(["low", "medium", "high"]).default("low"),
+  captions: z.enum(["normal", "large"]).default("normal"),
+  speechPace: z.enum(["normal", "slow"]).default("normal"),
+  noReach: z.boolean().default(false)
 });
 export type PassportInput = z.infer<typeof passportSchema>;
 
@@ -20,7 +25,7 @@ export const sessionEventSchema = z.object({
 }).passthrough();
 
 export const sessionSchema = z.object({
-  protocol: z.enum(["wai_first_calibration", "passport_meeting"]),
+  protocol: z.enum(["wai_first_calibration", "passport_meeting", "care_journey_station"]),
   inputMode: z.enum(["buttons", "camera"]),
   robotModelId: z.string().max(40).optional().nullable(),
   events: z.array(sessionEventSchema).max(400),

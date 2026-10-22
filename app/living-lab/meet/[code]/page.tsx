@@ -3,19 +3,25 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizePassportCode } from "@/lib/hri/passport";
-import MeetClient from "./MeetClient";
+import MeetClient, { type Station } from "./MeetClient";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Passport Meeting | HRI Living Lab",
+  title: "Hospital Journey with a Care Passport | HRI Living Lab",
   robots: { index: false, follow: false }
 };
 
-const CARE_TYPES = /hospital|medical|elder|care|rehab|therapy|telepresence|companion|assist|service/i;
-
 type Params = Promise<{ code: string }>;
 type SearchParams = Promise<{ robot?: string }>;
+
+// A patient's hospital journey, played by real robots from the atlas registry (seed data from
+// thailand_humanoid_atlas_seed_records.json). Each station has a task the robot really performs.
+const JOURNEY: { task: Station["task"]; match: RegExp; typeMatch: RegExp }[] = [
+  { task: "reception", match: /Mr SAM/i, typeMatch: /administrative|outpatient|service/i },
+  { task: "delivery", match: /Pinto/i, typeMatch: /delivery|medical_assist/i },
+  { task: "telepresence", match: /Ninja|Mirror Telepresence/i, typeMatch: /telepresence/i }
+];
 
 export default async function MeetPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { code: rawCode } = await params;
@@ -25,18 +31,40 @@ export default async function MeetPage({ params, searchParams }: { params: Param
 
   const passport = await prisma.hriPassport.findUnique({
     where: { code },
-    select: { code: true, greeting: true, comfortDistance: true, speed: true, gaze: true, voice: true, language: true }
+    select: {
+      code: true, greeting: true, comfortDistance: true, speed: true, gaze: true, voice: true, language: true,
+      anxiety: true, captions: true, speechPace: true, noReach: true
+    }
   });
   if (!passport) redirect("/living-lab/meet?error=not_found");
 
-  const robotRows = await prisma.robotModel.findMany({
-    select: { id: true, canonicalName: true, robotType: true, developerOrg: true, manufacturer: true, primaryUseCase: true },
-    orderBy: { canonicalName: "asc" }
+  const robots = await prisma.robotModel.findMany({
+    select: { id: true, canonicalName: true, robotType: true, developerOrg: true, manufacturer: true }
   });
-  const robots = robotRows
-    .filter((r) => CARE_TYPES.test(r.robotType))
-    .map((r) => ({ id: r.id, name: r.canonicalName, type: r.robotType, org: r.developerOrg ?? r.manufacturer ?? null, useCase: r.primaryUseCase }));
-  const selected = robots.find((r) => r.id === robotId) ?? robots.find((r) => /Mr SAM/i.test(r.name)) ?? robots[0] ?? null;
+  const used = new Set<string>();
+  const stations: Station[] = [];
+  for (const step of JOURNEY) {
+    const robot =
+      robots.find((r) => !used.has(r.id) && step.match.test(r.canonicalName)) ??
+      robots.find((r) => !used.has(r.id) && step.typeMatch.test(r.robotType));
+    if (!robot) continue;
+    used.add(robot.id);
+    stations.push({
+      task: step.task,
+      robotId: robot.id,
+      name: robot.canonicalName,
+      type: robot.robotType,
+      org: robot.developerOrg ?? robot.manufacturer ?? null
+    });
+  }
+  const startIndex = Math.max(0, stations.findIndex((s) => s.robotId === robotId));
 
-  return <MeetClient lang={lang} passport={passport} robots={robots} selectedId={selected?.id ?? null} />;
+  // Prisma stores these as strings; narrow them once at the page boundary.
+  const care = {
+    anxiety: (passport.anxiety === "medium" || passport.anxiety === "high" ? passport.anxiety : "low") as "low" | "medium" | "high",
+    captions: (passport.captions === "large" ? "large" : "normal") as "normal" | "large",
+    speechPace: (passport.speechPace === "slow" ? "slow" : "normal") as "normal" | "slow"
+  };
+
+  return <MeetClient lang={lang} passport={{ ...passport, ...care }} stations={stations} startIndex={startIndex} />;
 }

@@ -24,6 +24,10 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
           gaze: passport.gaze,
           voice: passport.voice,
           language: passport.language,
+          anxiety: passport.anxiety,
+          captions: passport.captions,
+          speechPace: passport.speechPace,
+          noReach: passport.noReach,
           sessions: {
             create: {
               protocol: session.protocol,
@@ -47,7 +51,8 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
   throw new Error("Could not allocate a passport code. Please try again.");
 }
 
-// Records a meeting between a passport holder and a robot from the atlas registry.
+// Records one care-journey station (or a meeting) between a passport holder and a registry robot,
+// including the person's 1-5 comfort rating in the summary.
 export async function recordMeetingAction(codeRaw: string, sessionRaw: unknown) {
   const code = normalizePassportCode(codeRaw);
   const session = sessionSchema.parse(sessionRaw);
@@ -60,7 +65,7 @@ export async function recordMeetingAction(codeRaw: string, sessionRaw: unknown) 
 
   await prisma.hriSession.create({
     data: {
-      protocol: "passport_meeting",
+      protocol: session.protocol === "wai_first_calibration" ? "passport_meeting" : session.protocol,
       inputMode: session.inputMode,
       passportId: passport.id,
       robotModelId,

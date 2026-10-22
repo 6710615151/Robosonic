@@ -267,6 +267,11 @@ model HriPassport {
   gaze             String       @default("soft")
   voice            Boolean      @default(true)
   language         String       @default("th")
+  // Care needs: how anxious robots make the person, and how robots should communicate.
+  anxiety          String       @default("low")
+  captions         String       @default("normal")
+  speechPace       String       @default("normal")
+  noReach          Boolean      @default(false)
   sessions         HriSession[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
