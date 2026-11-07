@@ -6,16 +6,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { Activity, Bot, Box, ChartColumn, Compass, HeartHandshake, Hospital, IdCard, Sparkles, Unplug, UserPlus } from "lucide-react";
+import { Activity, ArrowRight, Bot, Box, ChartColumn, Compass, HeartHandshake, Hospital, IdCard, Sparkles, Unplug, UserPlus } from "lucide-react";
 import type { Lang } from "../copy";
 import { labCopy } from "../lab-copy";
 import { findOwnPassport, webglAvailable, type SimState } from "./lab-env";
 
-type NavKey = "overview" | "create" | "mine" | "robot" | "journey" | "research";
-type NavItem = { key: NavKey; href: string; icon: ComponentType<{ size?: number; "aria-hidden"?: boolean }>; active: boolean };
+type StageKey = "create" | "experience" | "compare" | "discover";
+type NavItem = { key: "overview" | "mine" | StageKey; href: string; icon: ComponentType<{ size?: number; "aria-hidden"?: boolean }>; active: boolean; num?: string; label: string };
+
+const STAGE_ORDER: StageKey[] = ["create", "experience", "compare", "discover"];
 
 export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigured: boolean }) {
   const t = labCopy[lang].shell;
+  const st = labCopy[lang].stages;
   const pathname = usePathname() ?? "/living-lab";
   const [ownToken, setOwnToken] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>("pending");
@@ -54,14 +57,20 @@ export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigu
   }, [statusOpen]);
 
   const under = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+  // The four stages of one experiment, in order. Routes are unchanged; only how they are presented.
   const items: NavItem[] = [
-    { key: "overview", href: "/living-lab", icon: Compass, active: pathname === "/living-lab" },
-    { key: "create", href: "/living-lab/create", icon: UserPlus, active: under("/living-lab/create") },
-    ...(ownToken ? [{ key: "mine" as const, href: `/living-lab/passport/${ownToken}`, icon: IdCard, active: under("/living-lab/passport") }] : []),
-    { key: "robot", href: "/living-lab/robot", icon: Bot, active: under("/living-lab/robot") },
-    { key: "journey", href: "/living-lab/meet", icon: Hospital, active: under("/living-lab/meet") },
-    { key: "research", href: "/living-lab/research", icon: ChartColumn, active: under("/living-lab/research") }
+    { key: "overview", href: "/living-lab", icon: Compass, active: pathname === "/living-lab", label: st.home },
+    { key: "create", href: "/living-lab/create", icon: UserPlus, active: under("/living-lab/create"), num: st.create.num, label: st.create.name },
+    { key: "experience", href: "/living-lab/robot", icon: Bot, active: under("/living-lab/robot"), num: st.experience.num, label: st.experience.name },
+    { key: "compare", href: "/living-lab/meet", icon: Hospital, active: under("/living-lab/meet"), num: st.compare.num, label: st.compare.name },
+    { key: "discover", href: "/living-lab/research", icon: ChartColumn, active: under("/living-lab/research"), num: st.discover.num, label: st.discover.name },
+    ...(ownToken ? [{ key: "mine" as const, href: `/living-lab/passport/${ownToken}`, icon: IdCard, active: under("/living-lab/passport"), label: t.nav.mine }] : [])
   ];
+  // Where am I, what is this, what next: one line under the bar on every stage page.
+  const activeStage = items.find((i) => i.active && i.num)?.key as StageKey | undefined;
+  const current: StageKey | "passport" | null = under("/living-lab/passport") ? "passport" : activeStage ?? null;
+  const index = current === "passport" ? 0 : current ? STAGE_ORDER.indexOf(current) : -1;
+  const nextKey: StageKey | null = current === "passport" ? "experience" : index >= 0 && index < 3 ? STAGE_ORDER[index + 1] : null;
 
   const limited = [sim === "off", true, !aiConfigured].filter(Boolean).length;
 
@@ -69,16 +78,18 @@ export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigu
   // carries the brand, so the lab adds no second header; status stays one tap away instead of taking
   // a row of chips on every page.
   return (
+    <>
     <nav className="lab-tabs" aria-label={t.navLabel}>
       <span className="lab-tabs-brand" aria-hidden="true">
         <span className="lab-shell-mark"><HeartHandshake size={16} /></span>
         {t.name}
       </span>
       <ul ref={tabsRef}>
-        {items.map(({ key, href, icon: Icon, active }) => (
+        {items.map(({ key, href, icon: Icon, active, num, label }) => (
           <li key={key}>
-            <Link href={href} aria-current={active ? "page" : undefined} className={key === "mine" ? "is-mine" : undefined}>
-              <Icon size={16} aria-hidden={true} /> {t.nav[key]}
+            <Link href={href} aria-current={active ? "page" : undefined} className={key === "mine" ? "is-mine" : key === "overview" ? "is-home" : undefined}>
+              {num ? <span className="lab-tab-num" aria-hidden="true">{num}</span> : <Icon size={16} aria-hidden={true} />}
+              <span className={key === "overview" ? "lab-tab-home" : undefined}>{label}</span>
             </Link>
           </li>
         ))}
@@ -116,5 +127,25 @@ export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigu
         </div>
       </div>
     </nav>
+    {current && (
+      <div className="lab-where" data-testid="lab-where">
+        <p>
+          {current === "passport" ? (
+            <span className="lab-where-text">{st.passport.where}</span>
+          ) : (
+            <>
+              <span className="lab-where-stage">{st.stageOf(index + 1)} · {st[current].name}</span>
+              <span className="lab-where-text">{st[current].where}</span>
+            </>
+          )}
+        </p>
+        {nextKey && (
+          <Link className="lab-where-next" href={st[nextKey].href} data-testid="lab-where-next">
+            {st.next}: <b>{st[nextKey].num} {st[nextKey].name}</b> <ArrowRight size={14} aria-hidden={true} />
+          </Link>
+        )}
+      </div>
+    )}
+    </>
   );
 }

@@ -14,6 +14,18 @@ const en = {
     ai: { label: "AI assistant", ok: "configured", off: "not configured" },
     statusHint: (n: number) => ` (${n} ${n === 1 ? "part is" : "parts are"} limited or simulated)`
   },
+  // The one journey every lab page belongs to. Used by the shell (tabs + "where am I" strip) and the overview.
+  stages: {
+    label: "Your experiment",
+    stageOf: (n: number) => `Stage ${n} of 4`,
+    next: "Next",
+    home: "Lab home",
+    create: { num: "01", name: "Create", title: "Personalize your experience", where: "Teach a robot, once, how you like to be cared for. Your answers become a Care Passport.", time: "About 1 minute", href: "/living-lab/create", cta: "Create my passport" },
+    experience: { num: "02", name: "Experience", title: "Meet the robots", where: "Two simulated robots with different hardware read your passport. See what each one changes, and why.", time: "As long as you like", href: "/living-lab/robot", cta: "Enter the Robot Lab" },
+    compare: { num: "03", name: "Compare", title: "Feel the difference", where: "At three hospital stations, meet each robot without your passport and with it, then rate how comfortable you felt.", time: "About 5 minutes", href: "/living-lab/meet", cta: "Start the hospital journey" },
+    discover: { num: "04", name: "Discover", title: "See what the lab learns", where: "Everyone's ratings become group averages. Find out whether personalization helps.", time: "Anonymous averages", href: "/living-lab/research", cta: "See the findings" },
+    passport: { where: "Your Care Passport: what every robot reads. Use it in the Robot Lab or on the hospital journey." }
+  },
   needPassport: {
     ownTitle: "Your passport is in this browser",
     ownBody: "You made a passport on this device. Start the journey with it, no code needed.",
@@ -223,6 +235,17 @@ const th: typeof en = {
     hardware: { label: "หุ่นยนต์จริง", off: "ไม่ได้เชื่อมต่อ" },
     ai: { label: "ผู้ช่วย AI", ok: "ตั้งค่าแล้ว", off: "ยังไม่ได้ตั้งค่า" },
     statusHint: (n: number) => ` (${n} ส่วนจำกัดหรือเป็นการจำลอง)`
+  },
+  stages: {
+    label: "การทดลองของคุณ",
+    stageOf: (n: number) => `ขั้นที่ ${n} จาก 4`,
+    next: "ต่อไป",
+    home: "หน้าแรกแล็บ",
+    create: { num: "01", name: "สร้าง", title: "ปรับให้เป็นของคุณ", where: "สอนหุ่นยนต์เพียงครั้งเดียวว่าคุณอยากได้รับการดูแลแบบไหน คำตอบของคุณจะกลายเป็น Care Passport", time: "ประมาณ 1 นาที", href: "/living-lab/create", cta: "สร้างพาสปอร์ตของฉัน" },
+    experience: { num: "02", name: "สัมผัส", title: "พบหุ่นยนต์", where: "หุ่นจำลองสองรุ่นที่ฮาร์ดแวร์ต่างกันอ่านพาสปอร์ตของคุณ ดูว่าแต่ละตัวเปลี่ยนอะไร และเพราะอะไร", time: "ใช้เวลาเท่าที่ต้องการ", href: "/living-lab/robot", cta: "เข้าห้องทดลองหุ่นยนต์" },
+    compare: { num: "03", name: "เปรียบเทียบ", title: "รู้สึกถึงความต่าง", where: "ที่ 3 จุดในโรงพยาบาล พบหุ่นแต่ละตัวทั้งแบบไม่มีและมีพาสปอร์ต แล้วให้คะแนนความสบายใจ", time: "ประมาณ 5 นาที", href: "/living-lab/meet", cta: "เริ่มเส้นทางโรงพยาบาล" },
+    discover: { num: "04", name: "ค้นพบ", title: "ดูสิ่งที่แล็บเรียนรู้", where: "คะแนนของทุกคนรวมเป็นค่าเฉลี่ยของกลุ่ม ดูว่าการปรับให้เข้ากับแต่ละคนช่วยได้จริงไหม", time: "ค่าเฉลี่ยแบบไม่ระบุตัวตน", href: "/living-lab/research", cta: "ดูผลการค้นพบ" },
+    passport: { where: "Care Passport ของคุณ คือสิ่งที่หุ่นทุกตัวอ่าน ใช้ได้ในห้องทดลองหุ่นยนต์และเส้นทางโรงพยาบาล" }
   },
   needPassport: {
     ownTitle: "พาสปอร์ตของคุณอยู่ในเบราว์เซอร์นี้",

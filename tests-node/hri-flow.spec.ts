@@ -54,7 +54,14 @@ test("one lab bar: tabs plus a status panel that opens, closes with Escape, and 
   const { context, page } = await open(browser, { width: 390 });
   await page.goto("/living-lab");
   const nav = page.getByRole("navigation", { name: "Living Lab" });
-  await expect(nav.getByRole("link", { name: "Overview", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Lab home", exact: true })).toHaveAttribute("aria-current", "page");
+  // Every stage page says where you are and what comes next.
+  await page.goto("/living-lab/robot");
+  await expect(page.getByTestId("lab-where")).toContainText("Stage 2 of 4");
+  await expect(page.getByTestId("lab-where-next")).toHaveAttribute("href", "/living-lab/meet");
+  await expect(nav.getByRole("link", { name: "Experience", exact: true })).toHaveAttribute("aria-current", "page");
+  await page.goto("/living-lab");
+  await expect(page.getByTestId("lab-where")).toHaveCount(0);
   // No second lab header above the tabs.
   await expect(page.locator(".lab-shell")).toHaveCount(0);
 

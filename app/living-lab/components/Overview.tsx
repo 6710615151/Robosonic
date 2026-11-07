@@ -1,17 +1,20 @@
 "use client";
 
-// /living-lab: the front door. It answers three questions in order: what is this (hero), what can I do
-// and how do the parts connect (how it works), and what is real right now (lab environment). A short
-// research introduction closes it. Everything shown comes from this browser or the server; there are
-// no invented sessions, counts or progress.
+// /living-lab: the front door, told as one story. A: the question and the robot that asks it (hero).
+// B: your experiment in four stages. C: the robots you will meet. D: the research question and how it
+// is answered. E: what is real right now. F: an invitation. Everything shown comes from this browser,
+// the server or the robot profiles in lib/hri; there are no invented sessions, counts or live signals.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
-import { ArrowRight, Box, Bot, ChartColumn, CircleCheck, CircleDashed, CircleSlash, Database, Hospital, IdCard, Plug, Sparkles, Unplug, UserPlus } from "lucide-react";
-import WaiBot from "@/app/components/brand/WaiBot";
+import { ArrowRight, Box, Bot, Check, CircleCheck, CircleDashed, CircleSlash, Database, IdCard, Minus, Plug, Sparkles, Unplug } from "lucide-react";
+import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
+import type { StationTask } from "@/lib/hri/journey-stations";
 import type { Lang } from "../copy";
 import { labCopy } from "../lab-copy";
 import { findOwnPassport, webglAvailable, type SimState } from "./lab-env";
+import HeroRobot from "./HeroRobot";
+import { overviewCopy } from "./overview-copy";
 
 type Tone = "ok" | "off" | "neutral" | "pending";
 type Icon = ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
@@ -24,7 +27,6 @@ const LEGACY_HASHES: Record<string, string> = {
   "#journey": "/living-lab/meet"
 };
 
-const STEP_ICONS: Record<string, Icon> = { passport: UserPlus, robot: Bot, journey: Hospital, research: ChartColumn };
 const TONE_ICONS: Record<Tone, Icon> = { ok: CircleCheck, off: CircleSlash, neutral: CircleDashed, pending: CircleDashed };
 
 function StatusRow({ icon: ItemIcon, label, state, tone, body }: { icon: Icon; label: string; state: string; tone: Tone; body: string }) {
@@ -41,18 +43,47 @@ function StatusRow({ icon: ItemIcon, label, state, tone, body }: { icon: Icon; l
   );
 }
 
-export default function Overview({ lang, registryCount, dbOnline, aiConfigured }: {
+export type JourneyRobot = { name: string; task: StationTask };
+
+const STAGES = ["create", "experience", "compare", "discover"] as const;
+const CAPS = ["mobile", "head", "arms", "speaker", "screen"] as const;
+
+// Sections fade up once as they enter the viewport. Without JS, or with reduced motion, they simply show.
+function useReveal() {
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
+    const items = Array.from(document.querySelectorAll<HTMLElement>(".llx-reveal"));
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("is-in");
+        io.unobserve(entry.target);
+      }
+    }, { rootMargin: "0px 0px -8% 0px" });
+    for (const el of items) {
+      if (el.getBoundingClientRect().top > window.innerHeight) { el.classList.add("is-pending"); io.observe(el); }
+    }
+    return () => io.disconnect();
+  }, []);
+}
+
+export default function Overview({ lang, registryCount, dbOnline, aiConfigured, journeyRobots }: {
   lang: Lang;
   // Care robots in the Atlas registry, or null when the database could not be read.
   registryCount: number | null;
   dbOnline: boolean;
   aiConfigured: boolean;
+  // Registry robots that play the hospital journey's stations (lib/hri/journey-stations.ts).
+  journeyRobots: JourneyRobot[];
 }) {
   const o = labCopy[lang].overview;
+  const st = labCopy[lang].stages;
+  const c = overviewCopy[lang];
   const tiers = labCopy[lang].tiers;
   const router = useRouter();
   const [ownToken, setOwnToken] = useState<string | null>(null);
   const [sim, setSim] = useState<SimState>("pending");
+  useReveal();
 
   useEffect(() => {
     const target = LEGACY_HASHES[window.location.hash];
@@ -68,94 +99,134 @@ export default function Overview({ lang, registryCount, dbOnline, aiConfigured }
   const simTone: Tone = sim === "ok" ? "ok" : sim === "off" ? "off" : "pending";
 
   return (
-    <main className="lab-page llo">
-      <section className="llo-hero" aria-labelledby="llo-title">
-        <div className="llo-hero-text">
-          <p className="lab-eyebrow">{o.hero.eyebrow}</p>
-          <h1 id="llo-title">{o.hero.title}</h1>
-          <p className="llo-lead">{o.hero.lead}</p>
-          <div className="llo-actions">
-            <Link className="lab-cta llo-cta" href="/living-lab/create">
-              {o.hero.cta} <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-            <Link className="lab-btn-quiet llo-secondary" href="/living-lab/robot">
-              <Bot size={18} aria-hidden="true" /> {o.hero.explore}
-            </Link>
+    <main className="lab-page llx">
+      {/* A — The question, asked by the robot itself. */}
+      <section className="llx-hero" aria-labelledby="llx-title">
+        <div className="llx-hero-text">
+          <p className="llx-eyebrow">{c.hero.eyebrow}</p>
+          <h1 id="llx-title">{c.hero.title}</h1>
+          <p className="llx-lead">{c.hero.lead}</p>
+          <p className="llx-body">{c.hero.body}</p>
+          <div className="llx-actions">
+            <Link className="llx-cta" href="/living-lab/create">{c.hero.cta} <ArrowRight size={18} aria-hidden="true" /></Link>
+            <Link className="llx-ghost" href="/living-lab/robot">{c.hero.explore}</Link>
           </div>
-          <p className="lab-note">{o.hero.ctaNote}</p>
-          <Link className="lab-link llo-have" href="/living-lab/meet">{o.hero.haveOne}</Link>
+          <p className="llx-note">{c.hero.ctaNote}</p>
+          {!ownToken && <Link className="llx-have" href="/living-lab/meet">{c.hero.haveOne} <ArrowRight size={14} aria-hidden="true" /></Link>}
         </div>
-
-        <figure className="llo-figure" aria-label={o.hero.figureLabel}>
-          <div className="llo-arch">
-            <WaiBot pose="wai" size={250} className="llo-bot" title={o.hero.figureLabel} />
-          </div>
-          <div className="llo-sample">
-            <span className="llo-sample-kicker">{o.hero.sampleKicker}</span>
-            <strong>Care Passport</strong>
-            <dl>
-              {o.hero.sample.map(([k, v]) => (
-                <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
-              ))}
-            </dl>
-          </div>
-          <figcaption className="lab-note">{o.hero.figureCaption}</figcaption>
-        </figure>
+        <HeroRobot label={c.hero.robotLabel} caption={c.hero.robotCaption} greet={c.hero.greet} fallbackCaption={c.hero.fallbackCaption} />
       </section>
 
       {ownToken && (
-        <section className="llo-resume" aria-labelledby="llo-resume-title" data-testid="overview-resume">
-          <span className="llo-resume-icon" aria-hidden="true"><IdCard size={22} /></span>
+        <section className="llx-resume" aria-labelledby="llx-resume-title" data-testid="overview-resume">
+          <IdCard size={22} aria-hidden="true" />
           <div>
-            <p className="lab-eyebrow">{o.resume.eyebrow}</p>
-            <h2 id="llo-resume-title">{o.resume.title}</h2>
-            <p>{o.resume.body}</p>
+            <h2 id="llx-resume-title">{c.resume.title}</h2>
+            <p>{c.resume.body}</p>
           </div>
-          <Link className="lab-cta" href={`/living-lab/passport/${ownToken}`}>
-            {o.resume.open} <ArrowRight size={18} aria-hidden="true" />
-          </Link>
+          <Link className="llx-cta is-small" href={`/living-lab/passport/${ownToken}`}>{c.resume.open} <ArrowRight size={16} aria-hidden="true" /></Link>
         </section>
       )}
 
-      <section className="llo-section" aria-labelledby="llo-how-title">
-        <header className="llo-head">
-          <p className="lab-eyebrow">{o.how.eyebrow}</p>
-          <h2 id="llo-how-title">{o.how.title}</h2>
-          <p className="llo-lead">{o.how.lead}</p>
+      {/* B — Your experiment: four stages that build on each other. */}
+      <section className="llx-section llx-reveal" aria-labelledby="llx-exp-title">
+        <header className="llx-head">
+          <p className="llx-kicker">{c.experiment.eyebrow}</p>
+          <h2 id="llx-exp-title">{c.experiment.title}</h2>
+          <p>{c.experiment.lead}</p>
         </header>
-        <ol className="llo-path">
-          {o.how.steps.map((step, i) => {
-            const StepIcon = STEP_ICONS[step.key];
+        <ol className="llx-stages">
+          {STAGES.map((key) => {
+            const stage = st[key];
+            const done = key === "create" && ownToken !== null;
             return (
-              <li key={step.key} className={`llo-step is-${step.key}`}>
-                <div className="llo-step-node" aria-hidden="true">
-                  <span className="llo-step-num">{i + 1}</span>
-                  <StepIcon size={18} />
-                </div>
-                <div className="llo-step-body">
-                  <p className="llo-step-meta">{step.meta}</p>
-                  <h3>{step.title}</h3>
-                  <p className="llo-for">
-                    <span className="visually-hidden">{o.how.forLabel}: </span>
-                    {step.for.map((who) => (
-                      <span key={who} className="llo-tag">{o.how.audiences[who as keyof typeof o.how.audiences]}</span>
-                    ))}
-                  </p>
-                  <p>{step.body}</p>
-                  <p className="lab-note">{step.note}</p>
-                  <Link className="lab-link" href={step.href}>{step.action} <ArrowRight size={16} aria-hidden="true" /></Link>
-                </div>
+              <li key={key} className={done ? "is-done" : undefined}>
+                <span className="llx-num" aria-hidden="true">{stage.num}</span>
+                <p className="llx-stage-name">{stage.name}{done && <span className="llx-done"><Check size={13} aria-hidden="true" /> {c.experiment.done}</span>}</p>
+                <h3>{stage.title}</h3>
+                <p>{stage.where}</p>
+                <p className="llx-time">{stage.time}</p>
+                <Link className="llx-link" href={stage.href}>{stage.cta} <ArrowRight size={15} aria-hidden="true" /></Link>
               </li>
             );
           })}
         </ol>
       </section>
 
-      <section className="llo-section llo-env" aria-labelledby="llo-env-title" data-testid="overview-status">
-        <header className="llo-head">
-          <p className="lab-eyebrow">{s.eyebrow}</p>
+      {/* C — The robots: identities from their real hardware profiles, nothing invented. */}
+      <section className="llx-section llx-reveal" aria-labelledby="llx-robots-title">
+        <header className="llx-head">
+          <p className="llx-kicker">{c.robots.eyebrow}</p>
+          <h2 id="llx-robots-title">{c.robots.title}</h2>
+          <p>{c.robots.lead}</p>
+        </header>
+        <div className="llx-robots">
+          {ROBOT_PROFILES.map((robot, i) => (
+            <article key={robot.id} className={`llx-bot is-${i === 0 ? "a" : "b"}`}>
+              <div className="llx-bot-head">
+                <span className="llx-bot-letter" aria-hidden="true">{i === 0 ? "A" : "B"}</span>
+                <span className="llx-sim">{c.robots.simulated}</span>
+              </div>
+              <h3>{robot.name[lang]}</h3>
+              <p>{robot.short[lang]}</p>
+              <ul className="llx-caps" aria-label={c.robots.hardware}>
+                {CAPS.map((cap) => {
+                  const has = robot.capabilities[cap];
+                  return (
+                    <li key={cap} className={has ? "has" : "lacks"}>
+                      {has ? <Check size={14} aria-hidden="true" /> : <Minus size={14} aria-hidden="true" />}
+                      <span>{c.robots.caps[cap]}</span>
+                      <span className="visually-hidden">: {has ? c.robots.yes : c.robots.no}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {robot.capabilities.mobile && <p className="llx-time">{c.robots.maxSpeed(robot.capabilities.maxSpeedMultiplier)}</p>}
+            </article>
+          ))}
+        </div>
+        {journeyRobots.length > 0 && (
+          <div className="llx-registry">
+            <div>
+              <h3>{c.robots.journeyTitle}</h3>
+              <p>{c.robots.journeyLead}</p>
+            </div>
+            <ol>
+              {journeyRobots.map((r, i) => (
+                <li key={r.name}><span className="llx-num-sm" aria-hidden="true">S{i + 1}</span><span><b>{c.robots.stations[r.task]}</b>{r.name}</span></li>
+              ))}
+            </ol>
+          </div>
+        )}
+        <Link className="llx-link" href="/living-lab/robot">{c.robots.enter} <ArrowRight size={15} aria-hidden="true" /></Link>
+      </section>
+
+      {/* D — The research story: the question, and how it is answered fairly. */}
+      <section className="llx-story llx-reveal" aria-labelledby="llx-story-title">
+        <div className="llx-story-q">
+          <p className="llx-kicker">{c.story.eyebrow}</p>
+          <h2 id="llx-story-title">{c.story.question}</h2>
+          <p>{c.story.body}</p>
+          <p className="llx-measured">{c.story.measured}</p>
+        </div>
+        <div className="llx-story-how">
+          <h3>{o.research.methodTitle}</h3>
+          <dl>
+            {o.research.method.map(([term, detail]) => (
+              <div key={term}><dt>{term}</dt><dd>{detail}</dd></div>
+            ))}
+          </dl>
+          <p className="llx-note">{o.research.disclaimer}</p>
+          <Link className="llx-link is-light" href="/living-lab/research">{c.story.action} <ArrowRight size={15} aria-hidden="true" /></Link>
+        </div>
+      </section>
+
+      {/* E — What is real right now. Each row reads something the browser or server actually knows. */}
+      <section className="llx-section llx-env llx-reveal" aria-labelledby="llo-env-title" data-testid="overview-status">
+        <header className="llx-head">
+          <p className="llx-kicker">{s.eyebrow}</p>
           <h2 id="llo-env-title">{s.title}</h2>
-          <p className="lab-note">{s.lead}</p>
+          <p>{s.lead}</p>
         </header>
         <ul className="llo-env-list">
           <StatusRow icon={Box} label={s.sim.label} state={s.states[sim]} tone={simTone} body={s.sim[sim]} />
@@ -167,22 +238,11 @@ export default function Overview({ lang, registryCount, dbOnline, aiConfigured }
         </ul>
       </section>
 
-      <section className="llo-section llo-why" aria-labelledby="llo-why-title">
-        <div className="llo-why-text">
-          <p className="lab-eyebrow">{o.research.eyebrow}</p>
-          <h2 id="llo-why-title">{o.research.title}</h2>
-          {o.research.body.map((para) => <p key={para}>{para}</p>)}
-          <p className="lab-note">{o.research.disclaimer}</p>
-          <Link className="lab-link" href="/living-lab/research">{o.research.action} <ArrowRight size={16} aria-hidden="true" /></Link>
-        </div>
-        <div className="llo-method">
-          <h3>{o.research.methodTitle}</h3>
-          <dl>
-            {o.research.method.map(([term, detail]) => (
-              <div key={term}><dt>{term}</dt><dd>{detail}</dd></div>
-            ))}
-          </dl>
-        </div>
+      {/* F — The invitation. */}
+      <section className="llx-final llx-reveal" aria-labelledby="llx-final-title">
+        <h2 id="llx-final-title">{c.final.title}</h2>
+        <p>{c.final.body}</p>
+        <Link className="llx-cta is-light" href="/living-lab/create">{c.final.cta} <ArrowRight size={18} aria-hidden="true" /></Link>
       </section>
     </main>
   );

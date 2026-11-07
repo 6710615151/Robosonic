@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "HRI Living Lab | Thailand Humanoid Atlas",
-  description: "Where humans meet robots. Create a Care Passport once, watch simulated care robots respect it, walk a hospital journey and see what the research learns.",
+  description: "Can robots understand you? Create a Care Passport once, meet simulated care robots that respect it, compare them on a hospital journey and see what the research learns.",
   alternates: { canonical: "/living-lab" }
 };
 
@@ -28,6 +28,7 @@ export default async function LivingLabPage({ searchParams }: { searchParams: Se
       registryCount={robots ? robots.length : null}
       dbOnline={robots !== null}
       aiConfigured={Boolean(process.env.GEMINI_API_KEY)}
+      journeyRobots={(robots ?? []).filter((r) => r.journeyTask).map((r) => ({ name: r.name, task: r.journeyTask! }))}
     />
   );
 }

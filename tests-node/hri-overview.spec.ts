@@ -9,8 +9,9 @@ test.beforeEach(async ({ context }) => {
 
 test("the overview says what this is, where to start, and that no physical robot is connected", async ({ page }) => {
   await page.goto("/living-lab");
-  await expect(page.getByRole("heading", { level: 1, name: "Where humans meet robots." })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Create your Care Passport/ })).toHaveAttribute("href", "/living-lab/create");
+  await expect(page.getByRole("heading", { level: 1, name: "Can robots understand you?" })).toBeVisible();
+  // One dominant action, in the hero (the closing invitation repeats it).
+  await expect(page.getByRole("link", { name: /Begin your experiment/ }).first()).toHaveAttribute("href", "/living-lab/create");
 
   const status = page.getByTestId("overview-status");
   const hardware = status.getByRole("listitem").filter({ hasText: "Physical robots" });
@@ -35,11 +36,11 @@ test("'continue' appears only when this browser holds a passport's edit key", as
 test("links to the old single-page sections still land on the right page", async ({ page }) => {
   await page.goto("/living-lab#calibrate");
   await expect(page).toHaveURL(/\/living-lab\/create$/);
-  await expect(page.getByRole("link", { name: "Create Passport", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Create", exact: true })).toHaveAttribute("aria-current", "page");
 
   await page.goto("/living-lab?window=7d");
   await expect(page).toHaveURL(/\/living-lab\/research\?window=7d$/);
-  await expect(page.getByRole("link", { name: "Research", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Discover", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("the overview has no horizontal overflow at phone width", async ({ page }) => {
