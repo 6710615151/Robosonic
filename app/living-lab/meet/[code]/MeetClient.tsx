@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BadgeCheck, CircleDashed, Hand, MoveDown, Play, RotateCcw, ShieldCheck } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
+import { adapt } from "@/lib/hri/adapt";
 import type { Hue, RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { describeDistance } from "@/lib/hri/passport";
+import { toPublicProfile } from "@/lib/hri/public-profile";
+import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
 import { recordMeetingAction } from "../../actions";
 
 export type StationTask = "reception" | "delivery" | "telepresence";
@@ -19,7 +22,7 @@ type Passport = {
   gaze: string;
   voice: boolean;
   language: string;
-  anxiety: "low" | "medium" | "high";
+  calm: boolean;
   captions: "normal" | "large";
   speechPace: "normal" | "slow";
   noReach: boolean;
@@ -31,6 +34,9 @@ type SavedStation = { mode: Mode; comfort: number };
 const START_DISTANCE = -2.6;
 // What a robot does without a passport: waves, walks up close at full speed, holds eye contact.
 const DEFAULT_BEHAVIOUR = { distance: 1.3, speed: 1.4, gaze: "direct", greeting: "wave", voice: true } as const;
+// The meet flow has no persisted profile to show, so it reuses one fixed timestamp for adaptation.
+const PROFILE_TIME = new Date(0);
+const CARE_ROBOT = ROBOT_PROFILES[0];
 
 function hueFor(type: string): Hue {
   if (/hospital|medical|therapy/i.test(type)) return "blue";
@@ -52,9 +58,8 @@ const ui = {
     appliedTitle: "What this robot read from your passport",
     defaultTitle: "Default behaviour (no passport)",
     greeting: "Greeting", distance: "Stops at", speed: "Movement", gaze: "Eye contact", voice: "Voice",
-    care: "Care needs", wai: "wai + bow", wave: "wave", slow: "slower", normal: "normal", fast: "fast",
+    wai: "wai + bow", wave: "wave", noGreeting: "no gesture", slow: "slower", normal: "normal", fast: "fast",
     soft: "soft", direct: "direct", on: "spoken", off: "text only",
-    anxiety: { low: "comfortable", medium: "a bit nervous", high: "anxious" },
     accessibility: "slower speech + large text",
     reach: "may reach to hand items", noReach: "never reaches, places items nearby",
     tooClose: "Too close", tooFar: "Too far",
@@ -62,6 +67,9 @@ const ui = {
     rateHint: "1 = very uncomfortable · 5 = very comfortable",
     rateLow: "Uncomfortable", rateHigh: "Comfortable",
     save: "Save station", saved: "Saved to the Living Lab.",
+    saveRateLimited: "Too many tries from this network. Please wait a few minutes, then press Save again.",
+    saveNotFound: "This passport no longer exists, so the rating could not be saved.",
+    saveFailed: "The rating could not be saved. Please press Save again.",
     next: "Next station", finish: "Finish journey",
     doneTitle: "Journey complete",
     doneBody: "Every care robot in this journey read your Care Passport. Compare the same stations with a default robot to see the difference.",
@@ -83,9 +91,8 @@ const ui = {
     appliedTitle: "สิ่งที่หุ่นอ่านจากพาสปอร์ตของคุณ",
     defaultTitle: "พฤติกรรมปกติ (ไม่มีพาสปอร์ต)",
     greeting: "การทักทาย", distance: "หยุดที่ระยะ", speed: "ความเร็ว", gaze: "การสบตา", voice: "เสียง",
-    care: "ความต้องการด้านการดูแล", wai: "ไหว้ + ก้มตัว", wave: "โบกมือ", slow: "ช้าลง", normal: "ปกติ", fast: "เร็ว",
+    wai: "ไหว้ + ก้มตัว", wave: "โบกมือ", noGreeting: "ไม่แสดงท่าทาง", slow: "ช้าลง", normal: "ปกติ", fast: "เร็ว",
     soft: "หลบสายตาเล็กน้อย", direct: "มองตรง", on: "พูดออกเสียง", off: "ข้อความอย่างเดียว",
-    anxiety: { low: "สบายใจ", medium: "กังวลนิดหน่อย", high: "กังวลมาก" },
     accessibility: "พูดช้าลง + ตัวอักษรใหญ่",
     reach: "ยื่นของถึงมือได้", noReach: "ไม่ยื่นมือ วางของไว้ใกล้ ๆ",
     tooClose: "ใกล้ไป", tooFar: "ไกลไป",
@@ -93,6 +100,9 @@ const ui = {
     rateHint: "1 = ไม่สบายใจเลย · 5 = สบายใจมาก",
     rateLow: "ไม่สบายใจ", rateHigh: "สบายใจ",
     save: "บันทึกสถานี", saved: "บันทึกสถานีลง Living Lab แล้ว",
+    saveRateLimited: "เครือข่ายนี้ลองหลายครั้งเกินไป กรุณารอสักครู่ แล้วกดบันทึกอีกครั้ง",
+    saveNotFound: "พาสปอร์ตนี้ไม่มีอยู่แล้ว จึงบันทึกคะแนนไม่ได้",
+    saveFailed: "บันทึกคะแนนไม่สำเร็จ กรุณากดบันทึกอีกครั้ง",
     next: "สถานีถัดไป", finish: "จบเส้นทาง",
     doneTitle: "จบเส้นทางแล้ว",
     doneBody: "หุ่นดูแลทุกตัวในเส้นทางนี้อ่าน Care Passport ของคุณ ลองเปรียบเทียบสถานีเดิมกับหุ่นแบบปกติเพื่อดูความต่าง",
@@ -169,16 +179,25 @@ export default function MeetClient({
   const station = stations[current] ?? null;
   const copy = station ? stationCopy[lang][station.task] : null;
 
-  // The robot's behaviour comes from the passport, adapted to the person's anxiety level.
-  const careSpeed = passport.anxiety === "high" ? Math.min(passport.speed, 0.5) : passport.anxiety === "medium" ? Math.min(passport.speed, 0.75) : passport.speed;
+  // The robot's behaviour comes from the passport through the same adapter the robot console uses.
+  // The server already capped the speed (toJourneyPassport), so only the calm demeanour is left to derive.
+  const profile = toPublicProfile({
+    ...passport,
+    anxiety: passport.calm ? "high" : "low",
+    status: "active",
+    version: 1,
+    updatedAt: PROFILE_TIME,
+    expiresAt: null
+  });
+  const plan = adapt(profile, CARE_ROBOT);
   const careBehaviour = {
-    distance: passport.comfortDistance,
-    speed: careSpeed,
-    gaze: passport.gaze,
-    greeting: passport.greeting,
-    voice: passport.voice,
-    hue: (passport.anxiety === "high" ? "blue" : hueFor(station?.type ?? "")) as Hue,
-    expression: (passport.anxiety === "high" ? "calm" : "happy") as "calm" | "happy"
+    distance: plan.distance.sceneUnits,
+    speed: plan.movement.multiplier,
+    gaze: plan.eyeContact,
+    greeting: plan.greeting,
+    voice: plan.voice,
+    hue: (passport.calm ? "blue" : hueFor(station?.type ?? "")) as Hue,
+    expression: (plan.demeanor === "calm" ? "calm" : "happy") as "calm" | "happy"
   };
 
   const robotRef = useRef<RobotBehavior | null>(null);
@@ -189,6 +208,8 @@ export default function MeetClient({
   const [bubble, setBubble] = useState<string>(t.ready);
   const [log, setLog] = useState<LogEvent[]>([]);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedStations, setSavedStations] = useState<Record<number, SavedStation>>({});
   const [running, setRunning] = useState(false);
   const [comfort, setComfort] = useState<number | null>(null);
@@ -251,6 +272,7 @@ export default function MeetClient({
     setApplied([]);
     setComfort(null);
     setSaved(false);
+    setSaveError(null);
     setRunning(true);
     adjustments.current = { tooClose: 0, tooFar: 0 };
     const b = nextMode === "passport" ? careBehaviour : DEFAULT_BEHAVIOUR;
@@ -277,8 +299,11 @@ export default function MeetClient({
         r.bothArms("wai"); r.expression("calm");
         later(500, () => r.bow(0.36, 1.7));
         later(2600, () => { r.bothArms("relaxed"); r.expression(nextMode === "passport" ? careBehaviour.expression : "happy"); });
-      } else {
+      } else if (b.greeting === "wave") {
         r.wave("R", 2.4); r.expression("happy");
+      } else {
+        // The person asked for no gesture: stay relaxed and greet with the voice only.
+        r.bothArms("relaxed"); r.expression(nextMode === "passport" ? careBehaviour.expression : "happy");
       }
       say(copy.intro(station.name), b.voice);
       mark("greeting"); mark("voice");
@@ -338,28 +363,37 @@ export default function MeetClient({
   async function saveStation() {
     if (!station || comfort === null) return;
     const r = robotRef.current;
-    await recordMeetingAction(passport.code, {
-      protocol: "care_journey_station",
-      inputMode: "buttons",
-      robotModelId: station.robotId,
-      events: log.slice(-250),
-      summary: {
-        mode,
-        task: station.task,
-        robot: station.name,
-        comfort,
-        tooClose: adjustments.current.tooClose,
-        tooFar: adjustments.current.tooFar,
-        finalDistance: r ? +r.state.distanceTarget.toFixed(2) : null,
-        anxiety: passport.anxiety,
-        captions: passport.captions,
-        speechPace: passport.speechPace,
-        noReach: passport.noReach
+    setSaving(true);
+    setSaveError(null);
+    try {
+      // Care needs stay on the passport only (data minimisation); the server also strips them.
+      const result = await recordMeetingAction(passport.code, {
+        protocol: "care_journey_station",
+        inputMode: "buttons",
+        robotModelId: station.robotId,
+        events: log.slice(-250),
+        summary: {
+          mode,
+          task: station.task,
+          robot: station.name,
+          comfort,
+          tooClose: adjustments.current.tooClose,
+          tooFar: adjustments.current.tooFar,
+          finalDistance: r ? +r.state.distanceTarget.toFixed(2) : null
+        }
+      });
+      if (!result.ok) {
+        setSaveError(result.error === "rate_limited" ? t.saveRateLimited : result.error === "not_found" ? t.saveNotFound : t.saveFailed);
+        return;
       }
-    });
-    setSaved(true);
-    setSavedStations((prev) => ({ ...prev, [current]: { mode, comfort } }));
-    human("station_saved", { task: station.task, mode, comfort });
+      setSaved(true);
+      setSavedStations((prev) => ({ ...prev, [current]: { mode, comfort } }));
+      human("station_saved", { task: station.task, mode, comfort });
+    } catch {
+      setSaveError(t.saveFailed);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function goNext() {
@@ -369,14 +403,13 @@ export default function MeetClient({
   }
 
   const rows: { key: string; label: string; value: string }[] = [
-    { key: "greeting", label: t.greeting, value: behaviour.greeting === "wai" ? t.wai : t.wave },
+    { key: "greeting", label: t.greeting, value: behaviour.greeting === "wai" ? t.wai : behaviour.greeting === "wave" ? t.wave : t.noGreeting },
     { key: "distance", label: t.distance, value: describeDistance(behaviour.distance)[lang] },
     { key: "speed", label: t.speed, value: behaviour.speed < 1 ? t.slow : behaviour.speed > 1 ? t.fast : t.normal },
     { key: "gaze", label: t.gaze, value: behaviour.gaze === "soft" ? t.soft : t.direct },
     { key: "voice", label: t.voice, value: behaviour.voice ? t.on : t.off }
   ];
   const careRows: { key: string; label: string; value: string }[] = [
-    { key: "anxiety", label: t.care, value: t.anxiety[passport.anxiety] },
     { key: "accessibility", label: lang === "th" ? "การสื่อสาร" : "Communication", value: passport.captions === "large" || passport.speechPace === "slow" ? t.accessibility : t.normal },
     { key: "reach", label: lang === "th" ? "การยื่นของ" : "Handing items", value: passport.noReach ? t.noReach : t.reach }
   ];
@@ -509,13 +542,14 @@ export default function MeetClient({
             )}
 
             <div className="mt-row">
-              <button className="mt-btn primary" disabled={comfort === null || saved || running || Boolean(savedStations[current])} onClick={saveStation}>{t.save}</button>
+              <button className="mt-btn primary" disabled={comfort === null || saved || saving || running || Boolean(savedStations[current])} onClick={saveStation}>{t.save}</button>
               {(saved || savedStations[current]) && current < stations.length - 1 && (
                 <button className="mt-btn" onClick={goNext}>{t.next}</button>
               )}
               <Link className="mt-btn" href="/living-lab">{t.back}</Link>
             </div>
             {(saved || savedStations[current]) && <p className="mt-ok">{t.saved}</p>}
+            {saveError && <p className="mt-error" role="alert">{saveError}</p>}
           </div>
         </section>
       )}
@@ -566,6 +600,7 @@ const css = `
 .mt-scale button:focus-visible { outline: 3px solid #19c37d; outline-offset: 2px; }
 .mt-scale-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
 .mt-ok { color: var(--accent); font-weight: 700; margin: 0; }
+.mt-error { color: var(--warning); font-weight: 700; margin: 0; }
 .mt-done { border-color: var(--accent); }
 .mt-done h2 { margin: 0; }
 .mt-avg { font-size: 17px; margin: 0; }

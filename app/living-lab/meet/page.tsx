@@ -32,6 +32,11 @@ export default async function MeetEntryPage({ searchParams }: { searchParams: Se
       {params.error === "not_found" && (
         <div className="notice" style={{ borderLeftColor: "var(--danger)" }}>{th ? "ไม่พบพาสปอร์ตรหัสนี้" : "No passport with that code."}</div>
       )}
+      {params.error === "rate_limited" && (
+        <div className="notice" style={{ borderLeftColor: "var(--danger)" }}>
+          {th ? "ลองรหัสผิดหลายครั้งเกินไป กรุณารอประมาณ 10 นาทีแล้วลองใหม่" : "Too many incorrect codes. Please wait about 10 minutes and try again."}
+        </div>
+      )}
       <form method="get" action="/living-lab/meet" className="form panel" style={{ gap: 12 }}>
         <label>
           {th ? "รหัสพาสปอร์ต" : "Passport code"}

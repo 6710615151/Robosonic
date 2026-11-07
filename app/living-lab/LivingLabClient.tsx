@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { Camera, CameraOff, Hand, HeartHandshake, Pause, Play, Snail, Volume2, VolumeX } from "lucide-react";
+import { Camera, CameraOff, Hand, HeartHandshake, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
-import { describeDistance } from "@/lib/hri/passport";
+import { describeDistance, type PassportInput } from "@/lib/hri/passport";
+import { AutoCalibrator, type AutoEvent, type AutoEvidence, type AutoResult, type AutoStage, type PauseReason } from "@/lib/hri/auto-calibration";
+import type { PoseFrame } from "@/lib/hri/camera";
+import { CameraSession } from "@/lib/hri/camera-session";
 import { createPassportAction } from "./actions";
+import PassportCardVisual from "./PassportCardVisual";
 import { copy, type Lang } from "./copy";
 
 export type LabStats = {
@@ -28,7 +32,10 @@ export type LabStats = {
 };
 export type LabRobot = { id: string; name: string; type: string; org: string | null };
 
-type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "saving" | "done";
+type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "auto" | "review" | "saving" | "done";
+type InputMode = "buttons" | "camera" | "auto";
+type SessionSummary = Record<string, string | number | boolean | null>;
+const REVIEW_SECONDS = 10;
 type LogEvent = { t: number; src: "robot" | "human"; type: string; [key: string]: unknown };
 
 // Distances the robot steps through while approaching (higher = closer to the person).
@@ -41,7 +48,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const [phase, setPhase] = useState<Phase>("intro");
   const [speech, setSpeech] = useState<string>(t.introSpeech);
   const [status, setStatus] = useState<string>(t.statusIdle);
-  const [inputMode, setInputMode] = useState<"buttons" | "camera">("buttons");
+  const [inputMode, setInputMode] = useState<InputMode>("buttons");
   const [cameraState, setCameraState] = useState<"off" | "loading" | "on" | "error">("off");
   const [cameraInfo, setCameraInfo] = useState("");
   const [step, setStep] = useState(0);
@@ -53,9 +60,23 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const [accessible, setAccessible] = useState(false);
   const [noReach, setNoReach] = useState(false);
   const [log, setLog] = useState<LogEvent[]>([]);
+  const [consent, setConsent] = useState(false);
   const [passportCode, setPassportCode] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [editToken, setEditToken] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Auto mode
+  const [autoStage, setAutoStage] = useState<AutoStage>("baseline");
+  const [autoPaused, setAutoPaused] = useState<PauseReason | null>(null);
+  const [autoPerson, setAutoPerson] = useState(false);
+  const [autoWai, setAutoWai] = useState<boolean | null>(null);
+  const [autoLeans, setAutoLeans] = useState(0);
+  const [autoResult, setAutoResult] = useState<{ result: AutoResult; evidence: AutoEvidence } | null>(null);
+  const [autoNotice, setAutoNotice] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const autoRef = useRef<AutoCalibrator | null>(null);
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -64,14 +85,14 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const counters = useRef({ tooClose: 0, tooFast: 0, leanBack: 0 });
   const timers = useRef<number[]>([]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const stopCamera = useRef<(() => void) | null>(null);
+  const camera = useRef(new CameraSession());
   const logRef = useRef<HTMLDivElement | null>(null);
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
 
   const later = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
   const clearTimers = () => { timers.current.forEach((id) => window.clearTimeout(id)); timers.current = []; };
-  useEffect(() => () => { clearTimers(); stopCamera.current?.(); window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { clearTimers(); camera.current.stop(); window.speechSynthesis?.cancel(); }, []);
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [log]);
 
   const record = useCallback((e: LogEvent) => setLog((prev) => [...prev.slice(-299), e]), []);
@@ -104,16 +125,21 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   // ---------------- phases ----------------
   function begin() {
     const robot = robotRef.current;
-    if (!robot) return;
+    if (!robot || !consent) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
-    setLog([]); setStep(0); setSpeed(1); setComfort(null); setPassportCode(null); setQr(null); setError(null);
+    setLog([]); setStep(0); setSpeed(1); setComfort(null);
+    setPassportCode(null); setAccessToken(null); setEditToken(null); setKeyCopied(false); setQr(null); setError(null);
     robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); robot.setGlow(0.45, "teal");
-    human("session_start", { inputMode });
+    // After an Auto session the mode must fall back to what is actually on: camera or buttons.
+    const mode: InputMode = cameraState === "on" ? "camera" : "buttons";
+    setInputMode(mode);
+    setAutoNotice(null);
+    human("session_start", { inputMode: mode });
     setPhase("greet");
     // The robot waits quietly with lowered eyes: it does not wave at or stare at the visitor.
     say(t.waitSpeech);
-    setStatus(inputMode === "camera" ? t.statusWaitCamera : t.statusWaitButton);
+    setStatus(mode === "camera" ? t.statusWaitCamera : t.statusWaitButton);
   }
 
   function receiveWai(source: "button" | "camera") {
@@ -259,76 +285,322 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     say(on ? t.voiceOn : t.voiceOff);
     robot.bothArms("wai");
     later(1600, () => robot.bothArms("relaxed"));
+    await savePassport(
+      {
+        greeting: "wai", comfortDistance: comfort ?? robot.state.distanceTarget, speed: robot.state.speed, gaze, voice: on, language: lang,
+        anxiety, captions: accessible ? "large" : "normal", speechPace: accessible ? "slow" : "normal", noReach
+      },
+      {
+        tooClose: counters.current.tooClose,
+        tooFast: counters.current.tooFast,
+        leanBack: counters.current.leanBack,
+        finalDistance: +(comfort ?? robot.state.distanceTarget).toFixed(2),
+        finalSpeed: +robot.state.speed.toFixed(2),
+        durationSeconds: +robot.time.toFixed(1)
+      },
+      inputMode
+    );
+  }
+
+  // Shared by the button/camera flow and Auto mode: create the passport, keep the edit key, show the QR.
+  async function savePassport(passport: PassportInput, summary: SessionSummary, mode: InputMode) {
     setPhase("saving");
     setStatus(t.statusSaving);
     try {
-      const robotEvents = log.slice(-250);
-      const { code } = await createPassportAction(
-        {
-          greeting: "wai", comfortDistance: comfort ?? robot.state.distanceTarget, speed: robot.state.speed, gaze, voice: on, language: lang,
-          anxiety, captions: accessible ? "large" : "normal", speechPace: accessible ? "slow" : "normal", noReach
-        },
-        {
-          protocol: "wai_first_calibration",
-          inputMode,
-          events: robotEvents,
-          summary: {
-            tooClose: counters.current.tooClose,
-            tooFast: counters.current.tooFast,
-            leanBack: counters.current.leanBack,
-            finalDistance: +(comfort ?? robot.state.distanceTarget).toFixed(2),
-            finalSpeed: +robot.state.speed.toFixed(2),
-            durationSeconds: +robot.time.toFixed(1)
-          }
-        }
+      const result = await createPassportAction(
+        passport,
+        { protocol: "wai_first_calibration", inputMode: mode, events: log.slice(-250), summary },
+        consent
       );
-      const url = `${window.location.origin}/living-lab/meet/${code}`;
+      if (!result.ok) {
+        setError(result.error === "rate_limited" ? t.saveRateLimited(Math.ceil(result.retryAfterSeconds / 60)) : t.saveFailed);
+        setPhase(mode === "auto" ? "review" : "voice");
+        return;
+      }
+      const { code, accessToken, editToken } = result;
+      // The edit token is the owner's key to the card page. Keep it in this browser so the card
+      // unlocks here without asking again; the key is also shown once below for other devices.
+      try { window.localStorage.setItem(`hri-passport-edit:${accessToken}`, editToken); } catch { /* private mode */ }
+      const url = `${window.location.origin}/living-lab/passport/${accessToken}`;
       setPassportCode(code);
+      setAccessToken(accessToken);
+      setEditToken(editToken);
       setQr(await QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#07150f", light: "#ffffff" } }));
       setPhase("done");
       setStatus(t.statusDone);
       say(t.doneSpeech(code));
       human("passport_created", { code });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setPhase("voice");
+    } catch {
+      setError(t.saveFailed);
+      setPhase(mode === "auto" ? "review" : "voice");
+    }
+  }
+
+  // Consent is what lets calibration (and the optional camera) start. Revoking it before Start
+  // also turns the camera off: nothing is sensed without consent.
+  function changeConsent(on: boolean) {
+    setConsent(on);
+    if (!on && (cameraState === "on" || cameraState === "loading")) {
+      stopCam(); setInputMode("buttons"); human("camera_off");
+    }
+  }
+
+  // "Again" may hand the screen to the next visitor, so nothing of this visitor's carries over:
+  // they must give their own consent and answer the care questions for themselves.
+  function startOver() {
+    setCountdown(null);
+    changeConsent(false);
+    setAnxiety("low"); setAccessible(false); setNoReach(false);
+    setPhase("intro");
+    setStatus(t.statusIdle);
+    setSpeech(t.introSpeech);
+  }
+
+  async function copyEditKey() {
+    if (!editToken) return;
+    try {
+      await navigator.clipboard.writeText(editToken);
+      setKeyCopied(true);
+      window.setTimeout(() => setKeyCopied(false), 2000);
+    } catch {
+      setKeyCopied(false);
     }
   }
 
   // ---------------- camera (optional) ----------------
+  function stopCam() {
+    camera.current.stop();
+    setCameraState("off");
+  }
+
   async function toggleCamera() {
+    if (!consent) return;
     if (cameraState === "on" || cameraState === "loading") {
-      stopCamera.current?.(); stopCamera.current = null; setCameraState("off"); setInputMode("buttons"); human("camera_off");
+      stopCam(); setInputMode("buttons"); human("camera_off");
       return;
     }
-    if (!videoRef.current) return;
+    if ((await startCamera()) === "started") {
+      setInputMode("camera");
+      human("camera_on");
+    }
+  }
+
+  // One camera pipeline for both modes: frames go to the Auto calibrator while it runs, otherwise to
+  // the optional wai / lean-back helpers of the button flow.
+  // "cancelled" means stopCam() ran while the camera was loading: whoever stopped it has already reset the UI.
+  async function startCamera(): Promise<"started" | "cancelled" | "failed"> {
+    const video = videoRef.current;
+    if (!video) return "failed";
     setCameraState("loading");
     try {
-      const { startPoseCamera } = await import("@/lib/hri/camera");
       const wai = new WaiDetector();
       const lean = new LeanBackDetector();
-      stopCamera.current = await startPoseCamera(videoRef.current, ({ tMs, landmarks, fps }) => {
+      const onFrame = (frame: PoseFrame) => {
+        const { tMs, landmarks, fps, people } = frame;
         setCameraInfo(`${fps.toFixed(0)} fps · ${landmarks ? t.personSeen : t.noPerson}`);
-        if (!landmarks) return;
         const robot = robotRef.current;
-        const nose = landmarks[POSE.nose];
+        const nose = landmarks?.[POSE.nose];
         // The robot looks toward the visitor (image is not mirrored: image-right is the visitor's left).
-        if (robot && nose && (phaseRef.current === "approach" || phaseRef.current === "done")) robot.lookAt(-(nose.x - 0.5) * 2, (nose.y - 0.45) * 1.4);
+        const lookAtVisitor = () => { if (robot && nose) robot.lookAt(-(nose.x - 0.5) * 2, (nose.y - 0.45) * 1.4); };
+
+        const auto = autoRef.current;
+        if (auto) {
+          // While waiting for the wai the robot keeps its eyes lowered; afterwards it follows the person.
+          if (auto.stage !== "baseline" && auto.stage !== "greet" && auto.stage !== "returning_wai") lookAtVisitor();
+          setAutoPerson(!!landmarks && people === 1);
+          for (const event of auto.update({ tMs, landmarks, people, luma: frame.luma })) applyAutoEvent(event);
+          return;
+        }
+
+        if (!landmarks) return;
+        if (phaseRef.current === "approach" || phaseRef.current === "done") lookAtVisitor();
         if (phaseRef.current === "greet") {
           const s = wai.update(tMs, classifyWai(landmarks));
           if (s.state === "rising") setStatus(`${t.waiDetecting} ${Math.round(s.progress * 100)}%`);
           if (s.state === "fired") receiveWai("camera");
         }
         if (phaseRef.current === "approach" && lean.update(tMs, shoulderWidth(landmarks))) tooClose("camera");
+      };
+      const live = await camera.current.start(async (isCancelled) => {
+        const { startPoseCamera } = await import("@/lib/hri/camera");
+        return startPoseCamera(video, onFrame, isCancelled);
       });
+      if (!live) return "cancelled";
       setCameraState("on");
-      setInputMode("camera");
-      human("camera_on");
+      return "started";
     } catch (e) {
       setCameraState("error");
       setCameraInfo(e instanceof Error ? e.message : String(e));
+      return "failed";
     }
   }
+
+  // ---------------- Auto mode: one tap, then the camera does the rest ----------------
+  async function startAuto() {
+    const robot = robotRef.current;
+    if (!robot || !consent) return;
+    clearTimers();
+    counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
+    setLog([]); setStep(0); setSpeed(1); setComfort(null);
+    setPassportCode(null); setAccessToken(null); setEditToken(null); setKeyCopied(false); setQr(null); setError(null);
+    setAutoNotice(null); setAutoResult(null); setCountdown(null); setAutoLeans(0); setAutoWai(null); setAutoPaused(null);
+    setAutoStage("baseline"); setAutoPerson(false);
+    // Safe defaults for what the camera does not measure. Anxiety is never guessed.
+    setGaze("direct"); setAnxiety("low"); setAccessible(false); setNoReach(true);
+    // Auto mode talks (and shows the text), so the person can follow without reading the screen.
+    voiceRef.current = true; setVoice(true);
+    robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); robot.setGlow(0.45, "teal");
+    setInputMode("auto");
+    autoRef.current = new AutoCalibrator(lang);
+    setPhase("auto");
+    human("session_start", { inputMode: "auto" });
+    if (cameraState !== "on" && (await startCamera()) === "failed") {
+      autoRef.current = null;
+      setPhase("intro");
+      setAutoNotice(t.cameraError);
+    }
+  }
+
+  function stopAuto() {
+    autoRef.current = null;
+    stopCam();
+    clearTimers();
+    window.speechSynthesis?.cancel();
+    const robot = robotRef.current;
+    if (robot) { robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); }
+    human("auto_stopped");
+    setInputMode("buttons");
+    setPhase("intro");
+    setStatus(t.statusIdle);
+    setSpeech(t.introSpeech);
+  }
+
+  function applyAutoEvent(e: AutoEvent) {
+    const robot = robotRef.current;
+    if (!robot) return;
+    switch (e.type) {
+      case "stage":
+        setAutoStage(e.stage);
+        if (e.stage !== "complete" && e.stage !== "aborted") setStatus(t.autoStages[e.stage]);
+        if (e.stage === "baseline") say(t.autoBaselineSpeech);
+        if (e.stage === "greet") { robot.lookAt(0, 0.35); say(t.waitSpeech); }
+        break;
+      case "paused":
+        setAutoPaused(e.reason);
+        setStatus(t.autoPause[e.reason]);
+        say(t.autoPause[e.reason]);
+        human("auto_paused", { reason: e.reason });
+        break;
+      case "resumed":
+        setAutoPaused(null);
+        say(t.autoResumed);
+        human("auto_resumed");
+        break;
+      case "wai_progress":
+        setStatus(`${t.waiDetecting} ${Math.round(e.progress * 100)}%`);
+        break;
+      case "wai_received":
+      case "wai_timeout": {
+        const seen = e.type === "wai_received";
+        setAutoWai(seen);
+        human(seen ? "wai" : "wai_timeout", { source: "auto" });
+        robot.lookAt(0, 0.2); robot.bothArms("wai"); robot.expression("calm");
+        say(seen ? t.waiSpeech : t.autoNoWai);
+        later(500, () => robot.bow(0.36, 1.7));
+        later(2600, () => { robot.bothArms("relaxed"); robot.expression("happy"); robot.setGlow(0.7, "teal"); });
+        break;
+      }
+      case "step":
+        robot.setSpeed(e.speed);
+        robot.setDistance(e.distance);
+        setSpeed(e.speed);
+        setStep(Math.min(e.index, STEPS.length - 1));
+        if (e.index === 1) say(t.autoStep);
+        human("auto_step", { index: e.index, distance: e.distance });
+        break;
+      case "too_fast":
+        counters.current.tooFast++; counters.current.leanBack++;
+        setAutoLeans((n) => n + 1);
+        robot.setSpeed(e.speed); robot.setDistance(e.retreatTo); robot.expression("sorry"); robot.nod(1);
+        setSpeed(e.speed);
+        say(t.autoTooFast);
+        human("too_fast", { source: "auto", speed: e.speed });
+        break;
+      case "too_close":
+        counters.current.tooClose++; counters.current.leanBack++;
+        setAutoLeans((n) => n + 1);
+        robot.setDistance(e.backTo); robot.moveArm("R", "handOnChest"); robot.expression("sorry"); robot.lean("back");
+        say(t.sorryLean);
+        later(1700, () => { robot.lean("upright"); robot.moveArm("R", "relaxed"); });
+        human("too_close", { source: "auto", distance: e.backTo });
+        break;
+      case "lean_in":
+        robot.expression("happy");
+        say(t.autoLeanIn);
+        human("lean_in", { source: "auto" });
+        break;
+      case "distance_set":
+        setComfort(e.distance); setSpeed(e.speed);
+        robot.setSpeed(e.speed); robot.setDistance(e.distance); robot.nod(1); robot.setGlow(0.9, "teal");
+        human("distance_set", { source: "auto", distance: e.distance, reason: e.reason });
+        break;
+      case "gaze_check":
+        robot.lookAt(0, 0);
+        say(t.autoGazeCheck);
+        break;
+      case "complete":
+        autoRef.current = null;
+        stopCam(); // sensing ends as soon as it is no longer needed
+        setGaze(e.result.gaze);
+        setAutoResult({ result: e.result, evidence: e.evidence });
+        setPhase("review");
+        setStatus(t.reviewTitle);
+        setCountdown(REVIEW_SECONDS);
+        robot.expression("happy"); robot.bothArms("wai");
+        later(1600, () => robot.bothArms("relaxed"));
+        say(t.reviewTitle);
+        human("auto_complete", { ...e.evidence });
+        break;
+      case "aborted":
+        autoRef.current = null;
+        stopCam();
+        robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.expression("neutral"); robot.lookAt(0, 0.35);
+        setAutoNotice(t.autoAborted[e.reason]);
+        setInputMode("buttons");
+        setPhase("intro");
+        setStatus(t.statusIdle);
+        say(t.autoAborted[e.reason]);
+        human("auto_aborted", { reason: e.reason });
+        break;
+    }
+  }
+
+  async function saveAuto() {
+    if (!autoResult || phaseRef.current !== "review") return;
+    setCountdown(null);
+    const { result, evidence } = autoResult;
+    await savePassport(
+      result,
+      {
+        ...evidence,
+        tooClose: counters.current.tooClose,
+        tooFast: counters.current.tooFast,
+        leanBack: counters.current.leanBack,
+        finalDistance: result.comfortDistance,
+        finalSpeed: result.speed
+      },
+      "auto"
+    );
+  }
+
+  // The review screen saves by itself after a visible countdown, so Auto mode needs no second tap.
+  useEffect(() => {
+    if (phase !== "review" || countdown === null) return;
+    if (countdown <= 0) { void saveAuto(); return; }
+    const id = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, countdown]);
 
   const pct = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
 
@@ -342,6 +614,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
           <p className="ll-sub">{t.subtitle}</p>
         </div>
         <div className="ll-head-actions">
+          <Link className="button" href="/living-lab/robot">{t.robotConsole}</Link>
           <Link className="button" href="/living-lab/meet">{t.haveCode}</Link>
         </div>
       </header>
@@ -365,11 +638,23 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
               <h2>{t.introTitle}</h2>
               <ol className="ll-list">{t.introSteps.map((s) => <li key={s}>{s}</li>)}</ol>
               <p className="ll-note">{t.privacy}</p>
+              <label className="ll-consent">
+                <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
+                <span>{t.consentLabel}</span>
+              </label>
+              {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
+              {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
               <div className="ll-row">
-                <button className="ll-btn primary" onClick={begin} disabled={!ready}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
-                <button className="ll-btn" onClick={toggleCamera} disabled={cameraState === "loading"}>
+                <button className="ll-btn primary" onClick={begin} disabled={!ready || !consent}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
+                <button className="ll-btn" onClick={toggleCamera} disabled={!consent || cameraState === "loading"}>
                   {cameraState === "on" ? <CameraOff size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />} {cameraState === "on" ? t.cameraOff : t.cameraOn}
                 </button>
+              </div>
+              <div className="ll-auto-offer">
+                <button className="ll-btn big auto" onClick={startAuto} disabled={!ready || !consent || cameraState === "loading"}>
+                  <ScanFace size={20} aria-hidden="true" /> {t.autoStart}
+                </button>
+                <p className="ll-note">{t.autoHint}</p>
               </div>
               {cameraState === "error" && <p className="ll-error">{t.cameraError}: {cameraInfo}</p>}
             </div>
@@ -432,7 +717,59 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
             </div>
           )}
 
-          {(phase === "voice" || phase === "saving") && (
+          {phase === "auto" && (
+            <div className="ll-step">
+              <h2>{t.autoTitle}</h2>
+              <p>{t.autoSimNote}</p>
+              <p className="ll-auto-stage" aria-live="polite">{autoPaused ? t.autoPause[autoPaused] : t.autoStages[autoStage]}</p>
+              <div className="ll-meter" aria-label={t.distanceLabel}>
+                {STEPS.slice(1).map((_, i) => <span key={i} className={i < step ? "on" : ""} />)}
+              </div>
+              <div className="ll-auto-signals">
+                <span className={autoPerson ? "ok" : "warn"}>{autoPerson ? t.autoSignalPerson : t.autoSignalNoPerson}</span>
+                <span>{t.autoSignalWai}: {autoWai === null ? "…" : autoWai ? "✓" : "–"}</span>
+                <span>{t.autoSignalLean}: {autoLeans}</span>
+              </div>
+              <button className="ll-btn" onClick={stopAuto}>{t.autoStop}</button>
+            </div>
+          )}
+
+          {(phase === "review" || (phase === "saving" && inputMode === "auto")) && autoResult && (
+            <div className="ll-step">
+              <h2>{t.reviewTitle}</h2>
+              <ul className="ll-facts">
+                <li>{t.factDistance}: {describeDistance(autoResult.result.comfortDistance)[lang]}</li>
+                <li>{t.factSpeed}: {autoResult.result.speed < 1 ? t.slow : t.normal}</li>
+                <li>{t.factGaze}: {autoResult.result.gaze === "soft" ? t.soft : t.direct}</li>
+                <li>{t.factVoice}: {t.on}</li>
+              </ul>
+              <p className="ll-q">{t.reviewEvidence}</p>
+              <ul className="ll-list">
+                <li>{autoResult.evidence.waiDetected ? t.reviewWaiYes : t.reviewWaiNo}</li>
+                <li>{t.reviewLeans(autoResult.evidence.leanBacks)}</li>
+                {autoResult.evidence.leanIn && <li>{t.reviewLeanIn}</li>}
+                <li>{t.reviewGaze(autoResult.evidence.avertShare)}</li>
+              </ul>
+              <p className="ll-note">{t.reviewDefaults}</p>
+              {phase === "saving" ? (
+                <p className="ll-countdown" role="status">{t.statusSaving}</p>
+              ) : countdown !== null ? (
+                <p className="ll-countdown" role="timer">{t.reviewSaving(countdown)}</p>
+              ) : (
+                <p className="ll-note">{t.reviewHeld}</p>
+              )}
+              <div className="ll-row">
+                <button className="ll-btn primary" onClick={saveAuto} disabled={phase === "saving"}>{t.reviewSaveNow}</button>
+                {countdown !== null && phase === "review" && <button className="ll-btn" onClick={() => setCountdown(null)}>{t.reviewStop}</button>}
+                <button className="ll-btn" disabled={phase === "saving"} onClick={startOver}>
+                  <Pause size={18} aria-hidden="true" /> {t.again}
+                </button>
+              </div>
+              {error && <p className="ll-error">{error}</p>}
+            </div>
+          )}
+
+          {(phase === "voice" || (phase === "saving" && inputMode !== "auto")) && (
             <div className="ll-step">
               <h2>{t.voiceTitle}</h2>
               <div className="ll-choices">
@@ -443,29 +780,53 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
             </div>
           )}
 
-          {phase === "done" && passportCode && (
+          {phase === "done" && passportCode && accessToken && editToken && (
             <div className="ll-step">
               <h2>{t.passportTitle}</h2>
-              <div className="ll-passport">
-                {qr && <img src={qr} alt={t.qrAlt} width={160} height={160} />}
-                <div>
-                  <p className="ll-code" aria-label={t.codeLabel}>{passportCode}</p>
-                  <ul className="ll-facts">
-                    <li>{t.factGreeting}: 🙏 {t.wai}</li>
-                    <li>{t.factDistance}: {describeDistance(comfort ?? 0)[lang]}</li>
-                    <li>{t.factSpeed}: {speed < 1 ? t.slow : t.normal}</li>
-                    <li>{t.factGaze}: {gaze === "soft" ? t.soft : t.direct}</li>
-                    <li>{t.factVoice}: {voice ? t.on : t.off}</li>
-                    <li>{t.factAnxiety}: {t.anxietyLabels[anxiety]}</li>
-                    <li>{t.factComm}: {accessible ? t.commAccessible : t.commNormal}</li>
-                    <li>{t.factReach}: {noReach ? t.reachAvoid : t.reachOk}</li>
-                  </ul>
-                </div>
-              </div>
+              <PassportCardVisual
+                issued
+                heading={t.cardHeading}
+                motto={t.cardMotto}
+                code={passportCode}
+                codeLabel={t.codeLabel}
+                codeClassName="ll-code"
+                qr={qr}
+                qrAlt={t.qrAlt}
+                statusLabel={t.cardActive}
+                active
+                language={lang}
+                version={1}
+                meta={t.cardVersion(1)}
+                prefs={[
+                  { key: "distance", label: t.factDistance, value: describeDistance(comfort ?? 0)[lang] },
+                  { key: "speed", label: t.factSpeed, value: speed < 1 ? t.slow : t.normal },
+                  { key: "gaze", label: t.factGaze, value: gaze === "soft" ? t.soft : t.direct },
+                  { key: "language", label: t.factLanguage, value: lang === "th" ? t.langThai : t.langEnglish },
+                  { key: "speech", label: t.factSpeech, value: accessible ? t.slow : t.normal }
+                ]}
+              />
+              <p className="ll-q">{t.moreTitle}</p>
+              <ul className="ll-facts ll-more">
+                <li><span>{t.factGreeting}</span><strong>🙏 {t.wai}</strong></li>
+                <li><span>{t.factVoice}</span><strong>{voice ? t.on : t.off}</strong></li>
+                <li><span>{t.factAnxiety}</span><strong>{inputMode === "auto" ? t.factNotAsked : t.anxietyLabels[anxiety]}</strong></li>
+                <li><span>{t.factComm}</span><strong>{accessible ? t.commAccessible : t.commNormal}</strong></li>
+                <li><span>{t.factReach}</span><strong>{noReach ? t.reachAvoid : t.reachOk}</strong></li>
+              </ul>
               <p className="ll-note">{t.scanHint}</p>
+              <div className="ll-editkey">
+                <p><strong>{t.editKeyTitle}</strong></p>
+                <div className="ll-editkey-row">
+                  <code>{editToken}</code>
+                  <button type="button" className="ll-btn" onClick={copyEditKey}>{keyCopied ? t.copied : t.copyKey}</button>
+                </div>
+                <p className="ll-note">{t.editKeyHint}</p>
+              </div>
               <div className="ll-row">
-                <Link className="ll-btn primary" href={`/living-lab/meet/${passportCode}`}>🏥 {t.meetNow}</Link>
-                <button className="ll-btn" onClick={() => { setPhase("intro"); setStatus(t.statusIdle); setSpeech(t.introSpeech); }}><Pause size={18} aria-hidden="true" /> {t.again}</button>
+                <Link className="ll-btn primary" href={`/living-lab/passport/${accessToken}`}>{t.cardLink}</Link>
+                <Link className="ll-btn" href={`/living-lab/meet/${passportCode}`}>🏥 {t.meetNow}</Link>
+                <Link className="ll-btn" href="/living-lab/robot">{t.consoleLink}</Link>
+                <button className="ll-btn" onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
               </div>
             </div>
           )}
@@ -540,6 +901,13 @@ const styles = `
 .ll-step p { margin: 0 0 12px; line-height: 1.5; }
 .ll-list { margin: 0 0 12px; padding-left: 20px; line-height: 1.7; }
 .ll-note { font-size: 13px; color: var(--text-secondary); }
+.ll-consent { display: flex; gap: 10px; align-items: flex-start; background: #f4faf6; border: 1px solid #bcd9c6; border-radius: 10px; padding: 12px; margin: 0 0 4px; font-size: 13.5px; line-height: 1.5; cursor: pointer; }
+.ll-consent input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.ll-consent-hint { margin: 0 0 10px; font-size: 12.5px; font-weight: 700; color: var(--warning); }
+.ll-editkey { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; margin: 0 0 12px; background: #fffdf8; }
+.ll-editkey p { margin: 0 0 6px; }
+.ll-editkey-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.ll-editkey code { flex: 1 1 220px; word-break: break-all; font: 12.5px ui-monospace, monospace; background: #0b1511; color: #d9ffe9; border-radius: 8px; padding: 9px 10px; }
 .ll-row, .ll-choices { display: flex; gap: 10px; flex-wrap: wrap; }
 .ll-choices { display: grid; grid-template-columns: 1fr 1fr; }
 .ll-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: #07150f; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
@@ -552,9 +920,13 @@ const styles = `
 .ll-meter { display: flex; gap: 6px; margin-bottom: 14px; }
 .ll-meter span { flex: 1; height: 10px; border-radius: 6px; background: var(--surface-muted); }
 .ll-meter span.on { background: var(--accent); }
-.ll-passport { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; background: #fcfbf8; border: 1px dashed var(--accent); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
-.ll-code { font-size: 34px; font-weight: 900; letter-spacing: 6px; margin: 0 0 6px; font-variant-numeric: tabular-nums; }
 .ll-facts { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 14px; }
+/* "Also on your passport": label/value rows under the passport card (the card itself is PassportCardVisual). */
+.ll-more { list-style: none; padding: 0; display: grid; gap: 0; margin: 0 0 12px; }
+.ll-more li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ll-more li:last-child { border-bottom: none; }
+.ll-more span { color: var(--text-secondary); }
+.ll-more strong { text-align: right; }
 .ll-error { color: var(--danger); font-size: 14px; }
 .ll-q { margin: 12px 0 6px !important; font-weight: 700; }
 .ll-seg { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -575,4 +947,23 @@ const styles = `
 .ll-robots li { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 3px; }
 .ll-robots span { font-size: 12px; color: var(--text-secondary); text-transform: capitalize; }
 .ll-robots a { font-size: 13px; font-weight: 700; color: var(--accent); }
+.ll-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .ll-stage-card { height: 380px; }
+  .ll-choices { grid-template-columns: 1fr; }
+  .ll-head-actions { width: 100%; }
+  .ll-head-actions .button { flex: 1 1 auto; }
+}
+.ll-auto-offer { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ll-btn.auto { background: #0b1a15; border-color: #0b1a15; color: #fff; width: 100%; }
+.ll-btn.auto:disabled { background: #6f7d77; border-color: #6f7d77; }
+.ll-auto-stage { font-size: 17px; font-weight: 700; margin: 4px 0 10px; min-height: 1.5em; }
+.ll-auto-signals { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; font-size: 13px; }
+.ll-auto-signals span { padding: 4px 10px; border-radius: 999px; background: #f4f0e8; border: 1px solid var(--border); }
+.ll-auto-signals .ok { background: #e8f5ec; border-color: #9cc9aa; }
+.ll-auto-signals .warn { background: #fdf1e7; border-color: #e3b48c; }
+.ll-countdown { font-weight: 700; color: var(--accent-strong); margin: 4px 0 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .ll-btn, .ll-consent input { transition: none; }
+}
 `;

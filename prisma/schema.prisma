@@ -272,9 +272,29 @@ model HriPassport {
   captions         String       @default("normal")
   speechPace       String       @default("normal")
   noReach          Boolean      @default(false)
+  // Access control. Only SHA-256 hashes are stored; the raw tokens are shown to the owner once.
+  // accessToken (in the QR) lets a robot read the robot-facing profile via /api/hri/passport/[token].
+  // editToken lets the owner change or delete the passport. Older passports have neither and
+  // stay reachable only through their 6-character code.
+  accessTokenHash  String?      @unique
+  editTokenHash    String?
+  status           String       @default("active") // active | revoked
+  expiresAt        DateTime?
+  consentAt        DateTime?
+  version          Int          @default(1)
   sessions         HriSession[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+}
+
+// Fixed-window request counters shared by every serverless instance (in-memory limits
+// would reset per instance on Vercel). Keys hold a salted hash of the client IP, never the IP.
+model HriRateLimit {
+  key         String   @id
+  windowStart DateTime @default(now())
+  count       Int      @default(0)
+
+  @@index([windowStart])
 }
 
 model HriSession {
