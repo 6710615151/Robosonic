@@ -13,6 +13,26 @@ speaking speed.
 
 ---
 
+## 0. Current layout after the Living Lab UX redesign (2026-11-07, branch `feat/living-lab-ux`)
+
+Sections 3–6 below describe the build history; where they say "`/living-lab` = calibration", read this first.
+Behaviour, APIs, schema, journey order and observatory maths are unchanged; the redesign moved and re-framed UI.
+
+| Route | What it is now | Main file |
+|---|---|---|
+| `/living-lab` | Overview: what the lab is, where to start, how the four parts connect, what is real vs simulated, why the research exists. Old `#calibrate`, `#research`, `#robots`, `#journey` and `?window=` links are forwarded. | `app/living-lab/components/Overview.tsx` |
+| `/living-lab/create` | Passport creation (was `/living-lab`). Start screen = 3 stages (what happens, agree, choose Buttons / Voice / Auto); 4-stage bar across the flow; done screen ends with "What next?". | `LivingLabClient.tsx` (logic unchanged) |
+| `/living-lab/passport/[token]` | Card + "Use this passport" (journey, Robot Lab) and recovery actions on error screens. | `passport/[token]/PassportCardClient.tsx` |
+| `/living-lab/robot` | Robot Lab: passport → three robots with hardware chips → voice → one "Researcher tools" disclosure (ward protocol + JSON). `#token=<accessToken>` loads a passport and is stripped from the URL. | `robot/RobotConsoleClient.tsx` |
+| `/living-lab/meet`, `/meet/[code]` | Journey entry and journey. Intro before station 1; resume after reload from `sessionStorage["hri-journey:<code>"]` with the **same journeyId** (so the counterbalanced order is kept); "Station n of N · Round n of 2"; `?robot=` for a non-station robot is announced. | `meet/[code]/MeetClient.tsx` |
+| `/living-lab/research` | Research Observatory (was `#research`): question-led panels, sample strip, small-sample flags, privacy panel. | `LabSections.tsx` → `ResearchObservatory` |
+
+Shared pieces: `app/living-lab/layout.tsx` mounts `components/LabShell.tsx` (brand, honest status: WebGL / no physical
+robot / Gemini key configured, section tabs). Tokens live in `lab-theme.css` (`--ll-*`; legacy `--lab-*` alias them).
+Use the `llo-` / `lab-` class prefixes: `.ov-*` collides with the site overview in `brand.css`/`globals.css`.
+Server reads for these pages: `app/living-lab/data.ts`. New specs: `hri-overview`, `hri-journey`, plus a handoff test
+in `hri-robot-console`.
+
 ## 1. Ground rules from the user (non-negotiable)
 
 - **Extend, never rebuild.** HRI Passport already exists in the Living Lab (`app/living-lab/`, `lib/hri/`).

@@ -516,3 +516,16 @@ html[lang="th"] .lab .mt-eyebrow { font-family: var(--font-thai-stack); letter-s
 @media (max-width: 760px) { .lab-glance dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--font-thai-stack) !important; letter-spacing: 0; text-transform: none; }
 .lab-bar-value .lab-small { margin-left: 6px; }
+
+/* ---------------- Journey entry (/living-lab/meet) ---------------- */
+.lab-meet { max-width: 1100px; }
+.lab-meet-head { display: grid; gap: var(--ll-space-3); max-width: 720px; }
+.lab-meet-head h1 { margin: 0; font: 600 var(--ll-text-2xl)/1.15 var(--ll-font-display); letter-spacing: -0.02em; }
+.lab-meet-card { display: grid; gap: var(--ll-space-4); max-width: 520px; padding: var(--ll-space-5); border: 1px solid var(--border); border-radius: var(--ll-radius-lg); background: var(--surface); box-shadow: var(--ll-shadow-1); }
+.lab-meet-form { display: grid; gap: var(--ll-space-2); }
+.lab-meet-form label { font-weight: 650; }
+.lab-meet-form input { min-height: 60px; font: 600 28px/1 var(--ll-font-mono); letter-spacing: .3em; text-transform: uppercase; text-align: center; border-radius: var(--ll-radius); }
+.lab-meet-form input::placeholder { color: #a9adb3; letter-spacing: .3em; }
+.lab-meet-form .lab-cta { justify-content: center; border: none; cursor: pointer; margin-top: var(--ll-space-2); }
+.lab-meet-alert { margin: 0; padding: 12px 14px; border-radius: var(--ll-radius); border: 1px solid #e3b0a8; background: #fbeae7; color: var(--danger); font-size: var(--ll-text-sm); line-height: 1.5; }
+.lab-meet-alt { margin: 0; }
