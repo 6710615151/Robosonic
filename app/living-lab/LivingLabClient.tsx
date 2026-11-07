@@ -722,10 +722,9 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     return out.changed;
   }
 
-  function interviewActive(active: boolean, failed?: boolean) {
-    // While talking, saving waits. If the AI cannot be reached, the normal countdown takes over.
+  function interviewActive(active: boolean) {
+    // While talking, saving waits. It never starts by itself afterwards: the person saves, or skips.
     if (active) setCountdown(null);
-    else if (failed) setCountdown(REVIEW_SECONDS);
   }
 
   // The review screen saves by itself after a visible countdown, so Auto mode needs no second tap.

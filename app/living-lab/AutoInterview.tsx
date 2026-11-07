@@ -30,8 +30,8 @@ export default function AutoInterview({
   say: (text: string) => void;
   onUpdates: (updates: InterviewUpdates) => FieldKey[];
   onSave: () => void;
-  /** The conversation started or stopped. `failed` means the AI could not be reached. */
-  onActive: (active: boolean, failed?: boolean) => void;
+  /** The conversation started or stopped. */
+  onActive: (active: boolean) => void;
   /** The person chose not to talk: save with the measured values. */
   onSkip: () => void;
 }) {
@@ -44,6 +44,8 @@ export default function AutoInterview({
   const [typed, setTyped] = useState("");
   const [Recognition, setRecognition] = useState<RecognitionConstructor | null>(null);
 
+  const [canRetry, setCanRetry] = useState(false);
+  const retry = useRef<{ text: string; opening: boolean } | null>(null);
   const history = useRef<Turn[]>([]);
   const latest = useRef({ values, sources, camera });
   latest.current = { values, sources, camera };
@@ -54,9 +56,14 @@ export default function AutoInterview({
   callbacks.current = { say, onUpdates, onSave, onActive };
 
   useEffect(() => { setRecognition(() => findSpeechRecognition(window)); }, []);
-  useEffect(() => () => {
-    alive.current = false;
-    stopListening.current?.();
+  // React's dev mode mounts, unmounts and mounts again. The flag must be set back on every mount, or a
+  // reply that arrives after the second mount is silently dropped.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      stopListening.current?.();
+    };
   }, []);
 
   async function waitUntilQuiet() {
@@ -104,15 +111,22 @@ export default function AutoInterview({
     busy.current = false;
     if (!alive.current) return;
 
+    // The AI can be slow or busy for a moment. Keep the conversation on screen and let the person retry the
+    // same words, instead of ending it. Nothing is saved on its own.
+    const failed = (message: string) => {
+      retry.current = { text, opening };
+      setCanRetry(true);
+      setNotice(message);
+    };
     if (!response || !response.ok) {
       const error = response ? ((await response.json().catch(() => null)) as { error?: string } | null)?.error : undefined;
-      setNotice(error === "ai_busy" || error === "rate_limited" ? t.busy : t.unavailable);
-      setRunning(false);
-      callbacks.current.onActive(false, true);
+      failed(error === "ai_busy" || error === "rate_limited" ? t.busy : t.unavailable);
       return;
     }
     const body = (await response.json().catch(() => null)) as { say?: string; updates?: InterviewUpdates; save?: boolean } | null;
-    if (!body?.say) { setNotice(t.unavailable); setRunning(false); callbacks.current.onActive(false, true); return; }
+    if (!body?.say) { failed(t.unavailable); return; }
+    retry.current = null;
+    setCanRetry(false);
 
     const turns: Turn[] = [...(opening ? [] : [{ role: "user" as const, text }]), { role: "robot", text: body.say }];
     history.current = [...history.current, ...turns].slice(-10);
@@ -127,7 +141,17 @@ export default function AutoInterview({
   function start() {
     setRunning(true);
     callbacks.current.onActive(true);
-    void ask("", true);
+    // Coming back after a failed turn: send the same words again rather than greeting anew.
+    const again = retry.current;
+    setCanRetry(false);
+    void ask(again?.text ?? "", again ? again.opening : true);
+  }
+
+  function retryLast() {
+    const again = retry.current;
+    if (!again || busy.current) return;
+    setCanRetry(false);
+    void ask(again.text, again.opening);
   }
 
   function finish() {
@@ -188,6 +212,9 @@ export default function AutoInterview({
           {notice && <p className="ll-error" role="status" data-testid="interview-notice">{notice}</p>}
 
           <div className="ll-row">
+            {canRetry && (
+              <button className="ll-btn primary" onClick={retryLast} disabled={thinking} data-testid="interview-retry">{t.retry}</button>
+            )}
             {Recognition && (
               <button className="ll-btn" onClick={listening ? () => { stopListening.current?.(); stopListening.current = null; setListening(false); } : listenNext} disabled={thinking}>
                 {listening ? <MicOff size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />} {listening ? t.stopListen : t.speak}

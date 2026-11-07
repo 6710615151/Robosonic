@@ -17,8 +17,8 @@ export async function callGemini<T>(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { ok: false, status: 503 };
 
-  const primary = process.env.GEMINI_MODEL || "gemini-3.5-flash";
-  const fallback = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.1-flash-lite";
+  const primary = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+  const fallback = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash";
   const attempts = [primary, primary, fallback];
   const payload = JSON.stringify(body);
   const deadline = Date.now() + TIMEOUT_MS;
