@@ -126,44 +126,48 @@
 @media (prefers-reduced-motion: reduce) { .lab *, .lab *::before, .lab *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
 
 /* ---------------- Shared shell (components/LabShell.tsx) ---------------- */
-.lab-shell { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ll-space-3) var(--ll-space-5); margin: -22px -22px 0; padding: var(--ll-space-3) 22px; background: var(--ll-navy); color: var(--lab-dark-ink); }
-.lab-shell-brand { display: inline-flex; align-items: center; gap: var(--ll-space-3); min-height: var(--ll-touch); color: #fff !important; text-decoration: none; }
-.lab-shell-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--ll-radius); background: var(--ll-green); color: var(--ll-navy); flex: none; }
-.lab-shell-brand strong { display: block; font: 600 var(--ll-text-lg)/1.15 var(--ll-font-display); letter-spacing: -0.01em; color: #fff; }
-.lab-shell-brand small { display: block; font-size: var(--ll-text-xs); color: #c4cbd4; }
-.lab-status { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--ll-space-2); }
-.lab-status li { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid rgba(237, 233, 223, 0.18); border-radius: var(--ll-radius-pill); font-size: var(--ll-text-xs); line-height: 1.3; color: #e6e9ee; white-space: nowrap; }
-.lab-status li span { color: #aab3bf; }
+/* One sticky bar: lab label (desktop), tabs, and the status disclosure. No second header. */
+.lab-tabs { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: var(--ll-space-3); margin: -22px -22px var(--ll-space-5); padding: 0 22px; background: color-mix(in srgb, var(--ll-soft) 94%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.lab-tabs-brand { flex: none; display: inline-flex; align-items: center; gap: var(--ll-space-2); padding-right: var(--ll-space-3); margin-right: var(--ll-space-1); border-right: 1px solid var(--border); font: 600 var(--ll-text-sm)/1 var(--ll-font-display); color: var(--lab-ink); white-space: nowrap; }
+.lab-shell-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--ll-radius); background: var(--ll-navy); color: var(--ll-green); flex: none; }
+.lab-tabs > ul { flex: 1 1 auto; min-width: 0; list-style: none; margin: 0; padding: 0; display: flex; gap: var(--ll-space-1); overflow-x: auto; scrollbar-width: none; }
+.lab-tabs > ul::-webkit-scrollbar { display: none; }
+.lab-tabs > ul a { position: relative; display: inline-flex; align-items: center; gap: var(--ll-space-2); min-height: 52px; padding: 0 var(--ll-space-3); font-size: var(--ll-text-sm); font-weight: 600; color: var(--text-secondary); text-decoration: none; white-space: nowrap; transition: color var(--ll-dur-fast) var(--ll-ease); }
+.lab-tabs > ul a::after { content: ""; position: absolute; left: var(--ll-space-3); right: var(--ll-space-3); bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: transparent; transition: background var(--ll-dur) var(--ll-ease); }
+.lab-tabs > ul a:hover { color: var(--lab-ink); }
+.lab-tabs > ul a:hover::after { background: var(--ll-line-strong); }
+.lab-tabs > ul a[aria-current="page"] { color: var(--lab-ink); }
+.lab-tabs > ul a[aria-current="page"]::after { background: var(--ll-navy); }
+.lab-tabs > ul a:focus-visible { outline-offset: -3px; }
+.lab-tabs .is-mine { color: var(--ll-green-ink); }
+
+/* Status: a small button that opens a panel. A word for every state, never colour alone. */
+.lab-status-menu { position: relative; flex: none; }
+.lab-status-menu > button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; min-width: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--ll-radius-pill); background: var(--surface); font-size: var(--ll-text-xs); font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.lab-status-menu > button:hover, .lab-status-menu > button[aria-expanded="true"] { color: var(--lab-ink); border-color: var(--ll-line-strong); }
+.lab-status-count { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--ll-orange-tint); color: var(--ll-orange-ink); font: 700 11px/1 var(--ll-font-mono); }
+.lab-status-pop[hidden] { display: none; }
+.lab-status-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(320px, calc(100vw - 32px)); padding: var(--ll-space-3); border-radius: var(--ll-radius-lg); background: var(--ll-navy); color: #e6e9ee; box-shadow: var(--ll-shadow-2); }
+.lab-status-title { margin: 0 0 var(--ll-space-2); font-size: var(--ll-text-xs); font-weight: 600; color: #aab3bf; }
+.lab-status { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lab-status li { display: flex; align-items: flex-start; gap: 8px; font-size: var(--ll-text-sm); line-height: 1.4; color: #e6e9ee; }
+.lab-status li svg { flex: none; margin-top: 3px; }
+.lab-status li span { color: #c4cbd4; }
 .lab-status b { font-weight: 500; }
-.lab-status-short { display: none; }
 .lab-status li[data-state="ok"] svg { color: var(--ll-green); }
 .lab-status li[data-state="off"] svg { color: var(--ll-orange); }
 .lab-status li[data-state="pending"] svg { color: #aab3bf; }
 
-.lab-tabs { position: sticky; top: 0; z-index: 20; margin: 0 -22px var(--ll-space-5); padding: 0 22px; background: color-mix(in srgb, var(--ll-soft) 94%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
-.lab-tabs ul { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--ll-space-1); overflow-x: auto; scrollbar-width: none; }
-.lab-tabs ul::-webkit-scrollbar { display: none; }
-.lab-tabs a { position: relative; display: inline-flex; align-items: center; gap: var(--ll-space-2); min-height: 52px; padding: 0 var(--ll-space-3); font-size: var(--ll-text-sm); font-weight: 600; color: var(--text-secondary); text-decoration: none; white-space: nowrap; transition: color var(--ll-dur-fast) var(--ll-ease); }
-.lab-tabs a::after { content: ""; position: absolute; left: var(--ll-space-3); right: var(--ll-space-3); bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: transparent; transition: background var(--ll-dur) var(--ll-ease); }
-.lab-tabs a:hover { color: var(--lab-ink); }
-.lab-tabs a:hover::after { background: var(--ll-line-strong); }
-.lab-tabs a[aria-current="page"] { color: var(--lab-ink); }
-.lab-tabs a[aria-current="page"]::after { background: var(--ll-navy); }
-.lab-tabs a:focus-visible { outline-offset: -3px; }
-.lab-tabs .is-mine { color: var(--ll-green-ink); }
-
+@media (max-width: 1100px) { .lab-tabs-brand { display: none; } }
 @media (max-width: 860px) {
-  .lab-shell { margin: -16px -16px 0; padding: var(--ll-space-3) 16px; }
-  .lab-tabs { top: 60px; margin: 0 -16px var(--ll-space-4); padding: 0 8px; }
-  .lab-status li { min-height: 28px; }
+  .lab-tabs { top: 60px; gap: var(--ll-space-2); margin: -16px -16px var(--ll-space-4); padding: 0 8px; }
+  /* Tabs scroll sideways here: fade the trailing edge so it reads as "more this way". */
+  .lab-tabs > ul { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 }
 @media (max-width: 560px) {
-  .lab-shell-brand small { display: none; }
-  .lab-status { gap: 6px; }
-  .lab-status li { padding: 0 8px; }
-  .lab-status-long { display: none; }
-  .lab-status-short { display: inline; }
-  .lab-tabs a { padding: 0 10px; }
+  .lab-tabs > ul a { padding: 0 10px; }
+  .lab-status-summary { display: none; }
+  .lab-status-menu > button { padding: 0 8px; }
 }
 
 /* ---------------- Landing sections (LabSections.tsx) ---------------- */
@@ -245,12 +249,14 @@
 .lab-priority li:nth-child(4)::before { background: var(--lab-muted-line); }
 .lab-registry { display: grid; gap: 8px; }
 .lab-registry h3 { margin: 0; font-size: 16px; }
+.lab-registry-ref { color: var(--text-secondary); font-weight: 500 !important; }
+.lab-registry li[data-in-journey="no"] strong { color: var(--text-secondary); }
 .lab-registry ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 0 24px; }
 .lab-registry li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .lab-registry li > div { display: grid; gap: 2px; min-width: 0; }
 .lab-registry li strong { font-size: 14px; color: var(--lab-ink); }
 .lab-registry li > div span { font-size: 12.5px; color: var(--text-secondary); text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lab-registry li a { grid-column: 1 / -1; font-size: 13px; font-weight: 600; justify-self: start; min-height: 32px; display: inline-flex; align-items: center; }
+.lab-registry li a, .lab-registry-ref { grid-column: 1 / -1; font-size: 13px; font-weight: 600; justify-self: start; min-height: 32px; display: inline-flex; align-items: center; }
 
 /* Journey overview */
 .lab-stations { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
@@ -482,9 +488,14 @@ html[lang="th"] .llo-hero h1, html[lang="th"] .llo h2 { letter-spacing: 0; line-
 /* Anything scrolled into view (focus, find, scrollIntoView) stops below the pinned robot and above the
    bottom tab bar, so it is never hidden behind them (WCAG 2.4.11). */
 @media (max-width: 960px) {
-  .lab .ll-stage-card { position: sticky; top: var(--ll-pin-top, 112px); z-index: 4; height: max(38vh, 240px); box-shadow: var(--ll-shadow-2); }
+  html:has(.lab .ll-stage-card) { --ll-stage-h: clamp(180px, 26vh, 240px); }
+  .lab .ll-stage-card { position: sticky; top: var(--ll-pin-top, 112px); z-index: 4; height: var(--ll-stage-h); box-shadow: var(--ll-shadow-2); }
   .lab .ll-bubble { font-size: 15px; padding: 10px 12px; }
-  html:has(.lab .ll-stage-card) { scroll-padding-top: calc(var(--ll-pin-top, 112px) + max(38vh, 240px) + 12px); scroll-padding-bottom: 96px; }
+  html:has(.lab .ll-stage-card) { scroll-padding-top: calc(var(--ll-pin-top, 112px) + var(--ll-stage-h) + 12px); scroll-padding-bottom: 96px; }
+  /* Before a session: what will happen, consent and the method come first; the robot waits below,
+     unpinned, so the first screen is about the decision, not the illustration. */
+  .lab .ll-grid.is-intro .ll-stage-card { position: relative; top: auto; order: 2; box-shadow: none; }
+  html:has(.lab .ll-grid.is-intro) { scroll-padding-top: calc(var(--ll-pin-top, 112px) + 12px); }
 }
 @media (min-width: 861px) and (max-width: 960px) { html:has(.lab .ll-stage-card) { --ll-pin-top: 52px; scroll-padding-bottom: 16px; } }
 
@@ -527,5 +538,13 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
 .lab-meet-form input { min-height: 60px; font: 600 28px/1 var(--ll-font-mono); letter-spacing: .3em; text-transform: uppercase; text-align: center; border-radius: var(--ll-radius); }
 .lab-meet-form input::placeholder { color: #a9adb3; letter-spacing: .3em; }
 .lab-meet-form .lab-cta { justify-content: center; border: none; cursor: pointer; margin-top: var(--ll-space-2); }
+.lab-meet-alert.is-info { max-width: 720px; border-color: #e9c3a5; background: var(--ll-orange-tint); color: var(--ll-orange-ink); }
+/* "You need a passport" / "use the one in this browser": the first action on pages that need one. */
+.lab-callout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ll-space-3) var(--ll-space-5); max-width: 1100px; padding: var(--ll-space-4) var(--ll-space-5); border: 1px solid var(--lab-tint-border); border-radius: var(--ll-radius-lg); background: var(--ll-green-tint); }
+.lab-callout > div { flex: 1 1 340px; display: grid; gap: var(--ll-space-1); }
+.lab-callout h2 { margin: 0; font: 600 var(--ll-text-lg)/1.3 var(--ll-font-display); }
+.lab-callout form { margin: 0; }
+.lab-callout .lab-cta { border: none; cursor: pointer; }
+@media (max-width: 560px) { .lab-callout .lab-cta, .lab-callout form { width: 100%; justify-content: center; } }
 .lab-meet-alert { margin: 0; padding: 12px 14px; border-radius: var(--ll-radius); border: 1px solid #e3b0a8; background: #fbeae7; color: var(--danger); font-size: var(--ll-text-sm); line-height: 1.5; }
 .lab-meet-alt { margin: 0; }

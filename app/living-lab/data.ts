@@ -3,7 +3,10 @@
 import { prisma } from "@/lib/prisma";
 import { computeObservatory, windowStart, type ObservatoryStats, type ObservatoryWindow } from "@/lib/hri/observatory";
 
-export type LabRobot = { id: string; name: string; type: string; org: string | null };
+import { pickStations } from "@/lib/hri/journey-stations";
+
+// inJourney: this robot plays a hospital-journey station (the same rule as /living-lab/meet/[code]).
+export type LabRobot = { id: string; name: string; type: string; org: string | null; inJourney: boolean };
 
 // Robots whose registry type is about care, health or companionship: candidates for a passport meeting.
 const CARE_TYPES = /hospital|medical|elder|care|rehab|therapy|telepresence|companion|assist|service/i;
@@ -18,9 +21,11 @@ export async function loadCareRobots(): Promise<LabRobot[] | null> {
       select: { id: true, canonicalName: true, robotType: true, developerOrg: true, manufacturer: true },
       orderBy: { canonicalName: "asc" }
     });
+    // Stations are picked from every registry row in database order, exactly as the journey page does.
+    const stationIds = new Set(pickStations(await prisma.robotModel.findMany({ select: { id: true, canonicalName: true, robotType: true } })).map((s) => s.robot.id));
     return rows
-      .filter((r) => CARE_TYPES.test(r.robotType))
-      .map((r) => ({ id: r.id, name: r.canonicalName, type: r.robotType, org: r.developerOrg ?? r.manufacturer ?? null }));
+      .filter((r) => CARE_TYPES.test(r.robotType) || stationIds.has(r.id))
+      .map((r) => ({ id: r.id, name: r.canonicalName, type: r.robotType, org: r.developerOrg ?? r.manufacturer ?? null, inJourney: stationIds.has(r.id) }));
   } catch (error) {
     logOffline("robots", error);
     return null;

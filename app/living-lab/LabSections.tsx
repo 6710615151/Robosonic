@@ -10,7 +10,7 @@ import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
 import type { Lang } from "./copy";
 import { labCopy } from "./lab-copy";
 
-export type LabRobotEntry = { id: string; name: string; type: string; org: string | null };
+export type LabRobotEntry = { id: string; name: string; type: string; org: string | null; inJourney: boolean };
 
 const fmt = (value: number | null, digits = 1) => (value === null ? "–" : value.toFixed(digits));
 const pct = (value: number | null) => (value === null ? "–" : `${Math.round(value * 100)}%`);
@@ -111,15 +111,19 @@ export function RobotEcosystem({ lang, robots, compact = false }: { lang: Lang; 
         <div className="lab-registry">
           <h3>{t.registryTitle}</h3>
           <p className="lab-note">{t.registrySub}</p>
+          <p className="lab-note">{t.registryJourney} <Link className="lab-link" href="/living-lab/meet">{t.startJourney} <ArrowRight size={16} aria-hidden="true" /></Link></p>
           <ul>
-            {robots.slice(0, 12).map((r) => (
-              <li key={r.id}>
+            {/* Journey robots first: they are the ones you can meet with a passport. */}
+            {[...robots].sort((x, y) => Number(y.inJourney) - Number(x.inJourney)).slice(0, 12).map((r) => (
+              <li key={r.id} data-in-journey={r.inJourney ? "yes" : "no"}>
                 <div>
                   <strong>{r.name}</strong>
                   <span>{r.type.replace(/_/g, " ")}{r.org ? ` · ${r.org}` : ""}</span>
                 </div>
-                <span className="lab-tier sim">{t.registryTier}</span>
-                <Link href={`/living-lab/meet?robot=${r.id}`} aria-label={`${t.meet}: ${r.name}`}>{t.meet}</Link>
+                <span className={r.inJourney ? "lab-tier api" : "lab-tier future"}>{r.inJourney ? t.inJourney : t.notInJourney}</span>
+                {r.inJourney
+                  ? <Link href={`/living-lab/meet?robot=${r.id}`} aria-label={`${t.meet}: ${r.name}`}>{t.meet}</Link>
+                  : <span className="lab-registry-ref">{t.reference}</span>}
               </li>
             ))}
           </ul>

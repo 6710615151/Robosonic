@@ -116,8 +116,9 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
-  // On narrow screens the robot stays pinned above the questions (lab-theme.css). When a session starts,
-  // bring the first question into view just below it, so people see both the robot and what to do.
+  // On narrow screens the robot is pinned (small) above the questions once a session starts; before that,
+  // the consent and method choice come first and the robot sits below them (lab-theme.css). When a
+  // session starts, bring the first question into view just below the robot.
   const panelRef = useRef<HTMLDivElement>(null);
   const wasIntro = useRef(true);
   useEffect(() => {
@@ -830,7 +831,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
       <div className="lab-section" id="calibrate-wrap">
       <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />
       <CreationStages label={t.ready.stagesLabel} stages={t.ready.stages} current={stageOf(phase)} />
-      <section className="ll-grid">
+      <section className={phase === "intro" ? "ll-grid is-intro" : "ll-grid"}>
         <div className="ll-stage-card">
           <div className="ll-bubble" aria-live="polite">{speech}</div>
           <div className="ll-stage">

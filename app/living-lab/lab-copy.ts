@@ -12,8 +12,16 @@ const en = {
     sim: { label: "Simulation", pending: "checking…", ok: "running in this browser", off: "3D not available on this device" },
     hardware: { label: "Physical robot", off: "not connected" },
     ai: { label: "AI assistant", ok: "configured", off: "not configured" },
-    // Phone-width chips: still a word for every state, never colour alone.
-    short: { sim: { pending: "3D sim …", ok: "3D sim on", off: "3D sim off" }, hardware: "No physical robot", ai: { ok: "AI on", off: "AI off" } }
+    statusHint: (n: number) => ` (${n} ${n === 1 ? "part is" : "parts are"} limited or simulated)`
+  },
+  needPassport: {
+    ownTitle: "Your passport is in this browser",
+    ownBody: "You made a passport on this device. Start the journey with it, no code needed.",
+    useOwn: "Start with my passport",
+    emptyTitle: "The journey needs a Care Passport",
+    emptyBody: "Each robot is met twice, once without your passport and once with it, so you need one first. Making it takes about a minute. If someone gave you a passport card, enter its code below.",
+    create: "Create a passport (about 1 min)",
+    robotNotInJourney: (name: string) => `${name} is not one of the hospital journey's stations, so it cannot be met there yet. The journey starts at station 1.`
   },
   tiers: { sim: "Simulation", api: "API", future: "Future" },
   overview: {
@@ -102,7 +110,12 @@ const en = {
     registryTitle: "Care robots in the Atlas registry",
     registrySub: "Real robot models from the HumanoidTH registry. In the hospital journey their behaviour is simulated in the browser; none of them is connected.",
     registryTier: "Registry · simulated",
-    meet: "Meet with my passport"
+    meet: "Meet with my passport",
+    inJourney: "In the hospital journey",
+    notInJourney: "Not in the journey",
+    reference: "For reference",
+    registryJourney: "Only the robots marked \"In the hospital journey\" play its stations. The others are listed for reference and cannot be met yet.",
+    startJourney: "Start the hospital journey"
   },
   journey: {
     eyebrow: "Hospital journey",
@@ -202,7 +215,16 @@ const th: typeof en = {
     sim: { label: "การจำลอง", pending: "กำลังตรวจสอบ…", ok: "ทำงานในเบราว์เซอร์นี้", off: "อุปกรณ์นี้แสดงภาพ 3 มิติไม่ได้" },
     hardware: { label: "หุ่นยนต์จริง", off: "ไม่ได้เชื่อมต่อ" },
     ai: { label: "ผู้ช่วย AI", ok: "ตั้งค่าแล้ว", off: "ยังไม่ได้ตั้งค่า" },
-    short: { sim: { pending: "จำลอง 3D …", ok: "จำลอง 3D ทำงาน", off: "จำลอง 3D ใช้ไม่ได้" }, hardware: "ไม่มีหุ่นยนต์จริง", ai: { ok: "AI พร้อม", off: "AI ปิด" } }
+    statusHint: (n: number) => ` (${n} ส่วนจำกัดหรือเป็นการจำลอง)`
+  },
+  needPassport: {
+    ownTitle: "พาสปอร์ตของคุณอยู่ในเบราว์เซอร์นี้",
+    ownBody: "คุณสร้างพาสปอร์ตไว้บนเครื่องนี้ เริ่มเส้นทางด้วยพาสปอร์ตนี้ได้เลย ไม่ต้องกรอกรหัส",
+    useOwn: "เริ่มด้วยพาสปอร์ตของฉัน",
+    emptyTitle: "เส้นทางนี้ต้องใช้ Care Passport",
+    emptyBody: "คุณจะพบหุ่นแต่ละตัวสองครั้ง ครั้งหนึ่งไม่มีพาสปอร์ต อีกครั้งมีพาสปอร์ต จึงต้องมีพาสปอร์ตก่อน ใช้เวลาสร้างประมาณ 1 นาที ถ้ามีคนให้การ์ดพาสปอร์ตมา กรอกรหัสด้านล่าง",
+    create: "สร้างพาสปอร์ต (ประมาณ 1 นาที)",
+    robotNotInJourney: (name: string) => `${name} ไม่ได้ประจำจุดใดในเส้นทางโรงพยาบาล จึงยังพบในเส้นทางไม่ได้ เส้นทางจะเริ่มที่จุดที่ 1`
   },
   tiers: { sim: "จำลอง", api: "API", future: "อนาคต" },
   overview: {
@@ -291,7 +313,12 @@ const th: typeof en = {
     registryTitle: "หุ่นดูแลใน registry ของ Atlas",
     registrySub: "หุ่นรุ่นจริงจาก registry ของ HumanoidTH ในเส้นทางโรงพยาบาล พฤติกรรมของหุ่นเหล่านี้จำลองในเบราว์เซอร์ ไม่มีตัวใดเชื่อมต่ออยู่จริง",
     registryTier: "Registry · จำลอง",
-    meet: "พบด้วยพาสปอร์ตของฉัน"
+    meet: "พบด้วยพาสปอร์ตของฉัน",
+    inJourney: "อยู่ในเส้นทางโรงพยาบาล",
+    notInJourney: "ไม่อยู่ในเส้นทาง",
+    reference: "แสดงเพื่ออ้างอิง",
+    registryJourney: "เฉพาะหุ่นที่มีป้าย \"อยู่ในเส้นทางโรงพยาบาล\" เท่านั้นที่ประจำจุดในเส้นทาง ตัวอื่นแสดงเพื่ออ้างอิง ยังพบไม่ได้",
+    startJourney: "เริ่มเส้นทางโรงพยาบาล"
   },
   journey: {
     eyebrow: "เส้นทางโรงพยาบาล",

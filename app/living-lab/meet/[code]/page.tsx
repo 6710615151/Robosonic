@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizePassportCode } from "@/lib/hri/passport";
 import { API_LIMITS } from "@/lib/hri/passport-api";
+import { pickStations } from "@/lib/hri/journey-stations";
 import { toJourneyPassport } from "@/lib/hri/public-profile";
 import { consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
 import MeetClient, { type Station } from "./MeetClient";
@@ -17,14 +18,6 @@ export const metadata: Metadata = {
 
 type Params = Promise<{ code: string }>;
 type SearchParams = Promise<{ robot?: string }>;
-
-// A patient's hospital journey, played by real robots from the atlas registry (seed data from
-// thailand_humanoid_atlas_seed_records.json). Each station has a task the robot really performs.
-const JOURNEY: { task: Station["task"]; match: RegExp; typeMatch: RegExp }[] = [
-  { task: "reception", match: /Mr SAM/i, typeMatch: /administrative|outpatient|service/i },
-  { task: "delivery", match: /Pinto/i, typeMatch: /delivery|medical_assist/i },
-  { task: "telepresence", match: /Ninja|Mirror Telepresence/i, typeMatch: /telepresence/i }
-];
 
 export default async function MeetPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { code: rawCode } = await params;
@@ -55,22 +48,13 @@ export default async function MeetPage({ params, searchParams }: { params: Param
   const robots = await prisma.robotModel.findMany({
     select: { id: true, canonicalName: true, robotType: true, developerOrg: true, manufacturer: true }
   });
-  const used = new Set<string>();
-  const stations: Station[] = [];
-  for (const step of JOURNEY) {
-    const robot =
-      robots.find((r) => !used.has(r.id) && step.match.test(r.canonicalName)) ??
-      robots.find((r) => !used.has(r.id) && step.typeMatch.test(r.robotType));
-    if (!robot) continue;
-    used.add(robot.id);
-    stations.push({
-      task: step.task,
-      robotId: robot.id,
-      name: robot.canonicalName,
-      type: robot.robotType,
-      org: robot.developerOrg ?? robot.manufacturer ?? null
-    });
-  }
+  const stations: Station[] = pickStations(robots).map(({ task, robot }) => ({
+    task,
+    robotId: robot.id,
+    name: robot.canonicalName,
+    type: robot.robotType,
+    org: robot.developerOrg ?? robot.manufacturer ?? null
+  }));
   const requested = robotId ? stations.findIndex((s) => s.robotId === robotId) : -1;
   const startIndex = Math.max(0, requested);
   const robotNotInJourney = Boolean(robotId) && requested === -1;

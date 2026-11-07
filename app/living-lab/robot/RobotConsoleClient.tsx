@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Check, Minus, Play, Radio, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, Check, Copy, Eye, EyeOff, Hospital, IdCard, Minus, Play, Radio, UserPlus, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import { adapt, DEFAULT_PLAN, explainPlan, type BehaviourPlan, type PreferenceKey, type SafetyRule } from "@/lib/hri/adapt";
 import type { RobotBehavior } from "@/lib/hri/behavior-engine";
@@ -16,6 +16,8 @@ import {
   type RobotState,
   type VoiceIntent
 } from "@/lib/hri/voice-commands";
+import { findOwnPassport } from "../components/lab-env";
+import { startJourneyFromToken } from "./actions";
 import { robotCopy, type RobotLang } from "./copy";
 import VoiceControl, { type VoiceLogEntry } from "./VoiceControl";
 import styles from "./robot.module.css";
@@ -38,6 +40,9 @@ function readToken(raw: string): string | null {
   }
   return null;
 }
+
+// A token is a secret: show its two ends only, enough to recognise it.
+const maskToken = (token: string) => `${token.slice(0, 4)}…${token.slice(-4)}`;
 
 // What this robot says, shown as a caption too. The default robot has no passport to talk about.
 function spokenText(key: string, plan: BehaviourPlan) {
@@ -105,6 +110,14 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<PublicProfile | null>(null);
+  // The token that produced `profile`. Kept in this tab only, shown masked unless the visitor asks.
+  const [loadedToken, setLoadedToken] = useState<string | null>(null);
+  const [reveal, setReveal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [changing, setChanging] = useState(false);
+  // A passport this browser created (it holds the edit key): offered as a one-tap start.
+  const [ownToken, setOwnToken] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [ward, setWard] = useState(false);
   const rulesRef = useRef<SafetyRule[]>([]);
@@ -164,6 +177,16 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
     performOn(key, planFor(current, robotProfile), robotProfile.capabilities);
   }
 
+  async function copyToken() {
+    if (!loadedToken) return;
+    try {
+      await navigator.clipboard.writeText(loadedToken);
+      setCopied(true);
+    } catch {
+      setReveal(true); // clipboard blocked: show it so it can be copied by hand
+    }
+  }
+
   async function readPassport(event: FormEvent) {
     event.preventDefault();
     const token = readToken(input);
@@ -176,11 +199,12 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
 
   // Links from the passport card and the end of creation carry the token in the URL fragment
   // (#token=…), which browsers never send to the server. Read it once, then drop it from the address bar.
+  useEffect(() => { setOwnToken(findOwnPassport()); }, []);
+
   useEffect(() => {
     const match = /^#token=([A-Za-z0-9_-]{43})$/.exec(window.location.hash);
     if (!match) return;
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    setInput(match[1]);
     void loadToken(match[1]);
     // Runs once on arrival; loadToken only uses refs and setters.
   }, []);
@@ -216,6 +240,11 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
       }
       profileRef.current = body;
       setProfile(body);
+      setLoadedToken(token);
+      setReveal(false);
+      setCopied(false);
+      setChanging(false);
+      setInput("");
       setSpeaking(null);
       window.speechSynthesis?.cancel();
     } catch {
@@ -457,10 +486,14 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
                 // Only what changed: the facts above already list everything that was applied as written.
                 const rows = !isDefault && profile ? explainPlan(profile, plan).filter((row) => row.outcome !== "applied") : [];
                 if (!rows.length) return <p className={styles.note}>{t.noAdaptations}</p>;
+                // Two rows tell the story; the rest open on request, so the three cards stay comparable.
+                const open = showAll[key] ?? false;
+                const extra = rows.length - 2;
                 return (
-                  <ul className={styles.adaptations}>
-                    {rows.map((row) => (
-                      <li key={row.key} data-outcome={row.outcome}>
+                  <>
+                  <ul className={styles.adaptations} id={`adaptations-${key}`}>
+                    {rows.map((row, index) => (
+                      <li key={row.key} data-outcome={row.outcome} hidden={!open && index >= 2}>
                         <span className={styles.explainHead}>
                           <strong>{t.fact[FACT_KEY[row.key]]}</strong>
                           <span>{valueLabel(row.requested)} → {valueLabel(row.applied)}</span>
@@ -473,6 +506,18 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
                       </li>
                     ))}
                   </ul>
+                  {extra > 0 && (
+                    <button
+                      type="button"
+                      className={styles.more}
+                      aria-expanded={open}
+                      aria-controls={`adaptations-${key}`}
+                      onClick={() => setShowAll((current) => ({ ...current, [key]: !open }))}
+                    >
+                      {open ? t.next.fewer : t.next.more(extra)}
+                    </button>
+                  )}
+                  </>
                 );
               })()}
             </div>
@@ -523,25 +568,71 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
           <h2 id="read-passport" className={styles.panelTitle}>{t.tokenTitle}</h2>
           {profile ? <span className={`${styles.badge} ${styles.badgeActive}`}>{t.loaded(profile.version)}</span> : null}
         </div>
-        <form className={styles.form} onSubmit={readPassport}>
-          <label className={styles.label} htmlFor="passport-token">{t.tokenLabel}</label>
-          <div className={styles.tokenRow}>
-            <input
-              id="passport-token"
-              className={styles.input}
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder={t.tokenPlaceholder}
-              autoComplete="off"
-              spellCheck={false}
-              inputMode="text"
-            />
-            <button type="submit" className={`${styles.btn} ${styles.primary}`} disabled={busy}>
-              {busy ? t.reading : t.read}
-            </button>
+        {profile && loadedToken && !changing ? (
+          // Loaded: the token is a secret, so it is masked until the visitor asks to see it.
+          <div className={styles.tokenLoaded} data-testid="console-token">
+            <p className={styles.tokenValue}>
+              <span className={styles.label}>{t.tokenLabel}</span>
+              <code data-testid="console-token-value">{reveal ? loadedToken : maskToken(loadedToken)}</code>
+            </p>
+            <div className={styles.formActions}>
+              <button type="button" className={styles.btn} onClick={() => setReveal((v) => !v)} aria-pressed={reveal}>
+                {reveal ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />} {reveal ? t.next.hide : t.next.show}
+              </button>
+              <button type="button" className={styles.btn} onClick={copyToken}>
+                <Copy size={16} aria-hidden /> {copied ? t.next.copied : t.next.copy}
+              </button>
+              <button type="button" className={styles.linkBtn} onClick={() => setChanging(true)}>{t.next.change}</button>
+              <a className={styles.linkBtn} href="#robot-next-title">{t.next.jump}</a>
+            </div>
+            <p className={styles.hint} aria-live="polite">{copied ? t.next.copiedNote : t.tokenHelp}</p>
           </div>
-          <p className={styles.hint}>{t.tokenHelp} {!profile && <Link href="/living-lab/create">{t.noPassportYet}</Link>}</p>
-        </form>
+        ) : (
+          <>
+            {!profile && (ownToken ? (
+              // This browser made a passport: one tap instead of finding and pasting a token.
+              <div className={styles.callout} data-testid="console-own">
+                <div>
+                  <h3 className={styles.calloutTitle}>{t.next.ownTitle}</h3>
+                  <p className={styles.hint}>{t.next.ownBody}</p>
+                </div>
+                <button type="button" className={`${styles.btn} ${styles.primary}`} disabled={busy} onClick={() => void loadToken(ownToken)}>
+                  <IdCard size={16} aria-hidden /> {t.next.useOwn}
+                </button>
+              </div>
+            ) : (
+              // No passport: say why this page needs one, and how long making one takes.
+              <div className={styles.callout} data-testid="console-empty">
+                <div>
+                  <h3 className={styles.calloutTitle}>{t.next.emptyTitle}</h3>
+                  <p className={styles.hint}>{t.next.emptyBody}</p>
+                </div>
+                <Link className={`${styles.btn} ${styles.primary}`} href="/living-lab/create">
+                  <UserPlus size={16} aria-hidden /> {t.next.create}
+                </Link>
+              </div>
+            ))}
+            <form className={styles.form} onSubmit={readPassport}>
+              <label className={styles.label} htmlFor="passport-token">{t.tokenLabel}</label>
+              <div className={styles.tokenRow}>
+                <input
+                  id="passport-token"
+                  className={styles.input}
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  placeholder={t.tokenPlaceholder}
+                  autoComplete="off"
+                  spellCheck={false}
+                  inputMode="text"
+                />
+                <button type="submit" className={`${styles.btn} ${styles.primary}`} disabled={busy}>
+                  {busy ? t.reading : t.read}
+                </button>
+              </div>
+              <p className={styles.hint}>{t.tokenHelp}</p>
+            </form>
+          </>
+        )}
         {error ? <p className={styles.error} role="alert" data-testid="console-error">{error}</p> : null}
       </section>
 
@@ -558,6 +649,27 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
           {card(null, DEFAULT_PLAN, "default")}
         </div>
       </section>
+
+      {profile && loadedToken ? (
+        // What to do with this passport next: the journey compares these robots with and without it.
+        <section className={`${styles.panel} ${styles.nextPanel}`} aria-labelledby="robot-next-title" data-testid="robot-next">
+          <div>
+            <h2 id="robot-next-title" className={styles.panelTitle}>{t.next.title}</h2>
+            <p className={styles.hint}>{t.next.body}</p>
+          </div>
+          <div className={styles.formActions}>
+            <form action={startJourneyFromToken}>
+              <input type="hidden" name="token" value={loadedToken} />
+              <button type="submit" className={`${styles.btn} ${styles.primary}`}>
+                <Hospital size={16} aria-hidden /> {t.next.journey} <ArrowRight size={16} aria-hidden />
+              </button>
+            </form>
+            <Link className={styles.btn} href={`/living-lab/passport/${loadedToken}`}>
+              <IdCard size={16} aria-hidden /> {t.next.card}
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <VoiceControl
         lang={lang}

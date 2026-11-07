@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { API_LIMITS } from "@/lib/hri/passport-api";
-import { consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
-import { hashToken, isWellFormedToken } from "@/lib/hri/security";
 import { cardCopy, type CardLang } from "../copy";
+import { loadCard, type CardState } from "../lookup";
 import PassportCardClient, { type CardPassport } from "./PassportCardClient";
 import styles from "../passport.module.css";
 
@@ -17,73 +14,6 @@ export const metadata: Metadata = {
 };
 
 type Params = Promise<{ token: string }>;
-
-const PASSPORT_FIELDS = {
-  code: true,
-  greeting: true,
-  comfortDistance: true,
-  speed: true,
-  gaze: true,
-  voice: true,
-  language: true,
-  captions: true,
-  speechPace: true,
-  noReach: true,
-  status: true,
-  version: true,
-  createdAt: true,
-  updatedAt: true,
-  expiresAt: true
-} as const;
-
-type PassportRow = {
-  code: string;
-  greeting: string;
-  comfortDistance: number;
-  speed: number;
-  gaze: string;
-  voice: boolean;
-  language: string;
-  captions: string;
-  speechPace: string;
-  noReach: boolean;
-  status: string;
-  version: number;
-  createdAt: Date;
-  updatedAt: Date;
-  expiresAt: Date | null;
-};
-
-type CardState =
-  | { state: "ok"; passport: PassportRow }
-  | { state: "rate_limited" }
-  | { state: "not_found" };
-
-// The card is protected like the API: an unknown token counts toward the shared failed-lookup
-// budget, and every caller gets the same per-minute request budget as a robot would.
-async function loadCard(token: string): Promise<CardState> {
-  const caller = await currentClientId();
-  const { requests, misses } = API_LIMITS;
-  if (!(await consumeRateLimit(`card:${caller}`, requests.limit, requests.windowSeconds)).allowed) {
-    return { state: "rate_limited" };
-  }
-  if (!(await peekRateLimit(`miss:${caller}`, misses.limit, misses.windowSeconds)).allowed) {
-    return { state: "rate_limited" };
-  }
-  if (!isWellFormedToken(token)) {
-    await consumeRateLimit(`miss:${caller}`, misses.limit, misses.windowSeconds);
-    return { state: "not_found" };
-  }
-  const passport = await prisma.hriPassport.findUnique({
-    where: { accessTokenHash: hashToken(token) },
-    select: PASSPORT_FIELDS
-  });
-  if (!passport) {
-    await consumeRateLimit(`miss:${caller}`, misses.limit, misses.windowSeconds);
-    return { state: "not_found" };
-  }
-  return { state: "ok", passport };
-}
 
 function formatDate(value: Date, lang: CardLang) {
   return new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-US", {

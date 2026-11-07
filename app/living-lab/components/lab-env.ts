@@ -5,18 +5,23 @@
 // (LivingLabClient.tsx and passport/[token]/PassportCardClient.tsx).
 export const EDIT_KEY_PREFIX = "hri-passport-edit:";
 
-// Access token of a passport whose edit key this browser holds, or null.
-export function findOwnPassport(): string | null {
+// Access tokens of every passport whose edit key this browser holds (usually one).
+export function listOwnPassports(): string[] {
   try {
-    let found: string | null = null;
+    const found: string[] = [];
     for (let i = 0; i < window.localStorage.length; i += 1) {
       const key = window.localStorage.key(i);
-      if (key?.startsWith(EDIT_KEY_PREFIX) && key.length > EDIT_KEY_PREFIX.length) found = key.slice(EDIT_KEY_PREFIX.length);
+      if (key?.startsWith(EDIT_KEY_PREFIX) && key.length > EDIT_KEY_PREFIX.length) found.push(key.slice(EDIT_KEY_PREFIX.length));
     }
     return found;
   } catch {
-    return null; // storage blocked (private mode): no shortcut, nothing breaks
+    return []; // storage blocked (private mode): no shortcut, nothing breaks
   }
+}
+
+// Access token of a passport whose edit key this browser holds, or null.
+export function findOwnPassport(): string | null {
+  return listOwnPassports().at(-1) ?? null;
 }
 
 // Whether this browser can render the three.js robots.

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, CircleDashed, Hand, MoveDown, Play, RotateCcw, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bot, ChartColumn, CircleDashed, Compass, Hand, IdCard, MoveDown, Play, RotateCcw, ShieldCheck } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import { adapt } from "@/lib/hri/adapt";
 import type { Hue, RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
@@ -11,8 +11,11 @@ import { toPublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
 import { conditionOrder, newJourneyId, nextCondition, stationComplete, type StationRatings } from "@/lib/hri/journey";
 import { recordMeetingAction } from "../../actions";
+import { listOwnPassports } from "../../components/lab-env";
+import { matchOwnPassport } from "../actions";
 
-export type StationTask = "reception" | "delivery" | "telepresence";
+import type { StationTask } from "@/lib/hri/journey-stations";
+export type { StationTask };
 export type Station = { task: StationTask; robotId: string; name: string; type: string; org: string | null };
 
 type Passport = {
@@ -74,6 +77,18 @@ const ui = {
     doneTitle: "Journey complete",
     doneBody: "Thank you. Each rating was saved when you pressed Save, linked only to this passport's code, never to your name or email. In Research they appear only as group averages, and care details stay hidden until at least 5 people share them.",
     doneResearch: "See what the lab is learning",
+    verdict: (diff: number) => diff > 0
+      ? `On this journey you rated the robot that read your passport ${diff.toFixed(1)} points more comfortable on average.`
+      : diff < 0
+        ? `On this journey you rated the robot that had not read your passport ${Math.abs(diff).toFixed(1)} points more comfortable on average.`
+        : "On this journey you rated both versions of the robot the same on average.",
+    verdictNote: "This is your own result from one journey, not a finding of the lab.",
+    nextTitle: "Where to next",
+    nextCard: "Your passport card", nextCardBody: "See and edit what every robot reads.",
+    nextCardElsewhere: "Your passport card opens from its QR code or the link you saved when you made it. Editing needs the edit key, which is kept only in the browser that created the passport.",
+    nextRobot: "Robot Lab", nextRobotBody: "Watch two robots with different hardware apply this passport.",
+    nextResearch: "Research", nextResearchBody: "Your ratings join the group averages; nothing is shown per person.",
+    nextHome: "Living Lab home", nextHomeBody: "The overview of everything in the lab.",
     again: "Run the journey again",
     avg: "Your average comfort rating",
     back: "Back to the Living Lab",
@@ -137,6 +152,18 @@ const ui = {
     doneTitle: "จบเส้นทางแล้ว",
     doneBody: "ขอบคุณครับ คะแนนแต่ละครั้งถูกบันทึกเมื่อคุณกดบันทึก โดยผูกกับรหัสพาสปอร์ตนี้เท่านั้น ไม่ผูกกับชื่อหรืออีเมล ในหน้างานวิจัยจะแสดงเป็นค่าเฉลี่ยของกลุ่มเท่านั้น และข้อมูลด้านการดูแลจะถูกซ่อนจนกว่าจะมีอย่างน้อย 5 คน",
     doneResearch: "ดูสิ่งที่แล็บเรียนรู้",
+    verdict: (diff: number) => diff > 0
+      ? `ในเส้นทางนี้ คุณให้คะแนนหุ่นที่อ่านพาสปอร์ตแล้วว่าสบายใจกว่าโดยเฉลี่ย ${diff.toFixed(1)} คะแนน`
+      : diff < 0
+        ? `ในเส้นทางนี้ คุณให้คะแนนหุ่นที่ยังไม่ได้อ่านพาสปอร์ตว่าสบายใจกว่าโดยเฉลี่ย ${Math.abs(diff).toFixed(1)} คะแนน`
+        : "ในเส้นทางนี้ คุณให้คะแนนหุ่นทั้งสองแบบเท่ากันโดยเฉลี่ย",
+    verdictNote: "นี่คือผลของคุณเองจากเส้นทางเดียว ไม่ใช่ข้อสรุปของแล็บ",
+    nextTitle: "ไปต่อที่ไหนดี",
+    nextCard: "การ์ดพาสปอร์ตของคุณ", nextCardBody: "ดูและแก้สิ่งที่หุ่นทุกตัวอ่าน",
+    nextCardElsewhere: "การ์ดพาสปอร์ตเปิดได้จาก QR หรือลิงก์ที่คุณบันทึกไว้ตอนสร้าง การแก้ไขต้องใช้คีย์แก้ไข ซึ่งเก็บไว้เฉพาะในเบราว์เซอร์ที่ใช้สร้างพาสปอร์ตเท่านั้น",
+    nextRobot: "ห้องทดลองหุ่นยนต์", nextRobotBody: "ดูหุ่นสองรุ่นที่ฮาร์ดแวร์ต่างกันนำพาสปอร์ตนี้ไปใช้",
+    nextResearch: "งานวิจัย", nextResearchBody: "คะแนนของคุณรวมเป็นค่าเฉลี่ยของกลุ่ม ไม่แสดงรายบุคคล",
+    nextHome: "หน้าแรก Living Lab", nextHomeBody: "ภาพรวมของทุกส่วนในแล็บ",
     again: "เดินเส้นทางอีกครั้ง",
     avg: "คะแนนความสบายใจเฉลี่ยของคุณ",
     back: "กลับไป Living Lab",
@@ -302,6 +329,8 @@ export default function MeetClient({
   const [journeyId, setJourneyId] = useState("");
   const [started, setStarted] = useState(false);
   const [resumed, setResumed] = useState<number | null>(null);
+  // At the end: the access token of this passport if this browser created it (undefined = not checked).
+  const [ownToken, setOwnToken] = useState<string | null | undefined>(undefined);
   const ratingsRef = useRef(ratings);
   ratingsRef.current = ratings;
   // Resume: a reload or a visit to another page must not start a new journey id, because the id fixes the
@@ -554,6 +583,17 @@ export default function MeetClient({
   const avgPassport = averageOf("passport");
   const avgDefault = averageOf("default");
 
+  // Once the journey is done, find out (on the server) whether this browser holds this passport's token,
+  // so the next steps can open its card and the Robot Lab with it. No token, no guess: plain links.
+  useEffect(() => {
+    if (!done || ownToken !== undefined) return;
+    const tokens = listOwnPassports();
+    if (!tokens.length) { setOwnToken(null); return; }
+    let live = true;
+    matchOwnPassport(passport.code, tokens).then((token) => { if (live) setOwnToken(token); }, () => { if (live) setOwnToken(null); });
+    return () => { live = false; };
+  }, [done, ownToken, passport.code]);
+
   if (!station || !copy) {
     return (
       <main style={{ display: "grid", gap: 16 }}>
@@ -609,7 +649,6 @@ export default function MeetClient({
         <section className="mt-panel mt-done">
           <h2>{t.doneTitle}</h2>
           <p className="muted">{t.doneBody}</p>
-          <p><Link className="mt-link" href="/living-lab/research">{t.doneResearch} →</Link></p>
           <dl className="mt-avgs">
             <div className="is-passport"><dt>{t.avgPassport}</dt><dd>{avgPassport === null ? "–" : avgPassport.toFixed(1)}<small>/5</small></dd></div>
             <div className="is-default"><dt>{t.avgDefault}</dt><dd>{avgDefault === null ? "–" : avgDefault.toFixed(1)}<small>/5</small></dd></div>
@@ -627,8 +666,25 @@ export default function MeetClient({
               ))}
             </tbody>
           </table>
+          {avgPassport !== null && avgDefault !== null && (
+            <p className="mt-verdict" data-testid="journey-verdict">{t.verdict(Math.round((avgPassport - avgDefault) * 10) / 10)} <span className="muted">{t.verdictNote}</span></p>
+          )}
+          <nav className="mt-next" aria-labelledby="journey-next-title" data-testid="journey-next">
+            <h3 id="journey-next-title">{t.nextTitle}</h3>
+            <ul>
+              <li>
+                {ownToken ? (
+                  <Link href={`/living-lab/passport/${ownToken}`} data-testid="journey-next-card"><IdCard size={18} aria-hidden="true" /><strong>{t.nextCard}</strong><span>{t.nextCardBody}</span></Link>
+                ) : (
+                  <div className="mt-next-static" data-testid="journey-next-card-elsewhere"><IdCard size={18} aria-hidden="true" /><strong>{t.nextCard}</strong><span>{t.nextCardElsewhere}</span></div>
+                )}
+              </li>
+              <li><Link href={ownToken ? `/living-lab/robot#token=${ownToken}` : "/living-lab/robot"} data-testid="journey-next-robot"><Bot size={18} aria-hidden="true" /><strong>{t.nextRobot}</strong><span>{t.nextRobotBody}</span></Link></li>
+              <li><Link href="/living-lab/research" data-testid="journey-next-research"><ChartColumn size={18} aria-hidden="true" /><strong>{t.nextResearch}</strong><span>{t.nextResearchBody}</span></Link></li>
+              <li><Link href="/living-lab" data-testid="journey-next-home"><Compass size={18} aria-hidden="true" /><strong>{t.nextHome}</strong><span>{t.nextHomeBody}</span></Link></li>
+            </ul>
+          </nav>
           <div className="mt-row">
-            <Link className="mt-btn primary" href="/living-lab">{t.back}</Link>
             <button className="mt-btn" onClick={() => { setRatings({}); setCurrent(0); setResumed(null); setJourneyId(newJourneyId()); }}><RotateCcw size={18} aria-hidden="true" /> {t.again}</button>
           </div>
         </section>
@@ -803,6 +859,18 @@ const css = `
 .mt-error { color: var(--warning); font-weight: 700; margin: 0; }
 .mt-done { border-color: var(--accent); }
 .mt-done h2 { margin: 0; }
+.mt-verdict { margin: 0; font-size: 15px; line-height: 1.6; color: var(--lab-ink); }
+.mt-verdict .muted { display: block; font-size: 13px; }
+.mt-next { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+.mt-next h3 { margin: 0; font-size: 17px; }
+.mt-next ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.mt-next a, .mt-next-static { height: 100%; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-content: start; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--lab-ink); text-decoration: none; }
+.mt-next a:hover { border-color: var(--lab-ink); }
+.mt-next a:focus-visible { outline: 3px solid var(--lab-focus); outline-offset: 2px; }
+.mt-next svg { grid-row: span 2; margin-top: 2px; color: var(--accent); }
+.mt-next strong { font-size: 15px; }
+.mt-next span { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.mt-next-static { background: var(--lab-paper); border-style: dashed; }
 .mt-avg { font-size: 17px; margin: 0; }
 .mt-avg strong { font-size: 24px; color: var(--accent); }
 .mt-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -838,6 +906,11 @@ const css = `
 .mt-table thead th:nth-child(2) { color: #8a4f17; }
 .mt-table thead th:nth-child(3) { color: var(--lab-cyan-ink); }
 .mt-table tbody th { font-weight: 600; color: var(--text-secondary); }
+/* Header labels wrap instead of running into the next column (Thai labels are long at phone width). */
+.mt-table thead th { white-space: normal; }
+.mt-table thead th:first-child, .mt-table tbody th { width: 46%; }
+.mt-table tbody th span { white-space: normal; overflow-wrap: anywhere; }
+html[lang="th"] .mt-table thead th { font-family: inherit; letter-spacing: 0; text-transform: none; font-size: 12px; }
 .mt-table tbody th span { display: block; font-weight: 400; font-size: 12px; }
 .mt-table td { font-weight: 600; color: var(--lab-ink); font-variant-numeric: tabular-nums; }
 .mt-table tr.changed td:nth-child(3) { background: var(--lab-tint); box-shadow: inset 2px 0 0 var(--lab-cyan-ink); }
