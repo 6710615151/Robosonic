@@ -34,7 +34,7 @@ export const VOICE_QUESTIONS = {
   },
   voice: {
     on: ["พูดออกเสียง", "ออกเสียง", "พูด", "เสียง", "speak", "out loud", "spoken", "voice"],
-    off: ["ไม่พูด", "ไม่ต้องพูด", "ไม่ออกเสียง", "ข้อความ", "เงียบ", "text", "silent", "quiet"]
+    off: ["ไม่พูดออกเสียง", "ไม่พูด", "ไม่ต้องพูด", "ไม่ออกเสียง", "ข้อความ", "เงียบ", "text", "silent", "quiet"]
   },
   confirm: {
     save: ["บันทึก", "ยืนยัน", "ถูกต้อง", "ตกลง", "save", "confirm", "correct"]

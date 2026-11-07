@@ -46,6 +46,9 @@ export const AUTO_THRESHOLDS = {
   discomfortLeanBacks: 2 // this many lean-backs → slower and farther than measured
 } as const;
 
+// What a person can say while the robot approaches (matched on-device, never by an AI model).
+export type VoiceCue = "too_close" | "too_fast" | "comfortable" | "continue" | "greeted";
+
 export type AutoFrame = { tMs: number; landmarks: Landmark[] | null; people: number; luma?: number };
 export type PauseReason = "no_person" | "one_person" | "too_dark";
 export type AbortReason = PauseReason | "timeout";
@@ -67,6 +70,8 @@ export type AutoResult = {
 export type AutoEvidence = {
   waiDetected: boolean;
   leanBacks: number;
+  /** Times the person corrected the robot by voice (too close, too fast, stop). */
+  voiceCorrections: number;
   tooFast: number;
   leanIn: boolean;
   distanceReason: string;
@@ -84,10 +89,10 @@ export type AutoEvent =
   | { type: "wai_received" }
   | { type: "wai_timeout" }
   | { type: "step"; index: number; distance: number; speed: number }
-  | { type: "too_fast"; speed: number; retreatTo: number }
-  | { type: "too_close"; backTo: number }
+  | { type: "too_fast"; speed: number; retreatTo: number; source?: "voice" }
+  | { type: "too_close"; backTo: number; source?: "voice" }
   | { type: "lean_in" }
-  | { type: "distance_set"; distance: number; speed: number; reason: string }
+  | { type: "distance_set"; distance: number; speed: number; reason: string; source?: "voice" }
   | { type: "gaze_check" }
   | { type: "complete"; result: AutoResult; evidence: AutoEvidence }
   | { type: "aborted"; reason: AbortReason };
@@ -117,6 +122,7 @@ export class AutoCalibrator {
 
   private waiDetected = false;
   private leanBacks = 0;
+  private voiceCorrections = 0;
   private tooFast = 0;
   private leanIn = false;
   private pauses = 0;
@@ -259,6 +265,57 @@ export class AutoCalibrator {
     return out;
   }
 
+  // A spoken cue. Camera signals and speech are two inputs to the same state machine: what the person
+  // says is an explicit statement, so it acts at once. Only meaningful while the robot is approaching
+  // (or, for "greeted", while it waits for the greeting). Returns the same events as camera frames do.
+  applyVoice(cue: VoiceCue): AutoEvent[] {
+    const out: AutoEvent[] = [];
+    if (this.paused || this.stage === "complete" || this.stage === "aborted") return out;
+    const t = this.lastT;
+    const approaching = this.stage === "moving" || this.stage === "dwell";
+
+    if (cue === "greeted") {
+      if (this.stage !== "greet") return out;
+      this.waiDetected = true;
+      out.push({ type: "wai_received" });
+      this.enter("returning_wai", t, out);
+      return out;
+    }
+    if (!approaching) return out;
+
+    switch (cue) {
+      case "too_close": {
+        this.voiceCorrections++;
+        const backTo = round2(Math.max(FARTHEST_BACKOFF, this.distance - 0.8));
+        out.push({ type: "too_close", backTo, source: "voice" });
+        this.setDistance(backTo, "voice_too_close", t, out);
+        break;
+      }
+      case "too_fast": {
+        this.voiceCorrections++;
+        this.tooFast++;
+        this.speed = Math.max(AUTO_THRESHOLDS.minSpeed, round2(this.speed * 0.5));
+        this.stepIndex = Math.max(0, this.stepIndex - 1);
+        this.distance = AUTO_STEPS[Math.min(this.stepIndex, AUTO_STEPS.length - 1)];
+        out.push({ type: "too_fast", speed: this.speed, retreatTo: this.distance, source: "voice" });
+        this.enter("dwell", t, out);
+        break;
+      }
+      case "comfortable": {
+        // "Stop / just right": settle at the current step instead of waiting for the dwell timer.
+        this.setDistance(this.distance, "voice_comfortable", t, out);
+        break;
+      }
+      case "continue": {
+        // One step closer, but never past the last regular step: the closest step stays gated on a
+        // lean-in, so a misheard word cannot push the robot to its closest position.
+        if (this.stage === "dwell" && this.stepIndex < AUTO_STEPS.length - 1) this.moveTo(this.stepIndex + 1, t, out);
+        break;
+      }
+    }
+    return out;
+  }
+
   // ---------------- transitions ----------------
 
   private pauseReason(frame: AutoFrame): PauseReason | null {
@@ -307,7 +364,7 @@ export class AutoCalibrator {
     let why = reason;
     // Several lean-backs mean the whole approach was uncomfortable: keep more distance and move slower.
     // This replaces asking about (or guessing) anxiety.
-    if (this.leanBacks >= AUTO_THRESHOLDS.discomfortLeanBacks) {
+    if (this.leanBacks + this.voiceCorrections >= AUTO_THRESHOLDS.discomfortLeanBacks) {
       d = Math.max(FARTHEST_BACKOFF, d - 0.4);
       this.speed = Math.min(this.speed, 0.5);
       why += "+discomfort";
@@ -315,7 +372,10 @@ export class AutoCalibrator {
     this.finalDistance = round2(d);
     this.distance = this.finalDistance;
     this.distanceReason = why;
-    out.push({ type: "distance_set", distance: this.finalDistance, speed: this.speed, reason: why });
+    out.push({
+      type: "distance_set", distance: this.finalDistance, speed: this.speed, reason: why,
+      ...(reason.startsWith("voice") ? { source: "voice" as const } : {})
+    });
     this.enter("gaze", t, out);
     out.push({ type: "gaze_check" });
   }
@@ -341,6 +401,7 @@ export class AutoCalibrator {
     const evidence: AutoEvidence = {
       waiDetected: this.waiDetected,
       leanBacks: this.leanBacks,
+      voiceCorrections: this.voiceCorrections,
       tooFast: this.tooFast,
       leanIn: this.leanIn,
       distanceReason: this.distanceReason,
