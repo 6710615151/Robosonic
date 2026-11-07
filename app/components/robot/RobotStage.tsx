@@ -18,6 +18,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RobotBehavior, type RobotEvent } from "@/lib/hri/behavior-engine";
+import { applyLivery, type Livery } from "./livery";
 
 export type CameraFraming = "portrait" | "fullBody";
 
@@ -31,6 +32,8 @@ type RobotStageProps = {
   onEvent?: (event: RobotEvent) => void;
   className?: string;
   ariaLabel?: string;
+  // "atlas" = HumanoidTH emerald/ivory brand livery; "original" keeps the model's teal textures.
+  livery?: Livery;
 };
 
 const FRAMINGS: Record<CameraFraming, { position: [number, number, number]; target: [number, number, number] }> = {
@@ -47,7 +50,8 @@ export default function RobotStage({
   onReady,
   onEvent,
   className = "robot-viewer-frame",
-  ariaLabel = "Interactive humanoid robot"
+  ariaLabel = "Interactive humanoid robot",
+  livery = "original"
 }: RobotStageProps) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const onReadyRef = useRef(onReady);
@@ -124,6 +128,7 @@ export default function RobotStage({
           for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) materials[m.name] = m;
         }
       });
+      applyLivery(materials, livery);
       const box = new Box3().setFromObject(model);
       const size = new Vector3();
       const center = new Vector3();
@@ -195,7 +200,7 @@ export default function RobotStage({
       renderer.dispose();
       frame.removeChild(renderer.domElement);
     };
-  }, [framing, pointerGaze, draggable, ariaLabel]);
+  }, [framing, pointerGaze, draggable, ariaLabel, livery]);
 
   return <div ref={frameRef} className={className} />;
 }

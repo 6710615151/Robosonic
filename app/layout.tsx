@@ -1,27 +1,46 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { IBM_Plex_Sans_Thai, Inter } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans_Thai, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
+import Link from "next/link";
 import SidebarNav from "./components/SidebarNav";
 import LanguageSelector from "./components/LanguageSelector";
 import MobileHeader from "./components/MobileHeader";
 import MobileTabNav from "./components/MobileTabNav";
 import DataPullFab from "./components/DataPullFab";
 import FirstTimeLoader from "./components/FirstTimeLoader";
+import AtlasLogo from "./components/brand/AtlasLogo";
 import { getTranslation } from "@/lib/translations";
 import { isAdmin } from "@/lib/auth";
 import { defaultSeoDescription, getSiteUrl, siteName } from "@/lib/seo";
 import "./globals.css";
+import "./brand.css";
 
-const inter = Inter({
+// Bilingual type system: Plus Jakarta Sans (Latin body), Space Grotesk (display),
+// IBM Plex Sans Thai (all Thai text), IBM Plex Mono (data, labels, code).
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-jakarta",
+  display: "swap",
+});
+
+const grotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-grotesk",
+  weight: ["500", "600", "700"],
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-plex-mono",
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   subsets: ["thai", "latin"],
   variable: "--font-ibm-plex-sans-thai",
-  weight: ["100", "200", "300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -131,7 +150,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <html lang={lang} className={`${inter.variable} ${ibmPlexSansThai.variable}`}>
+    <html lang={lang} className={`${jakarta.variable} ${grotesk.variable} ${plexMono.variable} ${ibmPlexSansThai.variable}`}>
       <body>
         <script
           type="application/ld+json"
@@ -142,12 +161,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <MobileHeader />
           <aside className="sidebar">
             <div className="brand-logo-container">
-              <img src="/logo.png" alt="Thailand Humanoid Atlas" className="brand-logo" />
+              <Link href="/" className="brand-lockup" aria-label="Thailand Humanoid Atlas — Overview">
+                <AtlasLogo width={196} decorative />
+              </Link>
+              <span className="brand-sub">{lang === "th" ? "แอตลาสวิจัยแบบเปิด" : "Open research atlas"}</span>
             </div>
-            <div style={{ flex: 1, overflowY: "auto", paddingRight: "4px" }}>
+            <div className="sidebar-scroll">
               <SidebarNav currentLang={lang} />
             </div>
-            <div style={{ paddingTop: "14px", borderTop: "1px solid #14352a", marginTop: "auto" }}>
+            <div className="sidebar-foot">
               <LanguageSelector currentLang={lang} />
             </div>
           </aside>

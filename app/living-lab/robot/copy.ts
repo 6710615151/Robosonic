@@ -79,7 +79,24 @@ export const robotCopy = {
       speed_capped: (value?: string) => `Speed capped at ${value ?? "the hardware limit"}.`,
       no_head: "No head: eye contact becomes a screen cue instead of the robot looking at you.",
       no_arms: "No arms: it cannot wai, wave or hand items over; it uses its screen and places items nearby.",
-      no_speaker: "No speaker: the greeting is text only."
+      no_speaker: "No speaker: the greeting is text only.",
+      no_screen: "No screen: large captions cannot be shown, so the robot speaks only.",
+      safety_speed_limit: (value?: string) => `Safety rule: movement limited to ${value ?? "a safe speed"}. A passport can slow a robot down, never speed it past a safety rule.`,
+      safety_distance_limit: (value?: string) => `Safety rule: the robot keeps at least a ${value ?? "safe"} distance, even if the passport asks for closer.`
+    },
+    explain: {
+      title: "Requested → applied",
+      outcome: { applied: "applied", adapted: "adapted", not_supported: "not supported" },
+      screenCue: "screen cue",
+      fixed: "fixed position",
+      hand_to_person: "hand to you",
+      place_nearby: "place nearby",
+      none: "no gesture"
+    },
+    protocol: {
+      title: "Clinical protocol",
+      label: "Apply a ward protocol: movement at most ×0.8, never closer than medium distance",
+      priority: "Priority, highest first: hardware safety → clinical protocol → your Care Passport → robot default. A passport never overrides a safety rule."
     },
     sound: {
       title: "Sound check",
@@ -209,7 +226,24 @@ export const robotCopy = {
       speed_capped: (value?: string) => `จำกัดความเร็วที่ ${value ?? "ขีดจำกัดของฮาร์ดแวร์"}`,
       no_head: "ไม่มีหัว: การสบตากลายเป็นสัญญาณบนจอแทนการหันมามองคุณ",
       no_arms: "ไม่มีแขน: ไหว้ โบกมือ หรือยื่นของไม่ได้ ต้องใช้จอและวางของไว้ใกล้ ๆ",
-      no_speaker: "ไม่มีลำโพง: คำทักทายเป็นข้อความอย่างเดียว"
+      no_speaker: "ไม่มีลำโพง: คำทักทายเป็นข้อความอย่างเดียว",
+      no_screen: "ไม่มีจอ: แสดงคำบรรยายตัวใหญ่ไม่ได้ หุ่นจึงพูดอย่างเดียว",
+      safety_speed_limit: (value?: string) => `กฎความปลอดภัย: จำกัดความเร็วที่ ${value ?? "ระดับที่ปลอดภัย"} พาสปอร์ตทำให้หุ่นช้าลงได้ แต่ทำให้เร็วเกินกฎความปลอดภัยไม่ได้`,
+      safety_distance_limit: (value?: string) => `กฎความปลอดภัย: หุ่นรักษาระยะอย่างน้อย "${value ?? "ที่ปลอดภัย"}" แม้พาสปอร์ตจะขอให้เข้าใกล้กว่านั้น`
+    },
+    explain: {
+      title: "สิ่งที่ขอ → สิ่งที่หุ่นทำ",
+      outcome: { applied: "ทำตาม", adapted: "ปรับลด", not_supported: "ทำไม่ได้" },
+      screenCue: "สัญญาณบนจอ",
+      fixed: "อยู่กับที่",
+      hand_to_person: "ยื่นให้ถึงมือ",
+      place_nearby: "วางไว้ใกล้ ๆ",
+      none: "ไม่แสดงท่าทาง"
+    },
+    protocol: {
+      title: "ระเบียบปฏิบัติทางคลินิก",
+      label: "ใช้ระเบียบของหอผู้ป่วย: ความเร็วไม่เกิน ×0.8 และไม่เข้าใกล้กว่าระยะปานกลาง",
+      priority: "ลำดับความสำคัญ จากสูงไปต่ำ: ความปลอดภัยของฮาร์ดแวร์ → ระเบียบทางคลินิก → Care Passport ของคุณ → ค่าเริ่มต้นของหุ่น พาสปอร์ตไม่มีทางอยู่เหนือกฎความปลอดภัย"
     },
     sound: {
       title: "ทดสอบเสียง",

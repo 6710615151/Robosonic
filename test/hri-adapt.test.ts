@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { adapt, DEFAULT_PLAN } from "../lib/hri/adapt";
+import { adapt, ADAPTATION_PRIORITY, DEFAULT_PLAN, explainPlan } from "../lib/hri/adapt";
 import { toPublicProfile } from "../lib/hri/public-profile";
 import { ROBOT_PROFILES } from "../lib/hri/robot-profiles";
 
@@ -103,4 +103,81 @@ test("adapt: the no-passport default matches the meet flow's default behaviour",
   assert.equal(DEFAULT_PLAN.voice, true);
   assert.equal(DEFAULT_PLAN.handover, "hand_to_person");
   assert.equal(DEFAULT_PLAN.demeanor, "friendly");
+});
+
+// ---------------- safety priority and explanations ----------------
+
+test("adapt: with no rules the plan is unchanged (rules are opt-in)", () => {
+  assert.deepEqual(adapt(profile(), full, []), adapt(profile(), full));
+});
+
+test("adapt: a clinical speed limit wins over a faster passport preference", () => {
+  const plan = adapt(profile({ speed: 1.6 }), full, [{ source: "clinical", maxSpeedMultiplier: 0.8 }]);
+  assert.equal(plan.movement.multiplier, 0.8);
+  assert.ok(plan.adaptations.some((a) => a.code === "safety_speed_limit" && a.source === "clinical"));
+});
+
+test("adapt: a passport that is already slower than the limit is never sped up", () => {
+  const plan = adapt(profile({ speed: 0.5 }), full, [{ source: "clinical", maxSpeedMultiplier: 0.8 }]);
+  assert.equal(plan.movement.multiplier, 0.5);
+  assert.ok(!plan.adaptations.some((a) => a.code === "safety_speed_limit"));
+});
+
+test("adapt: a minimum-distance rule keeps a 'close' passport farther away", () => {
+  const plan = adapt(profile({ comfortDistance: 1.3 }), full, [{ source: "clinical", maxCloseness: 0.6 }]);
+  assert.ok(plan.distance.closeness <= 0.6);
+  assert.notEqual(plan.distance.band, "close");
+  assert.ok(plan.adaptations.some((a) => a.code === "safety_distance_limit"));
+});
+
+test("adapt: hardware rules apply before clinical ones, and the tighter limit holds", () => {
+  const robot = { ...full, safety: [{ source: "hardware" as const, maxSpeedMultiplier: 0.6 }] };
+  const plan = adapt(profile({ speed: 2 }), robot, [{ source: "clinical", maxSpeedMultiplier: 0.9 }]);
+  assert.equal(plan.movement.multiplier, 0.6);
+  const limits = plan.adaptations.filter((a) => a.code === "safety_speed_limit");
+  assert.equal(limits.length, 1);
+  assert.equal(limits[0].source, "hardware");
+  assert.deepEqual([...ADAPTATION_PRIORITY], ["hardware", "clinical", "passport", "default"]);
+});
+
+test("adapt: safety rules do not move a fixed-base robot", () => {
+  const plan = adapt(profile({ speed: 2 }), screen, [{ source: "clinical", maxSpeedMultiplier: 0.5, maxCloseness: 0.2 }]);
+  assert.equal(plan.movement.multiplier, 0);
+  assert.equal(plan.distance.sceneUnits, 0);
+  assert.ok(!plan.adaptations.some((a) => a.code.startsWith("safety_")));
+});
+
+test("adapt: large captions without a screen fall back to normal with a reason", () => {
+  const noScreen = { ...full, capabilities: { ...full.capabilities, screen: false } };
+  const plan = adapt(profile({ captions: "large" }), noScreen);
+  assert.equal(plan.captions, "normal");
+  assert.ok(plan.adaptations.some((a) => a.code === "no_screen"));
+});
+
+test("explainPlan: a full humanoid applies every preference", () => {
+  const p = profile();
+  const rows = explainPlan(p, adapt(p, full));
+  assert.ok(rows.every((r) => r.outcome === "applied"), JSON.stringify(rows));
+});
+
+test("explainPlan: the screen robot reports what it cannot do and why", () => {
+  const p = profile({ greeting: "wai" });
+  const rows = Object.fromEntries(explainPlan(p, adapt(p, screen)).map((r) => [r.key, r]));
+  assert.equal(rows.distance.outcome, "not_supported");
+  assert.equal(rows.movement.applied, "stationary");
+  assert.equal(rows.eyeContact.applied, "screen_cue");
+  assert.equal(rows.greeting.outcome, "not_supported");
+  assert.ok(rows.greeting.reasons.some((r) => r.code === "no_arms"));
+  // place_nearby was asked for and is what happens: no failure is reported.
+  assert.equal(rows.handover.outcome, "applied");
+  assert.equal(rows.voice.outcome, "applied");
+});
+
+test("explainPlan: a safety limit is 'adapted', not 'not supported'", () => {
+  const p = profile({ speed: 1.6 });
+  const rows = explainPlan(p, adapt(p, full, [{ source: "clinical", maxSpeedMultiplier: 0.8 }]));
+  const movement = rows.find((r) => r.key === "movement")!;
+  assert.equal(movement.requested, "fast");
+  assert.equal(movement.applied, "slow");
+  assert.equal(movement.outcome, "adapted");
 });

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
+import { redactRows } from "@/lib/public-redaction";
 
 export const dynamic = "force-dynamic";
 
@@ -7,9 +9,21 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const table = searchParams.get("table") || "sources";
 
+  // Admins export full rows; everyone else gets sensitive columns redacted server-side.
+  const admin = await isAdmin();
+  // The response differs by session, so it must never be cached or shared.
+  const headers = {
+    "Content-Type": "text/csv",
+    "Content-Disposition": `attachment; filename="${table.replace(/[^a-z_]/g, "")}_export.csv"`,
+    "Cache-Control": "private, no-store"
+  };
+
   let data: any[] = [];
 
   switch (table) {
+    case "owned_inventory":
+      data = await prisma.ownedInventory.findMany();
+      break;
     case "robots":
       data = await prisma.robotModel.findMany();
       break;
@@ -29,13 +43,10 @@ export async function GET(req: NextRequest) {
       data = await prisma.sourceRecord.findMany();
   }
 
+  data = redactRows(table, data, admin);
+
   if (data.length === 0) {
-    return new NextResponse("id,empty\n1,No records found", {
-      headers: {
-        "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${table}_export.csv"`
-      }
-    });
+    return new NextResponse("id,empty\n1,No records found", { headers });
   }
 
   // Parse columns
@@ -62,10 +73,5 @@ export async function GET(req: NextRequest) {
 
   const csvContent = [headerRow, ...rows].join("\n");
 
-  return new NextResponse(csvContent, {
-    headers: {
-      "Content-Type": "text/csv",
-      "Content-Disposition": `attachment; filename="${table}_export.csv"`
-    }
-  });
+  return new NextResponse(csvContent, { headers });
 }

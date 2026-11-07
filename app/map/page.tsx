@@ -102,6 +102,7 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
     <>
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "ระบบนิเวศเชิงพื้นที่" : "Geographic ecosystem"}</p>
           <h1>{t.mapTitle}</h1>
           <p className="muted">{t.mapDesc}</p>
         </div>

@@ -40,6 +40,7 @@ export const metadata: Metadata = {
     <>
       <div className="topline" style={{ display: "block", marginBottom: "16px" }}>
         <div>
+          <p className="kicker">{lang === "th" ? "กราฟความสัมพันธ์" : "Relationship graph"}</p>
           <h1>{t.networkTitle}</h1>
           <p className="muted">{t.networkDesc}</p>
         </div>

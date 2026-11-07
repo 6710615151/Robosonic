@@ -105,6 +105,7 @@ export default async function ContributionsPage({ searchParams }: { searchParams
     <>
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "ทำเนียบงานวิจัย" : "Research directory"}</p>
           <h1>{t.contributorsTitle}</h1>
           <p className="muted">{t.contributorsDesc}</p>
         </div>

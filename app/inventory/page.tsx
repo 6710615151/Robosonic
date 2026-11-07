@@ -106,6 +106,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
     <>
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "สินทรัพย์ทางกายภาพ" : "Physical assets"}</p>
           <h1>{t.inventoryTitle}</h1>
           <p className="muted">{t.inventoryDesc}</p>
         </div>
@@ -128,11 +129,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
       </div>
 
       {!isPublic ? (
-        <div className="notice" style={{ backgroundColor: "#fdf2f2", borderLeftColor: "var(--danger)" }}>
+        <div className="notice danger">
           <strong>{localT.warnTitle}</strong> {localT.warnDesc}
         </div>
       ) : (
-        <div className="notice" style={{ backgroundColor: "#f0fdf4", borderLeftColor: "var(--success)" }}>
+        <div className="notice ok">
           <strong>{localT.safeTitle}</strong> {localT.safeDesc}
         </div>
       )}

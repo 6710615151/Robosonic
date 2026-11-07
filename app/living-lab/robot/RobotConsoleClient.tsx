@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import Link from "next/link";
 import { Play, Radio, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
-import { adapt, DEFAULT_PLAN, type BehaviourPlan } from "@/lib/hri/adapt";
+import { adapt, DEFAULT_PLAN, explainPlan, type BehaviourPlan, type PreferenceKey, type SafetyRule } from "@/lib/hri/adapt";
 import type { RobotBehavior } from "@/lib/hri/behavior-engine";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES, type RobotCapabilities, type RobotProfile } from "@/lib/hri/robot-profiles";
@@ -21,6 +21,9 @@ import VoiceControl, { type VoiceLogEntry } from "./VoiceControl";
 import styles from "./robot.module.css";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
+
+// A demonstration ward protocol. Clinical rules rank above the passport, below hardware safety.
+const WARD_PROTOCOL: SafetyRule[] = [{ source: "clinical", maxSpeedMultiplier: 0.8, maxCloseness: 0.6 }];
 
 // Accept either a raw token or a passport card link (?t=... is not used; the token is the last path segment).
 function readToken(raw: string): string | null {
@@ -103,6 +106,10 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [speaking, setSpeaking] = useState<string | null>(null);
+  const [ward, setWard] = useState(false);
+  const rulesRef = useRef<SafetyRule[]>([]);
+  rulesRef.current = ward ? WARD_PROTOCOL : [];
+  const planFor = (p: PublicProfile, robot: RobotProfile) => adapt(p, robot, rulesRef.current);
 
   const profileRef = useRef<PublicProfile | null>(null);
   const robots = useRef<Record<string, RobotBehavior | null>>({});
@@ -140,9 +147,10 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
 
   useEffect(() => {
     if (!profile) return;
-    performOn("a", adapt(profile, ROBOT_PROFILES[0]), ROBOT_PROFILES[0].capabilities);
-    performOn("b", adapt(profile, ROBOT_PROFILES[1]), ROBOT_PROFILES[1].capabilities);
-  }, [profile, performOn]);
+    const rules = ward ? WARD_PROTOCOL : [];
+    performOn("a", adapt(profile, ROBOT_PROFILES[0], rules), ROBOT_PROFILES[0].capabilities);
+    performOn("b", adapt(profile, ROBOT_PROFILES[1], rules), ROBOT_PROFILES[1].capabilities);
+  }, [profile, ward, performOn]);
 
   function ready(key: string, robot: RobotBehavior) {
     robots.current[key] = robot;
@@ -153,7 +161,7 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
     const current = profileRef.current;
     if (!current) return;
     const robotProfile = key === "a" ? ROBOT_PROFILES[0] : ROBOT_PROFILES[1];
-    performOn(key, adapt(current, robotProfile), robotProfile.capabilities);
+    performOn(key, planFor(current, robotProfile), robotProfile.capabilities);
   }
 
   async function readPassport(event: FormEvent) {
@@ -224,7 +232,7 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   function aiPreferences() {
     const current = profileRef.current;
     if (!current) return undefined;
-    const plan = adapt(current, ROBOT_PROFILES[0]);
+    const plan = planFor(current, ROBOT_PROFILES[0]);
     return { language: plan.language, greeting: plan.greeting, voice: plan.voice, captions: plan.captions };
   }
 
@@ -288,7 +296,7 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
 
     // One voice answers, so the replies do not talk over each other.
     if (speakRepliesRef.current && say) {
-      const rate = profileRef.current ? adapt(profileRef.current, ROBOT_PROFILES[0]).speechRate : 1;
+      const rate = profileRef.current ? planFor(profileRef.current, ROBOT_PROFILES[0]).speechRate : 1;
       speak(say, "th", rate);
     }
   }
@@ -322,8 +330,19 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   }
 
   const plans = {
-    a: profile ? adapt(profile, ROBOT_PROFILES[0]) : null,
-    b: profile ? adapt(profile, ROBOT_PROFILES[1]) : null
+    a: profile ? planFor(profile, ROBOT_PROFILES[0]) : null,
+    b: profile ? planFor(profile, ROBOT_PROFILES[1]) : null
+  };
+
+  const FACT_KEY: Record<PreferenceKey, keyof typeof t.fact> = {
+    distance: "distance", movement: "speed", eyeContact: "eyeContact", greeting: "greeting",
+    voice: "voice", captions: "captions", handover: "handover"
+  };
+  const valueLabel = (value: string) => {
+    if (value === "screen_cue") return t.explain.screenCue;
+    if (value === "fixed") return t.explain.fixed;
+    if (value === "hand_to_person" || value === "place_nearby" || value === "none") return t.explain[value];
+    return (t.value as Record<string, string>)[value] ?? value;
   };
 
   // The nine facts shown for a plan, as display strings (also used to compare against the default robot).
@@ -408,21 +427,29 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
             </dl>
 
             <div>
-              <h3 className={styles.subhead}>{t.adaptations}</h3>
-              {plan.adaptations.length ? (
-                <ul className={styles.adaptations}>
-                  {plan.adaptations.map((entry) => {
-                    const message = t.adaptation[entry.code];
-                    return (
-                      <li key={entry.code}>
-                        {typeof message === "function" ? message(entry.value) : message}
+              <h3 className={styles.subhead}>{t.explain.title}</h3>
+              {(() => {
+                // Only what changed: the facts above already list everything that was applied as written.
+                const rows = !isDefault && profile ? explainPlan(profile, plan).filter((row) => row.outcome !== "applied") : [];
+                if (!rows.length) return <p className={styles.note}>{t.noAdaptations}</p>;
+                return (
+                  <ul className={styles.adaptations}>
+                    {rows.map((row) => (
+                      <li key={row.key} data-outcome={row.outcome}>
+                        <span className={styles.explainHead}>
+                          <strong>{t.fact[FACT_KEY[row.key]]}</strong>
+                          <span>{valueLabel(row.requested)} → {valueLabel(row.applied)}</span>
+                          <em className={`${styles.outcome} ${row.outcome === "not_supported" ? styles.outcomeNo : ""}`}>{t.explain.outcome[row.outcome]}</em>
+                        </span>
+                        {row.reasons.map((reason) => {
+                          const message = t.adaptation[reason.code];
+                          return <span key={reason.code} className={styles.reason}>{typeof message === "function" ? message(reason.value) : message}</span>;
+                        })}
                       </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className={styles.note}>{t.noAdaptations}</p>
-              )}
+                    ))}
+                  </ul>
+                );
+              })()}
             </div>
 
             <div className={styles.actions}>
@@ -492,6 +519,13 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
           </div>
         </form>
         {error ? <p className={styles.error} role="alert" data-testid="console-error">{error}</p> : null}
+        <div className={styles.protocol}>
+          <label className={styles.protocolLabel}>
+            <input type="checkbox" checked={ward} onChange={(event) => setWard(event.target.checked)} data-testid="ward-protocol" />
+            <span><strong>{t.protocol.title}.</strong> {t.protocol.label}</span>
+          </label>
+          <p className={styles.hint}>{t.protocol.priority}</p>
+        </div>
       </section>
 
       <VoiceControl

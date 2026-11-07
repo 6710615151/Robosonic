@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WaiBot from "./components/brand/WaiBot";
 
 export default function NotFound() {
   return (
@@ -35,8 +36,8 @@ export default function NotFound() {
 
         .notfound-title {
           font-size: 24px;
-          font-weight: 800;
-          color: var(--text-primary);
+          font-weight: 700;
+          color: var(--th-forest);
           margin: 0 0 12px 0;
           letter-spacing: -0.5px;
         }
@@ -111,7 +112,7 @@ export default function NotFound() {
 
         .suggestion-chip:hover {
           border-color: var(--accent);
-          background: rgba(25, 82, 60, 0.05);
+          background: rgba(22, 168, 120, 0.08);
           color: var(--accent);
           transform: translateY(-0.5px);
         }
@@ -123,7 +124,7 @@ export default function NotFound() {
       `}} />
 
       <div className="notfound-card">
-        <div className="notfound-icon">🤖</div>
+        <div className="notfound-icon"><WaiBot pose="empty" size={120} decorative /></div>
         <h2 className="notfound-title">Resource Not Activated</h2>
         <p className="notfound-message">
           We searched the atlas, but this module could not be found or has not been activated in this workspace deployment yet.

@@ -9,6 +9,7 @@ import type { Hue, RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { describeDistance } from "@/lib/hri/passport";
 import { toPublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
+import { conditionOrder, newJourneyId, nextCondition, stationComplete, type StationRatings } from "@/lib/hri/journey";
 import { recordMeetingAction } from "../../actions";
 
 export type StationTask = "reception" | "delivery" | "telepresence";
@@ -29,7 +30,6 @@ type Passport = {
 };
 type LogEvent = { t: number; src: "robot" | "human"; type: string; [key: string]: unknown };
 type Mode = "passport" | "default";
-type SavedStation = { mode: Mode; comfort: number };
 
 const START_DISTANCE = -2.6;
 // What a robot does without a passport: waves, walks up close at full speed, holds eye contact.
@@ -77,7 +77,21 @@ const ui = {
     back: "Back to the Living Lab",
     ready: "Press start. The robot will read your Care Passport first.",
     empty: "No care robots from the registry were found. Please seed the atlas and try again.",
-    robotLabel: "Robot"
+    robotLabel: "Robot",
+    condition: (n: number) => `Condition ${n} of 2`,
+    conditionLabel: { default: "Robot without your passport", passport: "Robot with your passport" },
+    startCondition: (n: number) => `Start condition ${n} of 2`,
+    nextUp: "Saved. Now meet the same robot in the other condition.",
+    protocolNote: "You meet this robot twice: once without your passport, once with it. The order alternates between stations so the comparison is fair.",
+    compareTitle: "Side by side",
+    compareSub: "Same station, same robot. Highlighted rows are what your passport changed.",
+    colDefault: "Without passport",
+    colPassport: "With passport",
+    yourRating: "Your comfort",
+    adaptedTitle: "Adapted to this robot's hardware",
+    avgPassport: "Average with passport",
+    avgDefault: "Average without passport",
+    difference: "Difference"
   },
   th: {
     eyebrow: "เส้นทางโรงพยาบาลด้วย Care Passport",
@@ -110,7 +124,21 @@ const ui = {
     back: "กลับไป Living Lab",
     ready: "กดเริ่ม หุ่นจะอ่าน Care Passport ของคุณก่อน",
     empty: "ไม่พบหุ่นดูแลใน registry กรุณา seed ข้อมูล atlas แล้วลองอีกครั้ง",
-    robotLabel: "หุ่นยนต์"
+    robotLabel: "หุ่นยนต์",
+    condition: (n: number) => `เงื่อนไขที่ ${n} จาก 2`,
+    conditionLabel: { default: "หุ่นที่ไม่มีพาสปอร์ตของคุณ", passport: "หุ่นที่อ่านพาสปอร์ตของคุณ" },
+    startCondition: (n: number) => `เริ่มเงื่อนไขที่ ${n} จาก 2`,
+    nextUp: "บันทึกแล้ว ต่อไปพบหุ่นตัวเดิมในอีกเงื่อนไขหนึ่ง",
+    protocolNote: "คุณจะพบหุ่นตัวนี้สองครั้ง ครั้งหนึ่งไม่มีพาสปอร์ต อีกครั้งมีพาสปอร์ต ลำดับจะสลับกันในแต่ละสถานีเพื่อให้การเปรียบเทียบยุติธรรม",
+    compareTitle: "เปรียบเทียบเคียงกัน",
+    compareSub: "สถานีเดียวกัน หุ่นตัวเดียวกัน แถวที่ไฮไลต์คือสิ่งที่พาสปอร์ตของคุณเปลี่ยน",
+    colDefault: "ไม่มีพาสปอร์ต",
+    colPassport: "มีพาสปอร์ต",
+    yourRating: "ความสบายใจของคุณ",
+    adaptedTitle: "ปรับตามฮาร์ดแวร์ของหุ่นตัวนี้",
+    avgPassport: "เฉลี่ยเมื่อมีพาสปอร์ต",
+    avgDefault: "เฉลี่ยเมื่อไม่มีพาสปอร์ต",
+    difference: "ผลต่าง"
   }
 };
 
@@ -210,7 +238,12 @@ export default function MeetClient({
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedStations, setSavedStations] = useState<Record<number, SavedStation>>({});
+  const [ratings, setRatings] = useState<Record<number, StationRatings>>({});
+  // Random per journey run; set after mount so server and client render the same first frame.
+  const [journeyId, setJourneyId] = useState("");
+  useEffect(() => { setJourneyId(newJourneyId()); }, []);
+  const next = nextCondition(journeyId, current, ratings[current]);
+  const stationDone = stationComplete(ratings[current]);
   const [running, setRunning] = useState(false);
   const [comfort, setComfort] = useState<number | null>(null);
   const adjustments = useRef({ tooClose: 0, tooFar: 0 });
@@ -230,11 +263,11 @@ export default function MeetClient({
     setComfort(null);
     setRunning(false);
     setReady(false);
-    setMode("passport");
+    setMode(conditionOrder(journeyId, current)[0]);
     adjustments.current = { tooClose: 0, tooFar: 0 };
     setBubble(t.ready);
     window.speechSynthesis?.cancel();
-  }, [current, t.ready]);
+  }, [current, t.ready, journeyId]);
 
   const record = useCallback((e: LogEvent) => setLog((prev) => [...prev.slice(-299), e]), []);
   const onRobotEvent = useCallback((e: RobotEvent) => record({ ...e, src: "robot" }), [record]);
@@ -361,7 +394,8 @@ export default function MeetClient({
   }
 
   async function saveStation() {
-    if (!station || comfort === null) return;
+    if (!station || comfort === null || !next || next.mode !== mode) return;
+    const position = next.position;
     const r = robotRef.current;
     setSaving(true);
     setSaveError(null);
@@ -374,6 +408,8 @@ export default function MeetClient({
         events: log.slice(-250),
         summary: {
           mode,
+          order: position,
+          journey: journeyId,
           task: station.task,
           robot: station.name,
           comfort,
@@ -387,8 +423,16 @@ export default function MeetClient({
         return;
       }
       setSaved(true);
-      setSavedStations((prev) => ({ ...prev, [current]: { mode, comfort } }));
-      human("station_saved", { task: station.task, mode, comfort });
+      setRatings((prev) => ({ ...prev, [current]: { ...prev[current], [mode]: comfort } }));
+      human("station_saved", { task: station.task, mode, comfort, order: position });
+      // Ready for the other condition at this station: same robot, fresh start.
+      setApplied([]);
+      setComfort(null);
+      if (position === 1) {
+        const other = conditionOrder(journeyId, current)[1];
+        setMode(other);
+        setBubble(t.nextUp);
+      }
     } catch {
       setSaveError(t.saveFailed);
     } finally {
@@ -402,23 +446,27 @@ export default function MeetClient({
     }
   }
 
-  const rows: { key: string; label: string; value: string }[] = [
-    { key: "greeting", label: t.greeting, value: behaviour.greeting === "wai" ? t.wai : behaviour.greeting === "wave" ? t.wave : t.noGreeting },
-    { key: "distance", label: t.distance, value: describeDistance(behaviour.distance)[lang] },
-    { key: "speed", label: t.speed, value: behaviour.speed < 1 ? t.slow : behaviour.speed > 1 ? t.fast : t.normal },
-    { key: "gaze", label: t.gaze, value: behaviour.gaze === "soft" ? t.soft : t.direct },
-    { key: "voice", label: t.voice, value: behaviour.voice ? t.on : t.off }
+  type Behaviour = { distance: number; speed: number; gaze: string; greeting: string; voice: boolean };
+  const rowsFor = (b: Behaviour): { key: string; label: string; value: string }[] => [
+    { key: "greeting", label: t.greeting, value: b.greeting === "wai" ? t.wai : b.greeting === "wave" ? t.wave : t.noGreeting },
+    { key: "distance", label: t.distance, value: describeDistance(b.distance)[lang] },
+    { key: "speed", label: t.speed, value: b.speed < 1 ? t.slow : b.speed > 1 ? t.fast : t.normal },
+    { key: "gaze", label: t.gaze, value: b.gaze === "soft" ? t.soft : t.direct },
+    { key: "voice", label: t.voice, value: b.voice ? t.on : t.off }
   ];
+  const rows = rowsFor(behaviour);
   const careRows: { key: string; label: string; value: string }[] = [
     { key: "accessibility", label: lang === "th" ? "การสื่อสาร" : "Communication", value: passport.captions === "large" || passport.speechPace === "slow" ? t.accessibility : t.normal },
     { key: "reach", label: lang === "th" ? "การยื่นของ" : "Handing items", value: passport.noReach ? t.noReach : t.reach }
   ];
 
-  const savedCount = Object.keys(savedStations).length;
-  const done = stations.length > 0 && savedCount >= stations.length;
-  const average = savedCount
-    ? Object.values(savedStations).reduce((sum, s) => sum + s.comfort, 0) / savedCount
-    : null;
+  const done = stations.length > 0 && stations.every((_, i) => stationComplete(ratings[i]));
+  const averageOf = (mode: Mode) => {
+    const values = Object.values(ratings).map((r) => r[mode]).filter((v): v is number => typeof v === "number");
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  };
+  const avgPassport = averageOf("passport");
+  const avgDefault = averageOf("default");
 
   if (!station || !copy) {
     return (
@@ -442,7 +490,7 @@ export default function MeetClient({
         </div>
         <ol className="mt-steps" aria-label={t.journey}>
           {stations.map((s, i) => {
-            const doneHere = savedStations[i];
+            const doneHere = stationComplete(ratings[i]);
             return (
               <li key={`${s.robotId}-${i}`} className={`${i === current ? "current" : ""} ${doneHere ? "done" : ""}`}>
                 <button onClick={() => setCurrent(i)} aria-current={i === current ? "step" : undefined}>
@@ -459,19 +507,26 @@ export default function MeetClient({
         <section className="mt-panel mt-done">
           <h2>{t.doneTitle}</h2>
           <p className="muted">{t.doneBody}</p>
-          {average !== null && <p className="mt-avg">{t.avg}: <strong>{average.toFixed(1)}/5</strong></p>}
-          <ol className="mt-summary">
-            {stations.map((s, i) => (
-              <li key={`${s.robotId}-${i}`}>
-                <BadgeCheck size={18} aria-hidden="true" />
-                <span>{stationCopy[lang][s.task].title} · {s.name}</span>
-                <strong>{savedStations[i]?.comfort ?? "–"}/5</strong>
-              </li>
-            ))}
-          </ol>
+          <dl className="mt-avgs">
+            <div className="is-passport"><dt>{t.avgPassport}</dt><dd>{avgPassport === null ? "–" : avgPassport.toFixed(1)}<small>/5</small></dd></div>
+            <div className="is-default"><dt>{t.avgDefault}</dt><dd>{avgDefault === null ? "–" : avgDefault.toFixed(1)}<small>/5</small></dd></div>
+            <div><dt>{t.difference}</dt><dd>{avgPassport === null || avgDefault === null ? "–" : `${avgPassport - avgDefault >= 0 ? "+" : ""}${(avgPassport - avgDefault).toFixed(1)}`}</dd></div>
+          </dl>
+          <table className="mt-table">
+            <thead><tr><th scope="col">{t.journey}</th><th scope="col">{t.colDefault}</th><th scope="col">{t.colPassport}</th></tr></thead>
+            <tbody>
+              {stations.map((s, i) => (
+                <tr key={`${s.robotId}-${i}`}>
+                  <th scope="row">{stationCopy[lang][s.task].title}<span>{s.name}</span></th>
+                  <td>{ratings[i]?.default ?? "–"}/5</td>
+                  <td>{ratings[i]?.passport ?? "–"}/5</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <div className="mt-row">
             <Link className="mt-btn primary" href="/living-lab">{t.back}</Link>
-            <button className="mt-btn" onClick={() => { setSavedStations({}); setCurrent(0); }}><RotateCcw size={18} aria-hidden="true" /> {t.replay}</button>
+            <button className="mt-btn" onClick={() => { setRatings({}); setCurrent(0); setJourneyId(newJourneyId()); }}><RotateCcw size={18} aria-hidden="true" /> {t.replay}</button>
           </div>
         </section>
       ) : (
@@ -479,7 +534,7 @@ export default function MeetClient({
           <div className="mt-stage">
             <div className={`mt-bubble ${largeText ? "large" : ""}`} aria-live="polite">{bubble}</div>
             <RobotStage key={station.robotId} framing="fullBody" onReady={onReady} onEvent={onRobotEvent} className="mt-canvas" ariaLabel={station.name} />
-            <div className="mt-chip">{mode === "passport" ? t.withPassport : t.withoutPassport}</div>
+            <div className={`mt-chip is-${mode}`}>{t.conditionLabel[mode]}</div>
           </div>
 
           <div className="mt-panel">
@@ -489,67 +544,109 @@ export default function MeetClient({
               <p className="mt-robot"><ShieldCheck size={16} aria-hidden="true" /> {station.name} · {station.type.replace(/_/g, " ")}{station.org ? ` · ${station.org}` : ""}</p>
             </div>
 
-            <div className="mt-row">
-              <button className="mt-btn primary" disabled={!ready || running} onClick={() => run("passport")}><Play size={18} aria-hidden="true" /> {applied.length ? t.replay : t.start}</button>
-              <button className="mt-btn" disabled={!ready || running} onClick={() => run("default")} aria-pressed={mode === "default"}>
-                {t.withoutPassport}
-              </button>
-            </div>
-
-            <div className="mt-card">
-              <h2>{mode === "passport" ? t.appliedTitle : t.defaultTitle}</h2>
-              <ul>
-                {rows.map((row) => (
-                  <li key={row.key} className={applied.includes(row.key) ? "on" : ""}>
-                    {applied.includes(row.key) ? <BadgeCheck size={18} aria-hidden="true" /> : <CircleDashed size={18} aria-hidden="true" />}
-                    <span>{row.label}</span><strong>{row.value}</strong>
-                  </li>
-                ))}
-              </ul>
-              {mode === "passport" && (
-                <ul className="mt-care">
-                  {careRows.map((row) => (
-                    <li key={row.key}><span>{row.label}</span><strong>{row.value}</strong></li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="mt-row">
-              <button className="mt-btn" disabled={!ready} onClick={() => adjust("too_close")}><Hand size={18} aria-hidden="true" /> {t.tooClose}</button>
-              <button className="mt-btn" disabled={!ready} onClick={() => adjust("too_far")}><MoveDown size={18} aria-hidden="true" /> {t.tooFar}</button>
-            </div>
-
-            {!running && applied.length > 0 && !saved && (
-              <div className="mt-rating">
-                <h2>{t.rateTitle}</h2>
-                <p className="muted">{t.rateHint}</p>
-                <div className="mt-scale" role="group" aria-label={t.rateTitle}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      className={comfort === n ? "sel" : ""}
-                      aria-pressed={comfort === n}
-                      aria-label={`${n} — ${n <= 2 ? t.rateLow : n >= 4 ? t.rateHigh : t.normal}`}
-                      onClick={() => { setComfort(n); human("comfort_rating", { value: n, task: station.task, mode }); }}
-                    >
-                      {n}
-                    </button>
-                  ))}
+            {stationDone ? (
+              <div className="mt-compare">
+                <h2>{t.compareTitle}</h2>
+                <p className="muted">{t.compareSub}</p>
+                <table className="mt-table">
+                  <thead><tr><th scope="col"><span className="sr-only">{t.appliedTitle}</span></th><th scope="col">{t.colDefault}</th><th scope="col">{t.colPassport}</th></tr></thead>
+                  <tbody>
+                    {(() => {
+                      const before = rowsFor(DEFAULT_BEHAVIOUR);
+                      const after = rowsFor(careBehaviour);
+                      return before.map((row, i) => (
+                        <tr key={row.key} className={row.value !== after[i].value ? "changed" : ""}>
+                          <th scope="row">{row.label}</th><td>{row.value}</td><td>{after[i].value}</td>
+                        </tr>
+                      ));
+                    })()}
+                    {careRows.map((row) => {
+                      // A default robot speaks normally and hands items over.
+                      const before = row.key === "reach" ? t.reach : t.normal;
+                      return <tr key={row.key} className={before !== row.value ? "changed" : ""}><th scope="row">{row.label}</th><td>{before}</td><td>{row.value}</td></tr>;
+                    })}
+                    <tr className="mt-rated"><th scope="row">{t.yourRating}</th><td>{ratings[current]?.default}/5</td><td>{ratings[current]?.passport}/5</td></tr>
+                  </tbody>
+                </table>
+                {plan.adaptations.length > 0 && (
+                  <p className="muted mt-adapted">{t.adaptedTitle}: {plan.adaptations.map((a) => a.code.replace(/_/g, " ")).join(", ")}</p>
+                )}
+                <div className="mt-row">
+                  {current < stations.length - 1 && <button className="mt-btn primary" onClick={goNext}>{t.next}</button>}
+                  <Link className="mt-btn" href="/living-lab">{t.back}</Link>
                 </div>
-                <div className="mt-scale-ends"><span>{t.rateLow}</span><span>{t.rateHigh}</span></div>
               </div>
-            )}
+            ) : next && (
+              <>
+                <div className="mt-protocol">
+                  <ol aria-label={t.protocolNote}>
+                    {conditionOrder(journeyId, current).map((m, i) => (
+                      <li key={m} className={`${m === next.mode ? "current" : ""} ${typeof ratings[current]?.[m] === "number" ? "done" : ""}`} aria-current={m === next.mode ? "step" : undefined}>
+                        <span>{t.condition(i + 1)}</span> {t.conditionLabel[m]}
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="muted">{t.protocolNote}</p>
+                </div>
 
-            <div className="mt-row">
-              <button className="mt-btn primary" disabled={comfort === null || saved || saving || running || Boolean(savedStations[current])} onClick={saveStation}>{t.save}</button>
-              {(saved || savedStations[current]) && current < stations.length - 1 && (
-                <button className="mt-btn" onClick={goNext}>{t.next}</button>
-              )}
-              <Link className="mt-btn" href="/living-lab">{t.back}</Link>
-            </div>
-            {(saved || savedStations[current]) && <p className="mt-ok">{t.saved}</p>}
-            {saveError && <p className="mt-error" role="alert">{saveError}</p>}
+                <div className="mt-row">
+                  <button className="mt-btn primary" disabled={!ready || running} onClick={() => run(next.mode)}>
+                    <Play size={18} aria-hidden="true" /> {applied.length && mode === next.mode ? t.replay : t.startCondition(next.position)}
+                  </button>
+                </div>
+
+                <div className={`mt-card is-${mode}`}>
+                  <h2>{mode === "passport" ? t.appliedTitle : t.defaultTitle}</h2>
+                  <ul>
+                    {rows.map((row) => (
+                      <li key={row.key} className={applied.includes(row.key) ? "on" : ""}>
+                        {applied.includes(row.key) ? <BadgeCheck size={18} aria-hidden="true" /> : <CircleDashed size={18} aria-hidden="true" />}
+                        <span>{row.label}</span><strong>{row.value}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  {mode === "passport" && (
+                    <ul className="mt-care">
+                      {careRows.map((row) => (
+                        <li key={row.key}><span>{row.label}</span><strong>{row.value}</strong></li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-row">
+                  <button className="mt-btn" disabled={!ready} onClick={() => adjust("too_close")}><Hand size={18} aria-hidden="true" /> {t.tooClose}</button>
+                  <button className="mt-btn" disabled={!ready} onClick={() => adjust("too_far")}><MoveDown size={18} aria-hidden="true" /> {t.tooFar}</button>
+                </div>
+
+                {!running && applied.length > 0 && mode === next.mode && (
+                  <div className="mt-rating">
+                    <h2>{t.rateTitle}</h2>
+                    <p className="muted">{t.rateHint}</p>
+                    <div className="mt-scale" role="group" aria-label={t.rateTitle}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          className={comfort === n ? "sel" : ""}
+                          aria-pressed={comfort === n}
+                          aria-label={`${n} — ${n <= 2 ? t.rateLow : n >= 4 ? t.rateHigh : t.normal}`}
+                          onClick={() => { setComfort(n); human("comfort_rating", { value: n, task: station.task, mode }); }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-scale-ends"><span>{t.rateLow}</span><span>{t.rateHigh}</span></div>
+                    <div className="mt-row">
+                      <button className="mt-btn primary" disabled={comfort === null || saving || running} onClick={saveStation}>{t.save}</button>
+                    </div>
+                  </div>
+                )}
+                {saved && <p className="mt-ok" role="status">{t.nextUp}</p>}
+                {saveError && <p className="mt-error" role="alert">{saveError}</p>}
+                <Link className="mt-link" href="/living-lab">{t.back}</Link>
+              </>
+            )}
           </div>
         </section>
       )}
@@ -559,35 +656,35 @@ export default function MeetClient({
 
 const css = `
 .mt-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-.mt-head h1 { margin: 4px 0; font-size: clamp(24px, 2.2vw, 34px); font-weight: 900; color: #07150f; }
+.mt-head h1 { margin: 4px 0; font-size: clamp(24px, 2.2vw, 34px); font-weight: 900; color: var(--lab-ink); }
 .mt-eyebrow { margin: 0; font-size: 12px; font-weight: 750; letter-spacing: 1.2px; text-transform: uppercase; color: var(--warning); }
 .mt-steps { list-style: none; display: flex; gap: 6px; flex-wrap: wrap; margin: 0; padding: 0; }
 .mt-steps button { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: #fff; color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.mt-steps .current button { border-color: var(--accent); color: #07150f; box-shadow: inset 0 0 0 2px var(--accent); }
+.mt-steps .current button { border-color: var(--accent); color: var(--lab-ink); box-shadow: inset 0 0 0 2px var(--accent); }
 .mt-steps .done button svg { color: var(--accent); }
 .mt-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 960px) { .mt-grid { grid-template-columns: 1fr; } }
-.mt-stage { position: relative; height: 620px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: linear-gradient(180deg, #ffffff, #e9eef2); }
+.mt-stage { position: relative; height: 620px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: linear-gradient(180deg, #ffffff, var(--lab-stage-end)); }
 @media (max-width: 960px) { .mt-stage { height: 480px; } }
 .mt-canvas { position: absolute; inset: 0; }
 .mt-bubble { position: absolute; z-index: 2; left: 14px; right: 14px; top: 14px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 17px; min-height: 50px; box-shadow: 0 8px 20px rgba(0,0,0,.06); transition: font-size .2s; }
 .mt-bubble.large { font-size: 22px; line-height: 1.45; font-weight: 600; }
-.mt-chip { position: absolute; z-index: 2; left: 14px; bottom: 14px; background: rgba(7,21,15,.85); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 650; }
+.mt-chip { position: absolute; z-index: 2; left: 14px; bottom: 14px; background: rgba(11,31,58,.9); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 650; }
 .mt-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 14px; }
 .mt-task h2 { margin: 0 0 4px; font-size: 20px; }
 .mt-task p { margin: 0; }
 .mt-robot { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px !important; font-size: 13px; font-weight: 650; color: var(--text-secondary); }
 .mt-robot svg { color: var(--accent); }
 .mt-row { display: flex; gap: 10px; flex-wrap: wrap; }
-.mt-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: #07150f; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; flex: 1 1 180px; }
+.mt-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: var(--lab-ink); font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; flex: 1 1 180px; }
 .mt-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mt-btn:disabled { opacity: .55; cursor: not-allowed; }
-.mt-btn:focus-visible { outline: 3px solid #19c37d; outline-offset: 2px; }
-.mt-card { border: 1px dashed var(--accent); border-radius: 12px; padding: 14px; background: #fcfbf8; }
+.mt-btn:focus-visible { outline: 3px solid var(--lab-focus); outline-offset: 2px; }
+.mt-card { border: 1px dashed var(--accent); border-radius: 12px; padding: 14px; background: var(--lab-paper); }
 .mt-card h2 { margin: 0 0 10px; font-size: 17px; }
 .mt-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .mt-card li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; color: var(--text-secondary); transition: color .3s; }
-.mt-card li.on { color: #07150f; }
+.mt-card li.on { color: var(--lab-ink); }
 .mt-card li.on svg { color: var(--accent); }
 .mt-card .mt-care { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .mt-card .mt-care li { grid-template-columns: 1fr auto; font-size: 13px; }
@@ -596,8 +693,8 @@ const css = `
 .mt-rating p { margin: 0; font-size: 13px; }
 .mt-scale { display: flex; gap: 8px; }
 .mt-scale button { flex: 1 1 0; min-height: 52px; border-radius: 10px; border: 1px solid var(--border); background: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
-.mt-scale button.sel { background: #e8f5ec; border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); color: #07150f; }
-.mt-scale button:focus-visible { outline: 3px solid #19c37d; outline-offset: 2px; }
+.mt-scale button.sel { background: var(--lab-tint); border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); color: var(--lab-ink); }
+.mt-scale button:focus-visible { outline: 3px solid var(--lab-focus); outline-offset: 2px; }
 .mt-scale-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
 .mt-ok { color: var(--accent); font-weight: 700; margin: 0; }
 .mt-error { color: var(--warning); font-weight: 700; margin: 0; }
@@ -608,5 +705,50 @@ const css = `
 .mt-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .mt-summary li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; color: var(--text-secondary); }
 .mt-summary li svg { color: var(--accent); }
-.mt-summary strong { color: #07150f; }
+.mt-summary strong { color: var(--lab-ink); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.mt-eyebrow { font-family: var(--lab-mono); font-weight: 600; letter-spacing: .12em; color: var(--lab-cyan-ink) !important; }
+.mt-head h1 { font-weight: 700 !important; letter-spacing: -0.02em; }
+.mt-panel, .mt-stage, .mt-card, .mt-rating { border-radius: 8px !important; }
+.mt-btn.primary { background: var(--lab-navy); border-color: var(--lab-navy); }
+.mt-chip.is-passport { background: #00657c; }
+.mt-chip.is-default { background: #8a4f17; }
+.mt-card.is-default { border-color: #c0742c; }
+.mt-card.is-passport { border-color: var(--lab-cyan-ink); }
+.mt-protocol { display: grid; gap: 8px; }
+.mt-protocol ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mt-protocol li { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary); background: var(--surface); }
+.mt-protocol li span { font: 600 10.5px/1.4 var(--lab-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-secondary); }
+.mt-protocol li.current { border-color: var(--lab-navy); color: var(--lab-ink); box-shadow: inset 0 0 0 1px var(--lab-navy); }
+.mt-protocol li.done { background: var(--lab-tint); border-color: var(--lab-tint-border); color: var(--lab-tint-ink); }
+.mt-protocol li.done span::after { content: " ✓"; }
+.mt-protocol p { margin: 0; font-size: 12.5px; }
+.mt-compare { display: grid; gap: 10px; }
+.mt-compare h2 { margin: 0; font-size: 18px; }
+.mt-compare p { margin: 0; font-size: 13px; }
+.mt-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: 13.5px; }
+.mt-table th, .mt-table td { background: transparent; overflow-wrap: anywhere; }
+.mt-table tbody th { text-transform: none; letter-spacing: 0; }
+.mt-panel { min-width: 0; }
+.mt-table th, .mt-table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.mt-table thead th { font: 600 10.5px/1.4 var(--lab-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-secondary); }
+.mt-table thead th:nth-child(2) { color: #8a4f17; }
+.mt-table thead th:nth-child(3) { color: var(--lab-cyan-ink); }
+.mt-table tbody th { font-weight: 600; color: var(--text-secondary); }
+.mt-table tbody th span { display: block; font-weight: 400; font-size: 12px; }
+.mt-table td { font-weight: 600; color: var(--lab-ink); font-variant-numeric: tabular-nums; }
+.mt-table tr.changed td:nth-child(3) { background: var(--lab-tint); box-shadow: inset 2px 0 0 var(--lab-cyan-ink); }
+.mt-table tr.mt-rated th, .mt-table tr.mt-rated td { border-top: 2px solid var(--border); font-size: 15px; }
+.mt-adapted { font-size: 12.5px !important; }
+.mt-link { justify-self: start; font-weight: 600; font-size: 13.5px; min-height: 40px; display: inline-flex; align-items: center; }
+.mt-avgs { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.mt-avgs div { padding: 12px 12px 12px 0; display: grid; gap: 4px; }
+.mt-avgs div + div { padding-left: 12px; border-left: 1px solid var(--border); }
+.mt-avgs dt { font-size: 12.5px; color: var(--text-secondary); }
+.mt-avgs dd { margin: 0; font: 600 26px/1.1 var(--lab-mono); color: var(--lab-ink); }
+.mt-avgs dd small { font-size: 13px; color: var(--text-secondary); }
+.mt-avgs .is-passport dt::before, .mt-avgs .is-default dt::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.mt-avgs .is-passport dt::before { background: #0089a8; }
+.mt-avgs .is-default dt::before { background: #c0742c; }
+@media (max-width: 560px) { .mt-protocol ol, .mt-avgs { grid-template-columns: 1fr; } .mt-avgs div + div { padding-left: 0; border-left: none; border-top: 1px solid var(--border); } }
 `;

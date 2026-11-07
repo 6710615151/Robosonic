@@ -262,8 +262,13 @@ export const metadata: Metadata = {
 
   return (
     <>
-      <h1>{t.analyticsTitle}</h1>
-      <p className="muted" style={{ marginBottom: "18px" }}>{t.analyticsDesc}</p>
+      <div className="topline">
+        <div>
+          <p className="kicker">{lang === "th" ? "วิเคราะห์จากข้อมูลจริง" : "Real-data analytics"}</p>
+          <h1>{t.analyticsTitle}</h1>
+          <p className="muted">{t.analyticsDesc}</p>
+        </div>
+      </div>
       <div className="notice">This workspace uses live database rows only. No sample data is injected here.</div>
       {dbOffline && (
         <div className="notice" style={{ marginBottom: 16 }}>

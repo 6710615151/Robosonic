@@ -27,7 +27,7 @@ export type ArmPoseName =
   | "handOnChest"
   | "point";
 export type Expression = "happy" | "neutral" | "concerned" | "calm" | "sorry";
-export type Hue = "teal" | "amber" | "blue" | "grey" | "green";
+export type Hue = "teal" | "amber" | "blue" | "grey" | "green" | "lime";
 export type RobotEvent = { t: number; type: string; [key: string]: unknown };
 
 export const RIG = {
@@ -78,7 +78,7 @@ const EXPRESSIONS: Record<Expression, Face> = {
 };
 
 const HUES: Record<Hue, Vec> = {
-  teal: [0, 1, 0.75], amber: [1, 0.62, 0.05], blue: [0.25, 0.55, 1], grey: [0.5, 0.5, 0.5], green: [0.2, 1, 0.3]
+  teal: [0, 1, 0.75], amber: [1, 0.62, 0.05], blue: [0.25, 0.55, 1], grey: [0.5, 0.5, 0.5], green: [0.2, 1, 0.3], lime: [0.62, 1, 0.22]
 };
 
 type Gesture = { kind: "nod" | "shake" | "wave" | "bow" | "blink"; t0: number; dur: number; times?: number; side?: Side; depth?: number };

@@ -40,8 +40,13 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <h1>{t.profileTitle}</h1>
-      <p className="muted" style={{ marginBottom: "18px" }}>{t.profileDesc}</p>
+      <div className="topline">
+        <div>
+          <p className="kicker">{lang === "th" ? "บัญชีผู้ใช้" : "Account"}</p>
+          <h1>{t.profileTitle}</h1>
+          <p className="muted">{t.profileDesc}</p>
+        </div>
+      </div>
       
       {currentEmail ? (
         <section className="panel" style={{ border: "1px solid var(--accent)", marginBottom: "20px" }}>

@@ -9,11 +9,15 @@ export type RobotCapabilities = {
   maxSpeedMultiplier: number;
 };
 
+import type { SafetyRule } from "./adapt";
+
 export type RobotProfile = {
   id: string;
   name: { th: string; en: string };
   short: { th: string; en: string };
   capabilities: RobotCapabilities;
+  // Hardware safety limits that no passport or protocol can lift. Optional: none for the simulations.
+  safety?: SafetyRule[];
 };
 
 export const ROBOT_PROFILES: RobotProfile[] = [

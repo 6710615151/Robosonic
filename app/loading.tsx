@@ -1,15 +1,10 @@
-"use client";
-
-import { Ring } from "@/components/loading-ui/ring";
-
-export function RingDemo() {
-  return <Ring className="size-16" />;
-}
+import WaiBot from "./components/brand/WaiBot";
 
 export default function Loading() {
   return (
-    <div style={{ display: "flex", minHeight: "90vh", width: "100%", alignItems: "center", justifyContent: "center" }}>
-      <RingDemo />
+    <div className="route-loading" role="status" aria-live="polite">
+      <WaiBot pose="loading" size={96} decorative />
+      <span>Synchronising atlas…</span>
     </div>
   );
 }

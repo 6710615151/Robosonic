@@ -167,8 +167,13 @@ export default async function RobotsPage() {
 
   return (
     <>
-      <h1>{t.robotsTitle}</h1>
-      <p className="muted" style={{ marginBottom: "18px" }}>{t.robotsDesc}</p>
+      <div className="topline">
+        <div>
+          <p className="kicker">{lang === "th" ? "ทะเบียนรุ่นหุ่นยนต์" : "Model registry"}</p>
+          <h1>{t.robotsTitle}</h1>
+          <p className="muted">{t.robotsDesc}</p>
+        </div>
+      </div>
       {dbOffline && (
         <div className="notice" style={{ marginBottom: 16 }}>
           Live database records are unavailable. No substitute robot registry records are being shown.

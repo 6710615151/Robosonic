@@ -1,14 +1,14 @@
 /* The HRI Passport as a physical-looking identity card. Shared by the calibration "done" screen and the
    passport card page. Built from the HumanoidTH shell's own palette, so it reads as the same brand:
-   sidebar deep green (#0b1a15) and its border (#14352a), --accent-strong (#365b41), and a lighter cut of the
+   sidebar deep green (var(--lab-dark)) and its border (var(--lab-navy)), --accent-strong (var(--accent)), and a lighter cut of the
    amber active-marker (--warning #705c30) that stays legible on the dark ground. */
 .card {
-  --pc-ink: #0b1a15;
-  --pc-forest: #14352a;
-  --pc-leaf: #365b41;
-  --pc-text: #eef5f1;
-  --pc-muted: #b9cdc3;
-  --pc-gold: #d9b45a;
+  --pc-ink: var(--lab-dark);
+  --pc-forest: var(--lab-navy);
+  --pc-leaf: var(--accent);
+  --pc-text: var(--lab-tint);
+  --pc-muted: var(--lab-tint-border);
+  --pc-gold: var(--lab-cyan);
   --pc-gold-line: rgba(217, 180, 90, 0.45);
   --pc-chip: rgba(11, 26, 21, 0.5);
   --pc-chip-line: rgba(238, 245, 241, 0.14);
@@ -76,7 +76,7 @@
   background: rgba(238, 245, 241, 0.1);
   border: 1px solid rgba(238, 245, 241, 0.26);
 }
-.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #7fe0a5; box-shadow: 0 0 0 3px rgba(127, 224, 165, 0.2); }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--lab-cyan); box-shadow: 0 0 0 3px rgba(127, 224, 165, 0.2); }
 .statusOff::before { background: var(--pc-gold); box-shadow: 0 0 0 3px rgba(217, 180, 90, 0.2); }
 
 .body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; }

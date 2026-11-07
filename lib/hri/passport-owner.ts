@@ -13,10 +13,13 @@ export type OwnerPatch = z.infer<typeof ownerPatchSchema>;
 // unlock: verifying an edit key from the card (a wrong key is also counted as a failed lookup).
 // update: saving changed preferences.
 // delete: hard delete, deliberately rarer.
+// rotate: replace the access token in the QR, for when the QR or link was shared too widely.
 export const OWNER_LIMITS = {
   unlock: { scope: "owner-unlock", limit: 20, windowSeconds: 600 },
   update: { scope: "owner-update", limit: 30, windowSeconds: 600 },
-  delete: { scope: "owner-delete", limit: 5, windowSeconds: 3600 }
+  delete: { scope: "owner-delete", limit: 5, windowSeconds: 3600 },
+  // rotate: issue a new access token (new QR); the old one stops working at once. Rare, like delete.
+  rotate: { scope: "owner-rotate", limit: 5, windowSeconds: 3600 }
 } as const;
 
 // A stored edit key is forgotten only when the server says it is wrong. A rate limit is temporary,

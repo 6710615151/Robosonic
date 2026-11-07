@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { getTranslation } from "@/lib/translations";
+import WaiBot from "../components/brand/WaiBot";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,13 @@ export default async function DataPullsPage() {
 
   return (
     <div className="data-pulls-page">
-      <h1>{t.dataPullsTitle}</h1>
-      <p className="muted">{t.dataPullsDesc}</p>
+      <div className="topline">
+        <div>
+          <p className="kicker">{lang === "th" ? "ไปป์ไลน์ดึงข้อมูล" : "Ingestion pipeline"}</p>
+          <h1>{t.dataPullsTitle}</h1>
+          <p className="muted">{t.dataPullsDesc}</p>
+        </div>
+      </div>
       <div className="notice" style={{ marginBottom: 14 }}>
         Pull jobs save source records for later relevance and perspective review. They do not publish community submissions automatically.
       </div>
@@ -31,15 +37,15 @@ export default async function DataPullsPage() {
           <tbody>
             {jobs.map((job) => (
               <tr key={job.id}>
-                <td>{job.adapter}</td>
+                <td><strong>{job.adapter}</strong></td>
                 <td>{job.query}</td>
-                <td>{job.status}</td>
-                <td>{job.recordsFound}</td>
-                <td>{job.recordsSaved}</td>
+                <td><span className={`badge ${job.status === "SUCCEEDED" ? "ok" : job.status === "FAILED" ? "danger" : "warn"}`}>{job.status}</span></td>
+                <td className="num">{job.recordsFound}</td>
+                <td className="num">{job.recordsSaved}</td>
                 <td>{job.errorMessage}</td>
               </tr>
             ))}
-            {!jobs.length && <tr><td className="empty" colSpan={6}>No jobs yet.</td></tr>}
+            {!jobs.length && <tr><td className="empty" colSpan={6}><div className="empty-state"><WaiBot pose="empty" size={80} decorative /><span>No jobs yet.</span></div></td></tr>}
           </tbody>
         </table>
       </div>

@@ -480,7 +480,8 @@ export async function loadGraphRecordsFromPrisma(): Promise<AtlasRecord[]> {
       published_at: item.createdAt.toISOString(),
       author: null,
       confidence: item.status === "APPROVED" ? 0.8 : 0.55,
-      evidence_excerpt: item.reviewNotes ?? item.notes,
+      // reviewNotes are internal reviewer notes; the public graph only shows the submitter's own notes.
+      evidence_excerpt: item.notes,
       notes: item.status,
       data_origin: "database"
     });

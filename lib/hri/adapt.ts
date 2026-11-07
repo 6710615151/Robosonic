@@ -4,7 +4,7 @@
 // commands for a specific robot. Each robot applies the same preferences within its own hardware.
 // Pure and client-safe: no database, no network. Unit-tested in test/hri-adapt.test.ts.
 import { describeDistance } from "./passport";
-import { distanceCloseness, speedBand, type PublicProfile } from "./public-profile";
+import { distanceCloseness, SCENE_DISTANCE_RANGE, speedBand, type PublicProfile } from "./public-profile";
 import type { RobotProfile } from "./robot-profiles";
 
 export type AdaptationCode =
@@ -13,9 +13,26 @@ export type AdaptationCode =
   | "speed_capped"
   | "no_head"
   | "no_arms"
-  | "no_speaker";
+  | "no_speaker"
+  | "no_screen"
+  | "safety_speed_limit"
+  | "safety_distance_limit";
 
-export type PlanAdaptation = { code: AdaptationCode; value?: string };
+// Who set a limit. Priority, highest first: hardware safety > clinical protocol > the person's
+// Care Passport > the robot's own default. A passport can make a robot slower or keep it farther
+// away, never faster or closer than a safety rule allows.
+export type RuleSource = "hardware" | "clinical";
+export const ADAPTATION_PRIORITY = ["hardware", "clinical", "passport", "default"] as const;
+
+export type SafetyRule = {
+  source: RuleSource;
+  // Upper bound on the movement multiplier (1 = the robot's nominal speed).
+  maxSpeedMultiplier?: number;
+  // Upper bound on closeness (0 = farthest, 1 = closest across the stage range): a minimum distance.
+  maxCloseness?: number;
+};
+
+export type PlanAdaptation = { code: AdaptationCode; value?: string; source?: RuleSource };
 
 export type BehaviourPlan = {
   distance: { sceneUnits: number; band: "close" | "medium" | "far"; closeness: number; fixed: boolean };
@@ -48,7 +65,17 @@ export const DEFAULT_PLAN: BehaviourPlan = {
   adaptations: []
 };
 
-export function adapt(profile: PublicProfile, robot: RobotProfile): BehaviourPlan {
+const round2 = (value: number) => Number(value.toFixed(2));
+
+// Scene units for a closeness value (the inverse of distanceCloseness).
+function sceneUnitsFor(closeness: number) {
+  const { far, close } = SCENE_DISTANCE_RANGE;
+  return round2(far + closeness * (close - far));
+}
+
+// `rules` are clinical or site protocols (for example a ward speed limit). The robot's own hardware
+// rules (robot.safety) always apply first. With no rules the plan is exactly the capability adaptation.
+export function adapt(profile: PublicProfile, robot: RobotProfile, rules: SafetyRule[] = []): BehaviourPlan {
   const preferences = profile.preferences;
   const { capabilities } = robot;
   const adaptations: PlanAdaptation[] = [];
@@ -97,11 +124,34 @@ export function adapt(profile: PublicProfile, robot: RobotProfile): BehaviourPla
     adaptations.push({ code: "no_speaker" });
   }
 
+  // Large captions need a screen; without one the robot speaks only.
+  let captions = profile.interaction.captions;
+  if (captions === "large" && !capabilities.screen) {
+    captions = "normal";
+    adaptations.push({ code: "no_screen" });
+  }
+
+  // Safety rules last, so they win over every preference above. Hardware before clinical.
+  let distanceUnits = sceneUnits;
+  const ordered = [...(robot.safety ?? []), ...rules].sort(
+    (a, b) => ADAPTATION_PRIORITY.indexOf(a.source) - ADAPTATION_PRIORITY.indexOf(b.source)
+  );
+  for (const rule of ordered) {
+    if (!fixed && rule.maxSpeedMultiplier !== undefined && multiplier > rule.maxSpeedMultiplier) {
+      multiplier = rule.maxSpeedMultiplier;
+      adaptations.push({ code: "safety_speed_limit", value: `×${rule.maxSpeedMultiplier}`, source: rule.source });
+    }
+    if (!fixed && rule.maxCloseness !== undefined && distanceCloseness(distanceUnits) > rule.maxCloseness) {
+      distanceUnits = sceneUnitsFor(rule.maxCloseness);
+      adaptations.push({ code: "safety_distance_limit", value: describeDistance(distanceUnits).en, source: rule.source });
+    }
+  }
+
   return {
     distance: {
-      sceneUnits,
-      band: describeDistance(sceneUnits).en as "close" | "medium" | "far",
-      closeness: distanceCloseness(sceneUnits),
+      sceneUnits: distanceUnits,
+      band: describeDistance(distanceUnits).en as "close" | "medium" | "far",
+      closeness: distanceCloseness(distanceUnits),
       fixed
     },
     movement: { multiplier, band: speedBand(multiplier), mobile: capabilities.mobile },
@@ -109,11 +159,62 @@ export function adapt(profile: PublicProfile, robot: RobotProfile): BehaviourPla
     eyeMechanism,
     greeting,
     voice,
-    captions: profile.interaction.captions,
+    captions,
     language: preferences.language.tag,
     speechRate: preferences.speakingSpeed.rate,
     handover,
     demeanor: profile.interaction.demeanor,
     adaptations
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Explanation: for every preference, what the person asked for, what this robot will do, and why.
+// Values are stable codes; the UI translates them.
+
+export type PreferenceKey = "distance" | "movement" | "eyeContact" | "greeting" | "voice" | "captions" | "handover";
+export type PreferenceOutcome = "applied" | "adapted" | "not_supported";
+export type PreferenceExplanation = {
+  key: PreferenceKey;
+  requested: string;
+  applied: string;
+  outcome: PreferenceOutcome;
+  reasons: PlanAdaptation[];
+};
+
+const REASON_KEYS: Record<AdaptationCode, PreferenceKey[]> = {
+  fixed_base_distance: ["distance"],
+  safety_distance_limit: ["distance"],
+  fixed_base_speed: ["movement"],
+  speed_capped: ["movement"],
+  safety_speed_limit: ["movement"],
+  no_head: ["eyeContact"],
+  no_arms: ["greeting", "handover"],
+  no_speaker: ["voice"],
+  no_screen: ["captions"]
+};
+// Codes that mean the robot cannot do the thing at all (rather than doing a reduced version of it).
+const UNSUPPORTED: ReadonlySet<AdaptationCode> = new Set(["fixed_base_distance", "fixed_base_speed", "no_head", "no_arms", "no_speaker", "no_screen"]);
+
+export function explainPlan(profile: PublicProfile, plan: BehaviourPlan): PreferenceExplanation[] {
+  const p = profile.preferences;
+  const i = profile.interaction;
+  const rows: Omit<PreferenceExplanation, "outcome" | "reasons">[] = [
+    { key: "distance", requested: p.distance.band, applied: plan.distance.fixed ? "fixed" : plan.distance.band },
+    { key: "movement", requested: p.movementSpeed.band, applied: plan.movement.mobile ? speedBand(plan.movement.multiplier) : "stationary" },
+    { key: "eyeContact", requested: p.eyeContact.level, applied: plan.eyeMechanism === "screen_cue" ? "screen_cue" : plan.eyeContact },
+    { key: "greeting", requested: i.greeting, applied: plan.greeting },
+    { key: "voice", requested: i.voice ? "spoken" : "text", applied: plan.voice ? "spoken" : "text" },
+    { key: "captions", requested: i.captions, applied: plan.captions },
+    { key: "handover", requested: i.handover, applied: plan.handover }
+  ];
+  return rows.map((row) => {
+    // A reason only counts when it changed something the person asked for: a robot without arms
+    // does not "fail" a greeting of "none".
+    const reasons = plan.adaptations.filter((a) => REASON_KEYS[a.code].includes(row.key) && row.requested !== row.applied);
+    const outcome: PreferenceOutcome = reasons.length === 0
+      ? "applied"
+      : reasons.some((r) => UNSUPPORTED.has(r.code)) ? "not_supported" : "adapted";
+    return { ...row, outcome, reasons };
+  });
 }

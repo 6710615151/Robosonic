@@ -142,6 +142,32 @@ test("deleting is confirmed inline, then the API returns 404", async ({ browser,
   await context.close();
 });
 
+test("replacing the QR issues a new access token and kills the old one; the owner stays the owner", async ({ browser, request }) => {
+  const row = await seed();
+  const context = await ownerContext(browser, row);
+  const page = await context.newPage();
+  await page.goto(`/living-lab/passport/${row.accessToken}`);
+
+  await expect(page.getByText("This QR is a key")).toBeVisible();
+  await page.getByTestId("rotate-button").click({ timeout: 15_000 });
+  await page.getByTestId("rotate-confirm").click();
+  await page.waitForURL((url) => url.pathname.startsWith("/living-lab/passport/") && !url.pathname.endsWith(row.accessToken));
+  const fresh = page.url().split("/").pop()!;
+  expect(fresh).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+  // Still the owner on the new card (the edit key moved with it), and told what happened.
+  await expect(page.getByTestId("owner-nickname")).toHaveText("integration-test", { timeout: 15_000 });
+  await expect(page.getByText("New QR issued.")).toBeVisible();
+
+  const headers = { "x-forwarded-for": randomIp() };
+  expect((await request.get(`/api/hri/passport/${row.accessToken}`, { headers })).status()).toBe(404);
+  const ok = await request.get(`/api/hri/passport/${fresh}`, { headers });
+  expect(ok.status()).toBe(200);
+  // Preferences unchanged, so robots see the same version.
+  expect((await ok.json()).version).toBe(1);
+  await context.close();
+});
+
 // The status code is not asserted: with streaming SSR a runtime not-found can flush 200 before the
 // fallback renders, so the test checks the user-visible outcome instead (like the UI does).
 test("unknown token → not-found notice, never an owner view", async ({ browser }) => {

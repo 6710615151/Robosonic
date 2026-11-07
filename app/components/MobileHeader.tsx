@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { CircleUserRound } from "lucide-react";
+import AtlasLogo from "./brand/AtlasLogo";
 
 export default function MobileHeader() {
   return (
     <header className="mobile-header">
-      <Link href="/" className="mobile-brand">
-        <img src="/logo.png" alt="Thailand Humanoid Atlas Logo" className="mobile-logo-img" />
-        <span className="mobile-title">THAILAND HUMANOID ATLAS</span>
+      <Link href="/" className="mobile-brand" aria-label="Thailand Humanoid Atlas — Overview">
+        <AtlasLogo width={92} className="mobile-logo-img" decorative />
+        <span className="mobile-title">Thailand Humanoid <b>Atlas</b></span>
       </Link>
-      <Link href="/profile" className="mobile-profile">
-        <CircleUserRound size={22} className="profile-icon" />
+      <Link href="/profile" className="mobile-profile" aria-label="Profile">
+        <CircleUserRound size={20} className="profile-icon" />
       </Link>
     </header>
   );

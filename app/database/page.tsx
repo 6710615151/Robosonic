@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { getTranslation } from "@/lib/translations";
+import { isAdmin } from "@/lib/auth";
+import { REDACTED, isRedactedTable, redactRows } from "@/lib/public-redaction";
+import { Download, Search, ShieldCheck } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +92,11 @@ export default async function DatabasePage({ searchParams }: { searchParams: Sea
     console.error("Database query failed in database browser page:", error);
   }
 
+  // Strip contact details, review notes and masked inventory fields before rendering for non-admins.
+  const admin = await isAdmin();
+  data = redactRows(table, data, admin);
+  const redacted = !admin && isRedactedTable(table);
+
   // Column headers based on keys in records
   const headers = data.length > 0 ? Object.keys(data[0]) : [];
 
@@ -96,40 +104,30 @@ export default async function DatabasePage({ searchParams }: { searchParams: Sea
     <>
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "ข้อมูลดิบ" : "Raw tables"}</p>
           <h1>{t.databaseTitle}</h1>
           <p className="muted">{t.databaseDesc}</p>
         </div>
         <div className="toolbar">
           <a className="button primary" href={`/api/export?table=${table}`} download>
-            Export CSV ({table.replace(/_/g, " ")})
+            <Download size={15} aria-hidden="true" /> Export CSV ({table.replace(/_/g, " ")})
           </a>
         </div>
       </div>
 
-
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .db-form {
-          display: grid;
-          grid-template-columns: 1fr 2fr 100px;
-          gap: 10px;
-          align-items: end;
-          margin-bottom: 16px;
-        }
-        @media (max-width: 768px) {
-          .db-form {
-            grid-template-columns: 1fr;
-          }
-          .db-form .query-btn {
-            width: 100%;
-          }
-        }
-      `}} />
+      {redacted && (
+        <div className="notice" role="note">
+          <ShieldCheck size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 6 }} />
+          {lang === "th"
+            ? "ข้อมูลติดต่อ บันทึกการตรวจสอบ และข้อมูลที่ปิดบังของคลังอุปกรณ์จะแสดงเป็น [restricted] สำหรับผู้ที่ไม่ใช่ผู้ดูแลระบบ (รวมถึงไฟล์ CSV)"
+            : "Contact details, internal review notes and masked inventory fields show as [restricted] unless you are signed in as an administrator. CSV exports follow the same rule."}
+        </div>
+      )}
 
       {/* Selector & Search Form */}
       <form method="GET" className="panel db-form">
-        <label style={{ fontSize: "12px", display: "flex", flexDirection: "column", gap: "4px" }}>
-          Table selection
+        <label>
+          {lang === "th" ? "เลือกตาราง" : "Table selection"}
           <select name="table" defaultValue={table}>
             {tableOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -137,32 +135,35 @@ export default async function DatabasePage({ searchParams }: { searchParams: Sea
           </select>
         </label>
 
-        <label style={{ fontSize: "12px", display: "flex", flexDirection: "column", gap: "4px" }}>
-          Text Search within table
+        <label>
+          {lang === "th" ? "ค้นหาข้อความในตาราง" : "Text Search within table"}
           <input name="q" defaultValue={q} placeholder={`Search fields in ${table}...`} />
         </label>
 
-        <button type="submit" className="primary query-btn" style={{ minHeight: "36px" }}>Query</button>
+        <button type="submit" className="primary query-btn">
+          <Search size={15} aria-hidden="true" /> Query
+        </button>
       </form>
 
       {/* Dense Monospace Grid view */}
-      <div className="panel" style={{ padding: "12px" }}>
-        <h2 style={{ fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "10px" }}>
-          Table Preview: <code>{table}</code> ({data.length} records)
-        </h2>
-        
-        <div className="table-wrap" style={{ border: "1px solid var(--border)", borderRadius: "4px" }}>
-          <table style={{ fontFamily: "monospace", fontSize: "11px", whiteSpace: "nowrap" }}>
+      <section className="panel db-preview">
+        <div className="db-preview-head">
+          <h2>Table Preview: <code>{table}</code></h2>
+          <span className="badge">{data.length} records · max 250</span>
+        </div>
+
+        <div className="table-wrap db-table">
+          <table>
             <thead>
-              <tr style={{ background: "var(--surface-muted)" }}>
+              <tr>
                 {headers.map(h => (
-                  <th key={h} style={{ borderRight: "1px solid var(--border)", padding: "6px 8px" }}>{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data.map((row, idx) => (
-                <tr key={idx} style={{ borderBottom: "1px solid var(--border)" }}>
+                <tr key={idx}>
                   {headers.map(h => {
                     const val = row[h];
                     let displayVal = "";
@@ -175,9 +176,13 @@ export default async function DatabasePage({ searchParams }: { searchParams: Sea
                     } else {
                       displayVal = String(val);
                     }
+                    const cls = val === null || val === undefined ? "is-null" : val === REDACTED ? "is-redacted" : undefined;
+                    // Truncate by code point, not UTF-16 unit, so emoji/maths symbols are never split
+                    // (a split surrogate pair made the server and client text differ).
+                    const chars = Array.from(displayVal);
                     return (
-                      <td key={h} style={{ borderRight: "1px solid var(--border)", padding: "6px 8px", color: val === null ? "var(--text-secondary)" : "inherit" }}>
-                        {displayVal.length > 50 ? `${displayVal.slice(0, 48)}...` : displayVal}
+                      <td key={h} className={cls}>
+                        {chars.length > 50 ? `${chars.slice(0, 48).join("")}...` : displayVal}
                       </td>
                     );
                   })}
@@ -185,7 +190,7 @@ export default async function DatabasePage({ searchParams }: { searchParams: Sea
               ))}
               {!data.length && (
                 <tr>
-                  <td className="empty" colSpan={headers.length || 1} style={{ textAlign: "center", padding: "20px" }}>
+                  <td className="empty" colSpan={headers.length || 1}>
                     No records found in this table query.
                   </td>
                 </tr>
@@ -193,7 +198,7 @@ export default async function DatabasePage({ searchParams }: { searchParams: Sea
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </>
   );
 }

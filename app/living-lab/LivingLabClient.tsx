@@ -22,22 +22,10 @@ import PassportCardVisual from "./PassportCardVisual";
 import AutoInterview from "./AutoInterview";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
+import { labCopy } from "./lab-copy";
+import { CalibrationProgress, JourneyOverview, LabHero, LabNav, ResearchObservatory, RobotEcosystem, SectionHead } from "./LabSections";
+import type { ObservatoryStats } from "@/lib/hri/observatory";
 
-export type LabStats = {
-  comfortWithPassport: number | null;
-  comfortWithout: number | null;
-  ratings: number;
-  passports: number;
-  sessions: number;
-  meetings: number;
-  avgDistance: number | null;
-  softGazeShare: number | null;
-  voiceShare: number | null;
-  slowedShare: number | null;
-  tooCloseTotal: number;
-  cameraShare: number | null;
-  distances: number[];
-};
 export type LabRobot = { id: string; name: string; type: string; org: string | null };
 
 type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "confirm" | "auto" | "review" | "saving" | "done";
@@ -58,7 +46,7 @@ const REVIEW_SLOWER_SPEED = 0.5;
 const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
 
 export default function LivingLabClient({ lang, stats, robots, initialIdentity, identityRequired = false }: {
-  lang: Lang; stats: LabStats | null; robots: LabRobot[]; initialIdentity: ClientIdentity;
+  lang: Lang; stats: ObservatoryStats | null; robots: LabRobot[]; initialIdentity: ClientIdentity;
   // True only when HRI_IDENTITY_REQUIRED=true: the robot then waits for a verified email.
   identityRequired?: boolean;
 }) {
@@ -429,7 +417,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
       setPassportCode(code);
       setAccessToken(accessToken);
       setEditToken(editToken);
-      setQr(await QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#07150f", light: "#ffffff" } }));
+      setQr(await QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#101c2e", light: "#ffffff" } }));
       setPhase("done");
       setStatus(t.statusDone);
       say(t.doneSpeech(code));
@@ -805,7 +793,14 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, voiceSafety, lang]);
 
-  const pct = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
+  // The five headline preferences printed on the passport card (confirm preview and the issued card).
+  const cardPrefs = () => [
+    { key: "distance" as const, label: t.factDistance, value: describeDistance(comfort ?? robotRef.current?.state.distanceTarget ?? 0)[lang] },
+    { key: "speed" as const, label: t.factSpeed, value: speed < 1 ? t.slow : t.normal },
+    { key: "gaze" as const, label: t.factGaze, value: gaze === "soft" ? t.soft : t.direct },
+    { key: "language" as const, label: t.factLanguage, value: lang === "th" ? t.langThai : t.langEnglish },
+    { key: "speech" as const, label: t.factSpeech, value: accessible ? t.slow : t.normal }
+  ];
 
   const sourceLabel = (source: Source) =>
     source === "camera" ? t.interview.sourceCamera : source === "voice" ? t.interview.sourceVoice : t.interview.sourceDefault;
@@ -814,18 +809,11 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
   return (
     <main className="ll">
       <style dangerouslySetInnerHTML={{ __html: styles }} />
-      <header className="ll-head">
-        <div>
-          <p className="ll-eyebrow"><HeartHandshake size={14} aria-hidden="true" /> {t.eyebrow}</p>
-          <h1>{t.title}</h1>
-          <p className="ll-sub">{t.subtitle}</p>
-        </div>
-        <div className="ll-head-actions">
-          <Link className="button" href="/living-lab/robot">{t.robotConsole}</Link>
-          <Link className="button" href="/living-lab/meet">{t.haveCode}</Link>
-        </div>
-      </header>
+      <LabHero lang={lang} />
+      <LabNav lang={lang} />
 
+      <div className="lab-section" id="calibrate-wrap">
+      <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />
       <section className="ll-grid">
         <div className="ll-stage-card">
           <div className="ll-bubble" aria-live="polite">{speech}</div>
@@ -841,6 +829,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
 
         <div className="ll-side">
         <div className="ll-panel">
+          <CalibrationProgress lang={lang} phase={phase} auto={inputMode === "auto"} />
           {phase === "intro" && (
             <div className="ll-step">
               <h2>{t.introTitle}</h2>
@@ -1052,6 +1041,23 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
             <div className="ll-step" data-testid="confirm-step">
               <h2>{t.confirmTitle}</h2>
               <p className="ll-note">{t.confirmHint}</p>
+              <div className="ll-preview" aria-label={labCopy[lang].calibrate.previewTitle}>
+                <p className="ll-q">{labCopy[lang].calibrate.previewTitle}</p>
+                <PassportCardVisual
+                  heading={t.cardHeading}
+                  motto={t.cardMotto}
+                  code="······"
+                  codeLabel={t.codeLabel}
+                  qr={null}
+                  qrAlt={t.qrAlt}
+                  statusLabel={labCopy[lang].calibrate.steps.review}
+                  active={false}
+                  language={lang}
+                  version={1}
+                  prefs={cardPrefs()}
+                />
+                <p className="ll-note">{labCopy[lang].calibrate.previewNote}</p>
+              </div>
               <fieldset className="ll-review" disabled={phase === "saving"}>
                 <p className="ll-q">{t.factGreeting}</p>
                 <div className="ll-seg" role="group" aria-label={t.factGreeting}>
@@ -1125,13 +1131,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
                 language={lang}
                 version={1}
                 meta={t.cardVersion(1)}
-                prefs={[
-                  { key: "distance", label: t.factDistance, value: describeDistance(comfort ?? 0)[lang] },
-                  { key: "speed", label: t.factSpeed, value: speed < 1 ? t.slow : t.normal },
-                  { key: "gaze", label: t.factGaze, value: gaze === "soft" ? t.soft : t.direct },
-                  { key: "language", label: t.factLanguage, value: lang === "th" ? t.langThai : t.langEnglish },
-                  { key: "speech", label: t.factSpeech, value: accessible ? t.slow : t.normal }
-                ]}
+                prefs={cardPrefs()}
               />
               <p className="ll-q">{t.moreTitle}</p>
               <ul className="ll-facts ll-more">
@@ -1171,58 +1171,31 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
         </div>
       </section>
 
-      <section className="ll-findings">
-        <h2>{t.findingsTitle}</h2>
-        <p className="ll-sub">{t.findingsSub}</p>
-        {stats ? (
-          <div className="ll-stats">
-            <div className="ll-hero"><strong>{stats.comfortWithPassport === null ? "–" : stats.comfortWithPassport.toFixed(1)}<small>/5</small></strong><span>{t.statComfortWith}</span></div>
-            <div className="ll-hero muted"><strong>{stats.comfortWithout === null ? "–" : stats.comfortWithout.toFixed(1)}<small>/5</small></strong><span>{t.statComfortWithout}</span></div>
-            <div><strong>{stats.ratings}</strong><span>{t.statRatings}</span></div>
-            <div><strong>{stats.passports}</strong><span>{t.statPassports}</span></div>
-            <div><strong>{stats.meetings}</strong><span>{t.statMeetings}</span></div>
-            <div><strong>{stats.avgDistance === null ? "–" : describeDistance(stats.avgDistance)[lang]}</strong><span>{t.statDistance}</span></div>
-            <div><strong>{pct(stats.softGazeShare)}</strong><span>{t.statSoftGaze}</span></div>
-            <div><strong>{pct(stats.slowedShare)}</strong><span>{t.statSlowed}</span></div>
-            <div><strong>{stats.tooCloseTotal}</strong><span>{t.statTooClose}</span></div>
-          </div>
-        ) : (
-          <p className="ll-error">{t.dbOffline}</p>
-        )}
-        {robots.length > 0 && (
-          <>
-            <h3>{t.robotsTitle}</h3>
-            <p className="ll-sub">{t.robotsSub}</p>
-            <ul className="ll-robots">
-              {robots.slice(0, 12).map((r) => (
-                <li key={r.id}>
-                  <strong>{r.name}</strong>
-                  <span>{r.type.replace(/_/g, " ")}{r.org ? ` · ${r.org}` : ""}</span>
-                  <Link href={`/living-lab/meet?robot=${r.id}`}>{t.meetThisRobot}</Link>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
+      </div>
+
+      <RobotEcosystem lang={lang} robots={robots} />
+      <JourneyOverview lang={lang} passportCode={passportCode} />
+      <ResearchObservatory lang={lang} stats={stats} />
     </main>
   );
 }
 
 const styles = `
-.ll { display: grid; gap: 18px; }
+.ll { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.ll-preview { display: grid; gap: 8px; margin: 4px 0 16px; padding: 14px; border: 1px dashed var(--lab-tint-border); border-radius: 8px; background: var(--lab-paper); }
+.ll-preview .ll-q { margin: 0 !important; }
 .ll-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
-.ll-head h1 { margin: 4px 0 0; font-size: clamp(26px, 2.4vw, 36px); font-weight: 900; color: #07150f; }
+.ll-head h1 { margin: 4px 0 0; font-size: clamp(26px, 2.4vw, 36px); font-weight: 900; color: var(--lab-ink); }
 .ll-eyebrow { margin: 0; font-size: 12px; font-weight: 750; letter-spacing: 1.2px; text-transform: uppercase; color: var(--warning); display: inline-flex; gap: 6px; align-items: center; }
 .ll-sub { margin: 6px 0 0; color: var(--text-secondary); font-size: 14px; max-width: 720px; line-height: 1.5; }
 .ll-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 960px) { .ll-grid { grid-template-columns: 1fr; } }
-.ll-stage-card { position: relative; background: linear-gradient(180deg, #ffffff, #efe9df); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; height: 600px; }
+.ll-stage-card { position: relative; background: linear-gradient(180deg, #ffffff, var(--lab-stage-end)); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; height: 600px; }
 @media (max-width: 960px) { .ll-stage-card { height: 480px; } }
 .ll-stage { position: absolute; inset: 0; }
 .ll-canvas { width: 100%; height: 100%; }
 .ll-bubble { position: absolute; z-index: 2; left: 14px; right: 14px; top: 14px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 17px; line-height: 1.45; box-shadow: 0 8px 20px rgba(0,0,0,.06); min-height: 50px; }
-.ll-chip { position: absolute; z-index: 2; left: 14px; bottom: 14px; background: rgba(7,21,15,.85); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 650; }
+.ll-chip { position: absolute; z-index: 2; left: 14px; bottom: 14px; background: rgba(11,31,58,.9); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 650; }
 .ll-cam { position: absolute; z-index: 2; right: 12px; bottom: 12px; width: 150px; display: none; border-radius: 10px; overflow: hidden; border: 2px solid #fff; background: #000; }
 .ll-cam.is-on { display: block; }
 .ll-cam video { width: 100%; display: block; transform: scaleX(-1); }
@@ -1230,22 +1203,22 @@ const styles = `
 .ll-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
 .ll-owner { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: var(--accent-strong); margin: 0 0 8px !important; }
 .ll-id { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 10px; }
-.ll-id h2 { margin: 0; font-size: 18px; display: inline-flex; align-items: center; gap: 8px; color: #07150f; }
+.ll-id h2 { margin: 0; font-size: 18px; display: inline-flex; align-items: center; gap: 8px; color: var(--lab-ink); }
 .ll-id h2 svg { color: var(--accent); }
 .ll-id p { margin: 0; }
 .ll-id-form { display: grid; gap: 6px; }
 .ll-id-form label { font-size: 13px; font-weight: 700; }
 .ll-id-inline { display: flex; gap: 8px; flex-wrap: wrap; }
-.ll-id-inline input { flex: 1 1 200px; min-width: 0; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 16px; background: #fff; color: #07150f; }
-.ll-id-inline input:focus-visible { outline: 3px solid #19c37d; outline-offset: 1px; border-color: var(--accent); }
+.ll-id-inline input { flex: 1 1 200px; min-width: 0; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 16px; background: #fff; color: var(--lab-ink); }
+.ll-id-inline input:focus-visible { outline: 3px solid var(--lab-focus); outline-offset: 1px; border-color: var(--accent); }
 .ll-id-inline .ll-btn { flex: 0 0 auto; }
 .ll-id-code { font: 700 22px ui-monospace, monospace !important; letter-spacing: 8px; text-align: center; }
-.ll-id-sent { font-size: 13.5px; line-height: 1.5; background: #f4faf6; border: 1px solid #bcd9c6; border-radius: 10px; padding: 10px 12px; }
+.ll-id-sent { font-size: 13.5px; line-height: 1.5; background: var(--lab-tint); border: 1px solid var(--lab-tint-border); border-radius: 10px; padding: 10px 12px; }
 .ll-id-links { display: flex; gap: 16px; flex-wrap: wrap; }
 .ll-id-link { background: none !important; border: none !important; box-shadow: none !important; padding: 4px 0 !important; min-height: 0 !important; color: var(--accent) !important; font: inherit; font-size: 13.5px; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .ll-id-link:disabled { color: var(--text-secondary) !important; text-decoration: none; cursor: default; }
 .ll-id-privacy { font-size: 12.5px; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 10px; }
-.ll-id.is-verified { background: #f4faf6; border-color: #9cc9aa; padding: 12px 14px; }
+.ll-id.is-verified { background: var(--lab-tint); border-color: var(--lab-tint-border); padding: 12px 14px; }
 .ll-id-row { display: flex; align-items: center; gap: 10px; }
 .ll-id-check { color: var(--accent); flex: none; }
 .ll-id-who { display: grid; min-width: 0; flex: 1; }
@@ -1257,22 +1230,22 @@ const styles = `
 .ll-step p { margin: 0 0 12px; line-height: 1.5; }
 .ll-list { margin: 0 0 12px; padding-left: 20px; line-height: 1.7; }
 .ll-note { font-size: 13px; color: var(--text-secondary); }
-.ll-consent { display: flex; gap: 10px; align-items: flex-start; background: #f4faf6; border: 1px solid #bcd9c6; border-radius: 10px; padding: 12px; margin: 0 0 4px; font-size: 13.5px; line-height: 1.5; cursor: pointer; }
+.ll-consent { display: flex; gap: 10px; align-items: flex-start; background: var(--lab-tint); border: 1px solid var(--lab-tint-border); border-radius: 10px; padding: 12px; margin: 0 0 4px; font-size: 13.5px; line-height: 1.5; cursor: pointer; }
 .ll-consent input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
 .ll-consent-hint { margin: 0 0 10px; font-size: 12.5px; font-weight: 700; color: var(--warning); }
-.ll-editkey { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; margin: 0 0 12px; background: #fffdf8; }
+.ll-editkey { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; margin: 0 0 12px; background: var(--lab-paper); }
 .ll-editkey p { margin: 0 0 6px; }
 .ll-editkey-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
-.ll-editkey code { flex: 1 1 220px; word-break: break-all; font: 12.5px ui-monospace, monospace; background: #0b1511; color: #d9ffe9; border-radius: 8px; padding: 9px 10px; }
+.ll-editkey code { flex: 1 1 220px; word-break: break-all; font: 12.5px ui-monospace, monospace; background: var(--lab-dark); color: var(--lab-dark-ink); border-radius: 8px; padding: 9px 10px; }
 .ll-row, .ll-choices { display: flex; gap: 10px; flex-wrap: wrap; }
 .ll-choices { display: grid; grid-template-columns: 1fr 1fr; }
-.ll-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: #07150f; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+.ll-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: var(--lab-ink); font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
 .ll-btn.big { min-height: 60px; font-size: 17px; }
 .ll-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.ll-btn.good { background: #e8f5ec; border-color: #9cc9aa; }
+.ll-btn.good { background: var(--lab-tint); border-color: var(--lab-tint-border); }
 .ll-btn.warn { background: #fdf1e7; border-color: #e3b48c; }
 .ll-btn:disabled { opacity: .55; cursor: not-allowed; }
-.ll-btn:focus-visible { outline: 3px solid #19c37d; outline-offset: 2px; }
+.ll-btn:focus-visible { outline: 3px solid var(--lab-focus); outline-offset: 2px; }
 .ll-meter { display: flex; gap: 6px; margin-bottom: 14px; }
 .ll-meter span { flex: 1; height: 10px; border-radius: 6px; background: var(--surface-muted); }
 .ll-meter span.on { background: var(--accent); }
@@ -1285,22 +1258,22 @@ const styles = `
 .ll-more strong { text-align: right; }
 .ll-error { color: var(--danger); font-size: 14px; }
 .ll-q { margin: 12px 0 6px !important; font-weight: 700; }
-.ll-voice { background: #f4faf6; border: 1px solid #bcd9c6; border-radius: 10px; padding: 12px; margin: 10px 0; display: grid; gap: 8px; }
+.ll-voice { background: var(--lab-tint); border: 1px solid var(--lab-tint-border); border-radius: 10px; padding: 12px; margin: 10px 0; display: grid; gap: 8px; }
 .ll-voice .ll-q, .ll-voice .ll-note { margin: 0; }
 .ll-heard { margin: 0; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
 .ll-type { display: grid; gap: 4px; font-size: 13.5px; }
 .ll-type-row { display: flex; gap: 8px; }
-.ll-type-row input { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 10px; border: 1px solid #9db8a8; border-radius: 8px; font: inherit; background: #fff; color: #07150f; }
+.ll-type-row input { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 10px; border: 1px solid var(--lab-tint-border); border-radius: 8px; font: inherit; background: #fff; color: var(--lab-ink); }
 .ll-review { border: 0; margin: 0; padding: 0; min-width: 0; }
 .ll-seg { display: flex; gap: 8px; flex-wrap: wrap; }
 .ll-seg .ll-btn { flex: 1 1 120px; min-height: 48px; }
-.ll-btn.sel { background: #e8f5ec; border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
-.ll-hero { background: #f2faf5; border-color: #9cc9aa !important; }
-.ll-hero.muted { background: #faf7f2; border-color: var(--border) !important; }
+.ll-btn.sel { background: var(--lab-tint); border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.ll-hero { background: var(--lab-tint); border-color: var(--lab-tint-border) !important; }
+.ll-hero.muted { background: var(--lab-paper); border-color: var(--border) !important; }
 .ll-hero small { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-left: 2px; }
 .ll-log-wrap summary { cursor: pointer; font-weight: 700; font-size: 14px; }
-.ll-log { margin-top: 8px; max-height: 160px; overflow: auto; background: #0b1511; color: #cfe; border-radius: 8px; padding: 8px; font: 12px ui-monospace, monospace; }
-.ll-log b.robot { color: #7fd6ff; } .ll-log b.human { color: #ffd27f; }
+.ll-log { margin-top: 8px; max-height: 160px; overflow: auto; background: var(--lab-dark); color: var(--lab-dark-ink); border-radius: 8px; padding: 8px; font: 12px ui-monospace, monospace; }
+.ll-log b.robot { color: #7fdcf0; } .ll-log b.human { color: #ffd27f; }
 .ll-findings { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
 .ll-findings h2 { margin: 0; font-size: 20px; } .ll-findings h3 { margin: 18px 0 0; font-size: 16px; }
 .ll-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
@@ -1318,29 +1291,29 @@ const styles = `
   .ll-head-actions .button { flex: 1 1 auto; }
 }
 .ll-auto-offer { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-.ll-btn.auto { background: #0b1a15; border-color: #0b1a15; color: #fff; width: 100%; }
-.ll-btn.auto:disabled { background: #6f7d77; border-color: #6f7d77; }
+.ll-btn.auto { background: var(--lab-dark); border-color: var(--lab-dark); color: #fff; width: 100%; }
+.ll-btn.auto:disabled { background: var(--lab-muted-line); border-color: var(--lab-muted-line); }
 .ll-auto-stage { font-size: 17px; font-weight: 700; margin: 4px 0 10px; min-height: 1.5em; }
 .ll-auto-signals { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; font-size: 13px; }
-.ll-auto-signals span { padding: 4px 10px; border-radius: 999px; background: #f4f0e8; border: 1px solid var(--border); }
-.ll-auto-signals .ok { background: #e8f5ec; border-color: #9cc9aa; }
+.ll-auto-signals span { padding: 4px 10px; border-radius: 999px; background: var(--surface-muted); border: 1px solid var(--border); }
+.ll-auto-signals .ok { background: var(--lab-tint); border-color: var(--lab-tint-border); }
 .ll-auto-signals .warn { background: #fdf1e7; border-color: #e3b48c; }
 .ll-countdown { font-weight: 700; color: var(--accent-strong); margin: 4px 0 10px; }
 /* Where each value came from: a text tag, never colour alone. */
-.ll-src { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 700; border: 1px solid var(--border); background: #f4f0e8; color: #5b5b55; white-space: nowrap; }
-.ll-src-camera { background: #e8f5ec; border-color: #9cc9aa; color: #1d5c33; }
-.ll-src-voice { background: #0b1a15; border-color: #0b1a15; color: #d9b45a; }
+.ll-src { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 700; border: 1px solid var(--border); background: var(--surface-muted); color: var(--text-secondary); white-space: nowrap; }
+.ll-src-camera { background: var(--lab-tint); border-color: var(--lab-tint-border); color: var(--lab-tint-ink); }
+.ll-src-voice { background: var(--lab-dark); border-color: var(--lab-dark); color: var(--lab-cyan); }
 .ll-mic { display: grid; gap: 6px; margin: 0 0 12px; }
 .ll-mic .ll-note { margin: 0; }
-.ll-interview { display: grid; gap: 10px; margin: 14px 0; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #fcfbf8; }
+.ll-interview { display: grid; gap: 10px; margin: 14px 0; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--lab-paper); }
 .ll-interview h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 16px; }
 .ll-interview p { margin: 0; }
 .ll-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
 .ll-topics li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: #fff; }
-.ll-topics li.done { background: #e8f5ec; border-color: #9cc9aa; color: #1d5c33; font-weight: 700; }
+.ll-topics li.done { background: var(--lab-tint); border-color: var(--lab-tint-border); color: var(--lab-tint-ink); font-weight: 700; }
 .ll-chat { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; max-height: 240px; overflow: auto; }
 .ll-chat li { padding: 8px 11px; border-radius: 10px; font-size: 14px; line-height: 1.5; border: 1px solid var(--border); background: #fff; }
-.ll-chat li.robot { background: #eef6f0; border-color: #cfe3d5; }
+.ll-chat li.robot { background: var(--lab-tint); border-color: var(--lab-tint-border); }
 .ll-chat li b { margin-right: 6px; font-size: 12px; }
 .ll-type input { flex: 1 1 200px; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); font: inherit; background: #fff; }
 @media (prefers-reduced-motion: reduce) {

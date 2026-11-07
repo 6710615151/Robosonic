@@ -91,7 +91,14 @@ export const cardCopy = {
     notFoundTitle: "Passport not found",
     notFoundBody: "This card link is not valid, or the passport was deleted. Ask the owner for a new QR.",
     unavailableTitle: "Passport unavailable",
-    unavailableBody: "The service is temporarily unavailable. Your passport data has not been changed."
+    unavailableBody: "The service is temporarily unavailable. Your passport data has not been changed.",
+    qrSecurityTitle: "This QR is a key",
+    qrSecurity: "Anyone who scans the QR or opens this link can read the preferences robots use. They cannot see your nickname, email or how robots make you feel, and they cannot edit or delete without your edit key. Share it only with robots and people you trust.",
+    rotate: "Replace QR",
+    rotateTitle: "Replace the QR and link",
+    rotateHint: "Use this if the QR or link was shared too widely. You get a new QR. The old QR, the old link and every robot that saved it stop working immediately. Your preferences and edit key stay the same.",
+    rotateConfirm: "Yes, replace the QR",
+    rotated: "New QR issued. The old QR and link no longer work. Save or reprint this card."
   },
   th: {
     eyebrow: "HRI Passport",
@@ -184,7 +191,14 @@ export const cardCopy = {
     notFoundTitle: "ไม่พบพาสปอร์ต",
     notFoundBody: "ลิงก์การ์ดนี้ไม่ถูกต้อง หรือพาสปอร์ตถูกลบแล้ว กรุณาขอ QR ใหม่จากเจ้าของ",
     unavailableTitle: "พาสปอร์ตใช้งานไม่ได้ชั่วคราว",
-    unavailableBody: "ระบบไม่พร้อมให้บริการชั่วคราว ข้อมูลพาสปอร์ตของคุณไม่ถูกเปลี่ยนแปลง"
+    unavailableBody: "ระบบไม่พร้อมให้บริการชั่วคราว ข้อมูลพาสปอร์ตของคุณไม่ถูกเปลี่ยนแปลง",
+    qrSecurityTitle: "QR นี้คือกุญแจ",
+    qrSecurity: "ใครก็ตามที่สแกน QR หรือเปิดลิงก์นี้จะอ่านความชอบที่หุ่นยนต์ใช้ได้ แต่จะไม่เห็นชื่อเล่น อีเมล หรือความรู้สึกของคุณต่อหุ่นยนต์ และแก้ไขหรือลบไม่ได้หากไม่มีคีย์แก้ไข กรุณาแชร์เฉพาะกับหุ่นยนต์และคนที่คุณไว้ใจ",
+    rotate: "เปลี่ยน QR",
+    rotateTitle: "เปลี่ยน QR และลิงก์",
+    rotateHint: "ใช้เมื่อ QR หรือลิงก์ถูกแชร์ออกไปกว้างเกินไป คุณจะได้ QR ใหม่ ส่วน QR เดิม ลิงก์เดิม และหุ่นยนต์ทุกตัวที่บันทึกไว้จะใช้ไม่ได้ทันที ความชอบและคีย์แก้ไขยังเหมือนเดิม",
+    rotateConfirm: "ยืนยันเปลี่ยน QR",
+    rotated: "ออก QR ใหม่แล้ว QR และลิงก์เดิมใช้ไม่ได้อีก กรุณาบันทึกหรือพิมพ์การ์ดนี้ใหม่"
   }
 } as const;
 

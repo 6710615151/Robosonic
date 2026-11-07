@@ -3,11 +3,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { Copy, Lock, Pencil, Share2, ShieldCheck, Trash2, X } from "lucide-react";
+import { Copy, KeyRound, Lock, Pencil, RefreshCw, Share2, ShieldCheck, Trash2, X } from "lucide-react";
 import { describeDistance } from "@/lib/hri/passport";
 import { shouldForgetEditKey } from "@/lib/hri/passport-owner";
 import PassportCardVisual from "../../PassportCardVisual";
-import { deletePassportAction, getOwnerViewAction, updatePassportAction } from "../../actions";
+import { deletePassportAction, getOwnerViewAction, rotateAccessTokenAction, updatePassportAction } from "../../actions";
 import { cardCopy, type CardLang } from "../copy";
 import styles from "../passport.module.css";
 
@@ -122,6 +122,8 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [confirmRotate, setConfirmRotate] = useState(false);
+  const [rotating, setRotating] = useState(false);
 
   const errorText = (error: string) => {
     if (error === "rate_limited") return t.rateLimited;
@@ -168,13 +170,23 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, storageKey, lang]);
 
+  // Arriving here right after replacing the QR: say so once.
+  useEffect(() => {
+    try {
+      if (window.sessionStorage.getItem("hri-passport-rotated")) {
+        window.sessionStorage.removeItem("hri-passport-rotated");
+        setSaveMsg(cardCopy[lang].rotated);
+      }
+    } catch { /* storage unavailable */ }
+  }, [lang]);
+
   // The QR encodes this card's own URL, so scanning it opens the same passport anywhere.
   useEffect(() => {
     let alive = true;
     QRCode.toDataURL(`${window.location.origin}/living-lab/passport/${token}`, {
       margin: 1,
       width: 240,
-      color: { dark: "#07150f", light: "#ffffff" }
+      color: { dark: "#101c2e", light: "#ffffff" }
     })
       .then((data) => { if (alive) setQr(data); })
       .catch(() => undefined);
@@ -285,6 +297,29 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
     setDeleting(false);
   }
 
+  async function rotate() {
+    if (!editKey || rotating) return;
+    setRotating(true);
+    setSaveError(null);
+    try {
+      const res = await rotateAccessTokenAction(token, editKey);
+      if (res.ok) {
+        // Keep the edit key under the new card URL, forget it under the dead one, then open the new card.
+        try {
+          window.localStorage.setItem(`hri-passport-edit:${res.accessToken}`, editKey);
+          window.localStorage.removeItem(storageKey);
+          window.sessionStorage.setItem("hri-passport-rotated", "1");
+        } catch { /* private mode: the owner can paste the edit key again */ }
+        window.location.replace(`/living-lab/passport/${res.accessToken}`);
+        return;
+      }
+      setSaveError(errorText(res.error));
+    } catch {
+      setSaveError(t.rateLimited);
+    }
+    setRotating(false);
+  }
+
   if (deleted) {
     return (
       <main className={styles.page}>
@@ -368,6 +403,10 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
             <div><dt>{t.updated}</dt><dd>{live.updatedAtLabel}</dd></div>
             <div><dt>{t.expires}</dt><dd>{live.expiresAtLabel ?? t.noExpiry}</dd></div>
           </dl>
+          <div className={styles.qrSecurity}>
+            <h3><KeyRound size={15} aria-hidden="true" /> {t.qrSecurityTitle}</h3>
+            <p>{t.qrSecurity}</p>
+          </div>
         </aside>
       </section>
 
@@ -444,7 +483,10 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
                   <button className={`${styles.btn} ${styles.primary}`} onClick={startEdit} data-testid="edit-button">
                     <Pencil size={16} aria-hidden="true" /> {t.edit}
                   </button>
-                  <button className={`${styles.btn} ${styles.danger}`} onClick={() => setConfirmDelete(true)} data-testid="delete-button">
+                  <button className={styles.btn} onClick={() => { setConfirmRotate(true); setConfirmDelete(false); }} data-testid="rotate-button">
+                    <RefreshCw size={16} aria-hidden="true" /> {t.rotate}
+                  </button>
+                  <button className={`${styles.btn} ${styles.danger}`} onClick={() => { setConfirmDelete(true); setConfirmRotate(false); }} data-testid="delete-button">
                     <Trash2 size={16} aria-hidden="true" /> {t.delete}
                   </button>
                 </div>
@@ -579,6 +621,21 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
                   </button>
                 </div>
               </>
+            )}
+
+            {confirmRotate && !editing && (
+              <div className={styles.rotateZone}>
+                <h3>{t.rotateTitle}</h3>
+                <p className={styles.note}>{t.rotateHint}</p>
+                <div className={styles.row}>
+                  <button className={`${styles.btn} ${styles.primary}`} onClick={rotate} disabled={rotating} data-testid="rotate-confirm">
+                    <RefreshCw size={16} aria-hidden="true" /> {rotating ? t.saving : t.rotateConfirm}
+                  </button>
+                  <button className={styles.btn} onClick={() => setConfirmRotate(false)} disabled={rotating}>
+                    <X size={16} aria-hidden="true" /> {t.cancel}
+                  </button>
+                </div>
+              </div>
             )}
 
             {confirmDelete && !editing && (

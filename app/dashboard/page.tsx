@@ -114,6 +114,7 @@ export default async function DashboardPage() {
     <>
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "คอนโซลข่าวกรองงานวิจัย" : "Research intelligence console"}</p>
           <h1>{t.dashboardTitle}</h1>
           <p className="muted">
             {t.dashboardDesc}
@@ -122,28 +123,28 @@ export default async function DashboardPage() {
       </div>
 
       {data.dbOffline && (
-        <div className="notice" style={{ backgroundColor: "#fffbeb", borderLeftColor: "var(--warning)", marginBottom: "16px" }}>
+        <div className="notice warn" style={{ marginBottom: "16px" }}>
           <strong>Database Offline:</strong> Live PostgreSQL is unavailable. This dashboard is not substituting example records.
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px", marginTop: "12px" }}>
+      <div className="dash-grid">
         
         {/* Location Distribution */}
         <section className="panel">
           <h2>Robot Origin Locations</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="bar-list">
             {data.locations.map((loc) => {
               const count = loc._count._all;
               const pct = locTotal > 0 ? (count / locTotal) * 100 : 0;
               return (
                 <div key={loc.countryOfOrigin || "unknown"}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+                  <div className="bar-row-head">
                     <span>{loc.countryOfOrigin || "Unknown"}</span>
                     <strong>{count} ({pct.toFixed(1)}%)</strong>
                   </div>
-                  <div style={{ height: "8px", background: "var(--surface-muted)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -155,18 +156,18 @@ export default async function DashboardPage() {
         {/* Robot Categories */}
         <section className="panel">
           <h2>Robot Categories</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="bar-list">
             {data.robotTypes.map((type) => {
               const count = type._count._all;
               const pct = typeTotal > 0 ? (count / typeTotal) * 100 : 0;
               return (
                 <div key={type.robotType}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+                  <div className="bar-row-head">
                     <span style={{ textTransform: "capitalize" }}>{type.robotType.replace(/_/g, " ")}</span>
                     <strong>{count} ({pct.toFixed(1)}%)</strong>
                   </div>
-                  <div style={{ height: "8px", background: "var(--surface-muted)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -178,18 +179,18 @@ export default async function DashboardPage() {
         {/* Source Record Types */}
         <section className="panel">
           <h2>Source Record Types</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="bar-list">
             {data.sourceTypes.map((st) => {
               const count = st._count._all;
               const pct = srcTotal > 0 ? (count / srcTotal) * 100 : 0;
               return (
                 <div key={st.sourceType}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+                  <div className="bar-row-head">
                     <span style={{ textTransform: "capitalize" }}>{st.sourceType.replace(/_/g, " ")}</span>
                     <strong>{count} ({pct.toFixed(1)}%)</strong>
                   </div>
-                  <div style={{ height: "8px", background: "var(--surface-muted)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -201,18 +202,18 @@ export default async function DashboardPage() {
         {/* Embodiment Level */}
         <section className="panel">
           <h2>Robot Embodiment Levels</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="bar-list">
             {data.embodimentLevels.map((el) => {
               const count = el._count._all;
               const pct = embTotal > 0 ? (count / embTotal) * 100 : 0;
               return (
                 <div key={el.embodimentLevel}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+                  <div className="bar-row-head">
                     <span style={{ textTransform: "capitalize" }}>{el.embodimentLevel.replace(/_/g, " ")}</span>
                     <strong>{count} ({pct.toFixed(1)}%)</strong>
                   </div>
-                  <div style={{ height: "8px", background: "var(--surface-muted)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -224,18 +225,18 @@ export default async function DashboardPage() {
         {/* Contribution Type */}
         <section className="panel">
           <h2>Contribution Types</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="bar-list">
             {data.contributionTypes.map((ct) => {
               const count = ct._count._all;
               const pct = contribTotal > 0 ? (count / contribTotal) * 100 : 0;
               return (
                 <div key={ct.contributionType}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+                  <div className="bar-row-head">
                     <span style={{ textTransform: "capitalize" }}>{ct.contributionType.replace(/_/g, " ")}</span>
                     <strong>{count} ({pct.toFixed(1)}%)</strong>
                   </div>
-                  <div style={{ height: "8px", background: "var(--surface-muted)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -247,18 +248,18 @@ export default async function DashboardPage() {
         {/* Perspective Themes */}
         <section className="panel">
           <h2>Perspective Themes</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="bar-list">
             {data.themes.map((th) => {
               const count = th._count._all;
               const pct = themeTotal > 0 ? (count / themeTotal) * 100 : 0;
               return (
                 <div key={th.perspectiveTheme}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+                  <div className="bar-row-head">
                     <span style={{ textTransform: "capitalize" }}>{th.perspectiveTheme.replace(/_/g, " ")}</span>
                     <strong>{count} ({pct.toFixed(1)}%)</strong>
                   </div>
-                  <div style={{ height: "8px", background: "var(--surface-muted)", borderRadius: "4px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -270,38 +271,38 @@ export default async function DashboardPage() {
       </div>
 
       {/* Confidence Score Buckets */}
-      <h2 style={{ marginTop: "24px" }}>Extracted Confidence Distribution</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginTop: "12px" }}>
+      <h2 className="dash-section-title">Extracted Confidence Distribution</h2>
+      <div className="dash-grid dash-grid--conf">
         
         {/* Perspective Confidence Distribution */}
         <section className="panel">
           <h2>Perspective Annotations (total: {totalAnnotations})</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
+          <div className="bar-list bar-list--tight">
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+              <div className="bar-row-head bar-row-head--sm">
                 <span>High (Confidence &ge; 0.8)</span>
                 <strong>{data.highConfidenceAnn}</strong>
               </div>
-              <div style={{ height: "6px", background: "var(--surface-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${totalAnnotations > 0 ? (data.highConfidenceAnn / totalAnnotations) * 100 : 0}%`, height: "100%", background: "var(--success)" }} />
+              <div className="bar-track thin">
+                <div className="bar-fill ok" style={{ width: `${totalAnnotations > 0 ? (data.highConfidenceAnn / totalAnnotations) * 100 : 0}%` }} />
               </div>
             </div>
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+              <div className="bar-row-head bar-row-head--sm">
                 <span>Moderate (0.5 &le; Confidence &lt; 0.8)</span>
                 <strong>{data.medConfidenceAnn}</strong>
               </div>
-              <div style={{ height: "6px", background: "var(--surface-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${totalAnnotations > 0 ? (data.medConfidenceAnn / totalAnnotations) * 100 : 0}%`, height: "100%", background: "var(--warning)" }} />
+              <div className="bar-track thin">
+                <div className="bar-fill warn" style={{ width: `${totalAnnotations > 0 ? (data.medConfidenceAnn / totalAnnotations) * 100 : 0}%` }} />
               </div>
             </div>
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+              <div className="bar-row-head bar-row-head--sm">
                 <span>Low (Confidence &lt; 0.5)</span>
                 <strong>{data.lowConfidenceAnn}</strong>
               </div>
-              <div style={{ height: "6px", background: "var(--surface-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${totalAnnotations > 0 ? (data.lowConfidenceAnn / totalAnnotations) * 100 : 0}%`, height: "100%", background: "var(--low-confidence)" }} />
+              <div className="bar-track thin">
+                <div className="bar-fill low" style={{ width: `${totalAnnotations > 0 ? (data.lowConfidenceAnn / totalAnnotations) * 100 : 0}%` }} />
               </div>
             </div>
           </div>
@@ -310,32 +311,32 @@ export default async function DashboardPage() {
         {/* Source Relevance Confidence Distribution */}
         <section className="panel">
           <h2>Source Relevance Confidence (total: {totalSources})</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
+          <div className="bar-list bar-list--tight">
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+              <div className="bar-row-head bar-row-head--sm">
                 <span>High (Confidence &ge; 0.8)</span>
                 <strong>{data.highConfidenceSrc}</strong>
               </div>
-              <div style={{ height: "6px", background: "var(--surface-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${totalSources > 0 ? (data.highConfidenceSrc / totalSources) * 100 : 0}%`, height: "100%", background: "var(--success)" }} />
+              <div className="bar-track thin">
+                <div className="bar-fill ok" style={{ width: `${totalSources > 0 ? (data.highConfidenceSrc / totalSources) * 100 : 0}%` }} />
               </div>
             </div>
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+              <div className="bar-row-head bar-row-head--sm">
                 <span>Moderate (0.5 &le; Confidence &lt; 0.8)</span>
                 <strong>{data.medConfidenceSrc}</strong>
               </div>
-              <div style={{ height: "6px", background: "var(--surface-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${totalSources > 0 ? (data.medConfidenceSrc / totalSources) * 100 : 0}%`, height: "100%", background: "var(--warning)" }} />
+              <div className="bar-track thin">
+                <div className="bar-fill warn" style={{ width: `${totalSources > 0 ? (data.medConfidenceSrc / totalSources) * 100 : 0}%` }} />
               </div>
             </div>
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+              <div className="bar-row-head bar-row-head--sm">
                 <span>Low (Confidence &lt; 0.5)</span>
                 <strong>{data.lowConfidenceSrc}</strong>
               </div>
-              <div style={{ height: "6px", background: "var(--surface-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${totalSources > 0 ? (data.lowConfidenceSrc / totalSources) * 100 : 0}%`, height: "100%", background: "var(--low-confidence)" }} />
+              <div className="bar-track thin">
+                <div className="bar-fill low" style={{ width: `${totalSources > 0 ? (data.lowConfidenceSrc / totalSources) * 100 : 0}%` }} />
               </div>
             </div>
           </div>

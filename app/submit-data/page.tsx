@@ -114,6 +114,7 @@ export default async function SubmitDataPage() {
     <>
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "ร่วมส่งข้อมูล" : "Community contribution"}</p>
           <h1>{t.submitTitle}</h1>
           <p className="muted">{t.submitDesc}</p>
         </div>

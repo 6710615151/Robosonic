@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { getTranslation } from "@/lib/translations";
 import AdminLoginForm from "./AdminLoginForm";
+import AtlasLogo from "../components/brand/AtlasLogo";
+import { ShieldCheck } from "lucide-react";
 
 type SearchParams = Promise<{ error?: string; from?: string }>;
 
@@ -42,9 +44,10 @@ export const metadata: Metadata = {
         .login-wrapper {
           min-height: 100dvh;
           width: 100%;
-          background: #eae9df;
-          background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
-          background-size: 24px 24px;
+          background:
+            radial-gradient(60% 60% at 50% 40%, rgba(22, 168, 120, 0.22), transparent 70%),
+            var(--lai-dark) 0 0 / 56px 56px,
+            var(--th-forest);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -76,9 +79,10 @@ export const metadata: Metadata = {
         }
 
         .login-card {
-          background: #08130f;
-          border: 1px solid #11261f;
-          border-radius: 16px;
+          background: linear-gradient(160deg, rgba(7, 59, 47, 0.92), rgba(6, 21, 15, 0.96));
+          border: 1px solid rgba(198, 164, 91, 0.35);
+          border-radius: 18px;
+          backdrop-filter: blur(6px);
           padding: 28px 34px 32px;
           width: 100%;
           box-shadow: 0 20px 50px rgba(5, 13, 10, 0.45);
@@ -93,13 +97,40 @@ export const metadata: Metadata = {
           left: -50%;
           width: 200%;
           height: 200%;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 60%);
+          background: radial-gradient(circle, rgba(185, 244, 90, 0.07) 0%, transparent 60%);
           pointer-events: none;
         }
 
+        .login-brand {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 12px;
+          color: #ffffff;
+          font-family: var(--font-grotesk), var(--font-display);
+          font-weight: 700;
+          font-size: 15px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .login-brand b { color: var(--th-lime); }
+        .login-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin: 0 0 10px;
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--th-gold);
+          position: relative;
+          z-index: 2;
+        }
         .login-title {
-          font-size: 21px;
-          font-weight: 800;
+          font-family: var(--font-display);
+          font-size: 22px;
+          font-weight: 700;
           color: #ffffff;
           margin: 0 0 6px 0;
           letter-spacing: -0.5px;
@@ -109,7 +140,7 @@ export const metadata: Metadata = {
 
         .login-desc {
           font-size: 13px;
-          color: #78998c;
+          color: #a9c4b8;
           line-height: 1.4;
           margin: 0 0 20px 0;
           position: relative;
@@ -136,8 +167,8 @@ export const metadata: Metadata = {
         }
 
         .login-input {
-          background: rgba(20, 53, 42, 0.45);
-          border: 1px solid rgba(20, 53, 42, 0.8);
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px solid rgba(185, 244, 90, 0.22);
           border-radius: 8px;
           color: #ffffff;
           padding: 10px 14px;
@@ -147,9 +178,9 @@ export const metadata: Metadata = {
         }
 
         .login-input:focus {
-          border-color: #10B981;
-          background: rgba(20, 53, 42, 0.65);
-          box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+          border-color: var(--th-lime);
+          background: rgba(0, 0, 0, 0.32);
+          box-shadow: 0 0 0 3px rgba(185, 244, 90, 0.16);
         }
 
         .password-input-wrap {
@@ -187,7 +218,7 @@ export const metadata: Metadata = {
         }
 
         .password-toggle:hover {
-          background: rgba(16, 185, 129, 0.12);
+          background: rgba(185, 244, 90, 0.12);
           box-shadow: none;
           color: #ffffff;
           transform: translateY(-50%);
@@ -198,13 +229,13 @@ export const metadata: Metadata = {
         }
 
         .password-toggle:focus-visible {
-          outline: 2px solid #10B981;
+          outline: 2px solid var(--th-lime);
           outline-offset: 2px;
         }
 
         .login-btn {
-          background: #10B981;
-          color: #050e0a;
+          background: var(--th-lime);
+          color: var(--th-forest);
           border: none;
           border-radius: 8px;
           padding: 12px;
@@ -216,7 +247,7 @@ export const metadata: Metadata = {
         }
 
         .login-btn:hover {
-          background: #34d399;
+          background: #c9fb72;
           transform: translateY(-1px);
         }
 
@@ -269,7 +300,11 @@ export const metadata: Metadata = {
       `}} />
 
       <div className="login-stack">
+        <div className="login-brand">
+          <AtlasLogo width={240} />
+        </div>
         <div className="login-card">
+          <p className="login-kicker"><ShieldCheck size={13} aria-hidden="true" /> {lang === "th" ? "พื้นที่ผู้ดูแลระบบ" : "Administrator access"}</p>
           <h2 className="login-title">{localT.title}</h2>
           <p className="login-desc">{localT.desc}</p>
 

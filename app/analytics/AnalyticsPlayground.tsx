@@ -105,7 +105,8 @@ const fieldCatalog: Record<Scope, Array<{ value: string; label: string }>> = {
   ]
 };
 
-const palette = ["#19523c", "#28744b", "#4f8b62", "#7fa87f", "#a9bea9", "#d4af37", "#c5931b", "#9c2e26", "#5e7568"];
+// HumanoidTH categorical palette: emerald → jade → lime, then gold and warm accents for contrast.
+const palette = ["#073b2f", "#16a878", "#8ccf3a", "#c6a45b", "#0e6b50", "#5fc7a0", "#8a6116", "#a8322a", "#4b5852"];
 const remainderLabel = "Remaining live categories";
 
 function humanize(value: string) {
@@ -313,9 +314,9 @@ export default function AnalyticsPlayground({ events }: AnalyticsPlaygroundProps
   }, [matrix, scopeEvents, trendSeriesTotals]);
 
   return (
-    <div style={{ display: "grid", gap: "16px" }}>
+    <div className="playground">
       <section className="panel motion-panel motion-pop">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+        <div className="playground-controls">
           <div>
             <div className="muted">Scope</div>
             <select value={scope} onChange={(e) => setScope(e.target.value as Scope)} style={{ width: "100%" }}>
@@ -396,9 +397,9 @@ export default function AnalyticsPlayground({ events }: AnalyticsPlaygroundProps
           <div style={{ width: "100%", height: 360, marginTop: "12px" }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendRows} margin={{ top: 10, right: 18, left: 0, bottom: 6 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#d8ded8" />
-                <XAxis dataKey="timeKey" stroke="#56645c" tick={{ fontSize: 12 }} />
-                <YAxis allowDecimals={false} stroke="#56645c" tick={{ fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2dccd" />
+                <XAxis dataKey="timeKey" stroke="#4b5852" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} stroke="#4b5852" tick={{ fontSize: 12 }} />
                 <Tooltip
                   formatter={(value: unknown) => [value as number, "Records"]}
                   labelFormatter={(label) => `Period: ${label}`}
@@ -451,16 +452,16 @@ export default function AnalyticsPlayground({ events }: AnalyticsPlaygroundProps
             <div style={{ width: "100%", height: 360, marginTop: "12px" }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart margin={{ top: 10, right: 14, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d8ded8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2dccd" />
                   <XAxis
                     type="number"
                     dataKey="x"
                     domain={["dataMin", "dataMax"]}
                     name="Time"
                     tickFormatter={(value) => new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short" })}
-                    stroke="#56645c"
+                    stroke="#4b5852"
                   />
-                  <YAxis type="number" dataKey="y" domain={[0, 1]} name="Confidence" stroke="#56645c" />
+                  <YAxis type="number" dataKey="y" domain={[0, 1]} name="Confidence" stroke="#4b5852" />
                   <ZAxis type="number" dataKey="y" range={[30, 120]} />
                   <Tooltip
                     cursor={{ strokeDasharray: "3 3" }}
@@ -471,7 +472,7 @@ export default function AnalyticsPlayground({ events }: AnalyticsPlaygroundProps
                       return new Date(point.x).toLocaleString();
                     }}
                   />
-                  <Scatter data={confidenceSeries} fill="#19523c" isAnimationActive animationDuration={500} />
+                  <Scatter data={confidenceSeries} fill="#16a878" isAnimationActive animationDuration={500} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
@@ -517,7 +518,7 @@ export default function AnalyticsPlayground({ events }: AnalyticsPlaygroundProps
                       <td
                         key={`${rowLabel}-${colLabel}`}
                         style={{
-                          background: count > 0 ? `rgba(25, 82, 60, ${alpha})` : "transparent",
+                          background: count > 0 ? `rgba(7, 59, 47, ${alpha})` : "transparent",
                           textAlign: "center",
                           fontWeight: count > 0 ? 700 : 400
                         }}

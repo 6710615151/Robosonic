@@ -7,7 +7,7 @@ import { newPassportCode, normalizePassportCode, passportSchema, sessionSchema }
 import { OWNER_LIMITS, ownerPatchSchema } from "@/lib/hri/passport-owner";
 import { API_LIMITS } from "@/lib/hri/passport-api";
 import { consumeActionLimit, consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
-import { hashToken, isWellFormedToken, issuePassportTokens, tokenMatchesHash } from "@/lib/hri/security";
+import { generateToken, hashToken, isWellFormedToken, issuePassportTokens, tokenMatchesHash } from "@/lib/hri/security";
 import { minimiseEvents, minimiseSummary } from "@/lib/hri/session-privacy";
 import { currentParticipant, identityRequired } from "@/lib/hri/identity-server";
 import { maskEmail, ownerForNewPassport } from "@/lib/hri/identity";
@@ -172,6 +172,19 @@ export async function deletePassportAction(accessTokenRaw: string, editTokenRaw:
   if (!passport) return { ok: false as const, error: "not_found" as const };
   await prisma.hriPassport.delete({ where: { id: passport.id } });
   return { ok: true as const };
+}
+
+// Replaces the access token (the secret in the QR and card link) with a new one. The old QR, card
+// link and every robot holding the old token lose access immediately; the edit key stays the same.
+// Preferences are unchanged, so the version is not bumped. The new token is returned once.
+export async function rotateAccessTokenAction(accessTokenRaw: string, editTokenRaw: string) {
+  const gate = await ownerGate(OWNER_LIMITS.rotate);
+  if (!gate.ok) return { ok: false as const, error: gate.error };
+  const passport = await ownedPassport(accessTokenRaw, editTokenRaw, gate.caller);
+  if (!passport) return { ok: false as const, error: "not_found" as const };
+  const accessToken = generateToken();
+  await prisma.hriPassport.update({ where: { id: passport.id }, data: { accessTokenHash: hashToken(accessToken) } });
+  return { ok: true as const, accessToken };
 }
 
 // Records one care-journey station (or a meeting) between a passport holder and a registry robot,

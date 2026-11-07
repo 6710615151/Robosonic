@@ -14,7 +14,7 @@ export default function RobotViewer() {
     const later = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
     // Hands-on-hips (the model's rest pose) reads as impolite in Thai settings, so stand relaxed.
     robot.bothArms("relaxed");
-    robot.setGlow(0.6, "teal");
+    robot.setGlow(0.6, "lime");
     robot.snap();
 
     later(3200, () => {
@@ -39,5 +39,5 @@ export default function RobotViewer() {
 
   useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
 
-  return <RobotStage framing="portrait" pointerGaze draggable onReady={onReady} ariaLabel="Interactive humanoid robot model" />;
+  return <RobotStage framing="portrait" pointerGaze draggable livery="atlas" onReady={onReady} ariaLabel="Interactive 3D HumanoidTH robot: drag to rotate" />;
 }

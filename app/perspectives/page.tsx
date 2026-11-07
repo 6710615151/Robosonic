@@ -61,8 +61,13 @@ export const metadata: Metadata = {
 
   return (
     <>
-      <h1>{t.perspectivesTitle}</h1>
-      <p className="muted">{t.perspectivesDesc}</p>
+      <div className="topline">
+        <div>
+          <p className="kicker">{lang === "th" ? "เสียงสาธารณะและสื่อ" : "Public & media voice"}</p>
+          <h1>{t.perspectivesTitle}</h1>
+          <p className="muted">{t.perspectivesDesc}</p>
+        </div>
+      </div>
       {dbOffline && (
         <div className="notice" style={{ marginBottom: 16 }}>
           Live perspective annotations are unavailable. No substitute perspective records are being shown.

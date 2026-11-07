@@ -158,6 +158,7 @@ export default async function AdminConsolePage({ searchParams }: { searchParams:
     <div className="admin-page">
       <div className="topline">
         <div>
+          <p className="kicker">{lang === "th" ? "คอนโซลตรวจสอบและ CMS" : "Review console & CMS"}</p>
           <h1>{t.adminTitle}</h1>
           <p className="muted">{t.adminDesc} {t.cmsDesc}</p>
         </div>
@@ -167,7 +168,7 @@ export default async function AdminConsolePage({ searchParams }: { searchParams:
       </div>
 
       {dbOffline && (
-        <div className="notice" style={{ backgroundColor: "#fff4f4", borderLeftColor: "var(--danger)", marginBottom: "16px" }}>
+        <div className="notice danger" style={{ marginBottom: "16px" }}>
           <strong>Database Offline:</strong> {localT.dbOffline}
           <div className="muted" style={{ marginTop: "6px", fontSize: "12px" }}>{errorMessage}</div>
         </div>
