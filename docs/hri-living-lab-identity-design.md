@@ -122,8 +122,8 @@ export type IdentityDeps = {
 2. ขอรหัสใหม่ = รหัสเก่าของอีเมลนั้นใช้ไม่ได้ทันที มีรหัสที่ใช้ได้ได้ทีละ 1 ตัวต่ออีเมล
 3. รหัสใช้ได้ **ครั้งเดียว**, หมดอายุ **10 นาที**, ผิดได้ **5 ครั้ง** แล้ว challenge นั้นตาย (`too_many_attempts`)
 4. `verifyCode` สำเร็จครั้งแรก = สร้าง Participant (sign-up และ sign-in คือ flow เดียวกัน)
-5. `sendFailed` ไม่ทิ้ง challenge ที่ใช้ได้ไว้ (ลบ/mark consumed) และไม่หัก cooldown ของผู้ใช้
-6. `readSession` ไม่ throw: token ปลอม หมดอายุ หรือ participant ถูกลบ → `null`
+5. `sendFailed` ไม่สร้าง challenge ใหม่ ไม่แตะรหัสเดิมที่ยังใช้ได้ ไม่เริ่ม cooldown และคืนโควตาที่หักไป
+6. `readSession`: token ปลอม หมดอายุ หรือ participant ถูกลบ → `null` แต่ถ้าฐานข้อมูลใช้ไม่ได้จะ throw เพื่อไม่ให้สับสนกับ "ยังไม่ได้ยืนยันอีเมล"
 7. อีเมลถูก normalize (trim + lowercase) ก่อนทุกอย่าง caller ไม่ต้องทำเอง
 
 **สิ่งที่ implementation ซ่อนไว้หลัง interface:**
@@ -174,7 +174,8 @@ model HriPassport {
   passport **ใหม่**ต้องมี `participantId` เสมอ (บังคับที่ `createPassportAction` ไม่ใช่ที่ schema เพราะแถวเก่าเป็น null)
 - ลบ participant → `onDelete: SetNull`: passport ยังอยู่แต่ไม่ผูกกับใคร (ตัดสินแล้ว ดูข้อ 12)
 - ความเป็นเจ้าของของ `HriSession` ได้มาจาก `passport.participantId` อยู่แล้ว จึงไม่ต้องเพิ่มคอลัมน์ใน `HriSession`
-- `HriEmailChallenge` ที่หมดอายุเกิน 1 วันลบทิ้งแบบสุ่ม 1% เหมือน `HriRateLimit`
+- `HriEmailChallenge` ที่หมดอายุเกิน 1 วันถูกลบทุกครั้งที่สร้าง challenge ใหม่ เพราะแถวเหล่านี้เก็บอีเมลดิบ
+- เจ้าของลบอีเมลของตัวเองได้จากการ์ด (`deleteMyEmailAction`) ซึ่งลบทั้ง `HriParticipant` และ challenge ของอีเมลนั้น
 
 ---
 

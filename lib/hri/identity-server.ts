@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createIdentity, DEV_ONLY_IDENTITY_SECRET, identityRequiredFromEnv, type Identity, type OtpMailer, type Participant } from "./identity";
 import { emailJsConfigFromEnv, emailJsMailer } from "./identity-emailjs";
 import { prismaIdentityStore } from "./identity-store";
-import { consumeRateLimit } from "./rate-limit";
+import { consumeRateLimit, releaseRateLimit } from "./rate-limit";
 
 // Scoped to the Living Lab: the cookie is never sent to the rest of the site.
 export const PARTICIPANT_COOKIE = "hri_participant";
@@ -43,7 +43,7 @@ export function getIdentity(): Identity | null {
   if (cached !== undefined) return cached;
   const secret = process.env.HRI_IDENTITY_SECRET?.trim() || (process.env.NODE_ENV === "production" ? "" : DEV_ONLY_IDENTITY_SECRET);
   cached = secret.length >= 16
-    ? createIdentity({ mailer: chooseMailer(), store: prismaIdentityStore, consume: consumeRateLimit, now: () => new Date(), secret })
+    ? createIdentity({ mailer: chooseMailer(), store: prismaIdentityStore, consume: consumeRateLimit, release: releaseRateLimit, now: () => new Date(), secret })
     : null;
   return cached;
 }
@@ -53,10 +53,16 @@ export function identityRequired(): boolean {
   return identityRequiredFromEnv(process.env.HRI_IDENTITY_REQUIRED);
 }
 
-// The verified participant behind this request's cookie, or null.
+// The verified participant behind this request's cookie, or null. Throws if the database cannot
+// answer, so a caller never saves a passport without an owner just because of an outage.
 export async function currentParticipant(): Promise<Participant | null> {
   const identity = getIdentity();
   if (!identity) return null;
   const token = (await cookies()).get(PARTICIPANT_COOKIE)?.value;
-  return identity.readSession(token);
+  try {
+    return await identity.readSession(token);
+  } catch (error) {
+    console.error("Living Lab identity: could not read the session:", error instanceof Error ? error.message : "unknown error");
+    throw error;
+  }
 }

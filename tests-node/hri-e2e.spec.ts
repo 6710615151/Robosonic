@@ -3,6 +3,7 @@
 // robot console (Robot A / B) → edit on the card → API and console see version 2 → delete → gone everywhere.
 // Writes to the database, so it only runs when NEON_BRANCH=dev, and it removes its passport even on failure.
 //
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET (see identity-helper.ts)
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-e2e.spec.ts
 import { test, expect, type Page } from "@playwright/test";
 import pg from "pg";

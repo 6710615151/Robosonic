@@ -12,20 +12,21 @@ export const prismaIdentityStore: IdentityStore = {
       prisma.hriEmailChallenge.updateMany({ where: { email, consumedAt: null }, data: { consumedAt: now } }),
       prisma.hriEmailChallenge.create({ data: { email, codeHash, expiresAt, createdAt: now } })
     ]);
-    // Expired challenges are useless after a day. Occasional cleanup, not security-relevant.
-    if (Math.random() < 0.01) {
-      prisma.hriEmailChallenge.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - 86_400_000) } } }).catch(() => undefined);
-    }
+    // These rows hold raw email addresses and are useless a day after they expire, so every new
+    // challenge clears them rather than leaving that to chance. A failed cleanup must not fail the sign-in.
+    await prisma.hriEmailChallenge.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - 86_400_000) } } }).catch(() => undefined);
     return created;
   },
 
-  async discardChallenge(id) {
-    await prisma.hriEmailChallenge.deleteMany({ where: { id } });
-  },
-
-  async recordFailedAttempt(id) {
-    const row = await prisma.hriEmailChallenge.update({ where: { id }, data: { attempts: { increment: 1 } }, select: { attempts: true } });
-    return row.attempts;
+  async claimAttempt(id, maxAttempts) {
+    // Conditional update: however many guesses arrive together, only maxAttempts can succeed.
+    const { count } = await prisma.hriEmailChallenge.updateMany({
+      where: { id, attempts: { lt: maxAttempts } },
+      data: { attempts: { increment: 1 } }
+    });
+    if (count === 0) return null;
+    const row = await prisma.hriEmailChallenge.findUnique({ where: { id }, select: { attempts: true } });
+    return row?.attempts ?? maxAttempts;
   },
 
   async consumeChallenge(id, now) {
@@ -45,5 +46,12 @@ export const prismaIdentityStore: IdentityStore = {
 
   async findParticipant(id) {
     return prisma.hriParticipant.findUnique({ where: { id }, select: { id: true, email: true, sessionVersion: true } });
+  },
+
+  async deleteParticipant(id, email) {
+    await prisma.$transaction([
+      prisma.hriEmailChallenge.deleteMany({ where: { email } }),
+      prisma.hriParticipant.deleteMany({ where: { id } })
+    ]);
   }
 };

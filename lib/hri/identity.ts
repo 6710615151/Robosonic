@@ -9,7 +9,9 @@
 //   emails. A new code replaces the previous one. Resend is allowed after 60 s.
 // - verifyCode(email, code, caller): a code works once, for 10 minutes, and dies after 5 wrong tries.
 //   Success creates the participant on first use and returns a signed session token (14 days).
-// - readSession(token): never throws; a forged, expired or revoked token returns null.
+// - readSession(token): a forged, expired or revoked token returns null. It throws only when the store
+//   fails, so that an outage is never mistaken for "nobody is signed in".
+// - deleteParticipant(token): removes the person behind a valid session, and their email with it.
 // Emails are normalised (trim + lowercase) inside; callers pass them as typed.
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
@@ -21,7 +23,10 @@ export const IDENTITY_LIMITS = {
   resendCooldownSeconds: 60,
   sessionMaxAgeSeconds: 14 * 24 * 60 * 60,
   sendPerEmail: { scope: "id-send-email", limit: 3, windowSeconds: 600 },
-  sendPerCaller: { scope: "id-send-ip", limit: 10, windowSeconds: 3600 },
+  // Per network, and a venue shares one. The total below is what bounds abuse.
+  sendPerCaller: { scope: "id-send-ip", limit: 30, windowSeconds: 3600 },
+  // Across everyone, so one client cannot use up the mail provider's quota in a day.
+  sendTotal: { scope: "id-send-total", limit: 100, windowSeconds: 24 * 60 * 60 },
   verifyPerCaller: { scope: "id-verify-ip", limit: 30, windowSeconds: 600 }
 } as const;
 
@@ -34,7 +39,7 @@ export type IdentityLanguage = "th" | "en";
 
 export type RequestResult =
   | { ok: true; resendInSeconds: number }
-  | { ok: false; error: "invalid_email" | "rate_limited" | "send_failed"; retryAfterSeconds?: number };
+  | { ok: false; error: "invalid_email" | "rate_limited" | "send_failed" | "unavailable"; retryAfterSeconds?: number };
 
 export type VerifyResult =
   | { ok: true; participant: Participant; sessionToken: string; maxAgeSeconds: number }
@@ -62,13 +67,15 @@ export type IdentityStore = {
   latestChallenge(email: string): Promise<ChallengeRecord | null>;
   // Stores a new challenge and closes every earlier open challenge for the same email.
   replaceChallenge(input: { email: string; codeHash: string; expiresAt: Date; now: Date }): Promise<ChallengeRecord>;
-  discardChallenge(id: string): Promise<void>;
-  // Increments the attempt counter and returns the new value.
-  recordFailedAttempt(id: string): Promise<number>;
+  // Atomically takes one attempt and returns the new count, or null if none are left. Taken before the
+  // code is compared, so parallel guesses cannot all pass on the same earlier count.
+  claimAttempt(id: string, maxAttempts: number): Promise<number | null>;
   // Marks the challenge consumed. Returns false if another request consumed it first.
   consumeChallenge(id: string, now: Date): Promise<boolean>;
   upsertParticipant(email: string, now: Date): Promise<ParticipantRecord>;
   findParticipant(id: string): Promise<ParticipantRecord | null>;
+  // Removes the participant and every challenge holding their email.
+  deleteParticipant(id: string, email: string): Promise<void>;
 };
 
 type RateFn = (key: string, limit: number, windowSeconds: number) => Promise<RateDecision>;
@@ -77,6 +84,8 @@ export type IdentityDeps = {
   mailer: OtpMailer;
   store: IdentityStore;
   consume: RateFn;
+  // Gives back one count taken by consume, when the thing it paid for did not happen.
+  release: (key: string) => Promise<void>;
   now: () => Date;
   secret: string;
 };
@@ -131,9 +140,6 @@ export function createIdentity(deps: IdentityDeps) {
     const email = normaliseEmail(emailRaw);
     if (!email) return { ok: false, error: "invalid_email" };
 
-    const byCaller = await deps.consume(`${L.sendPerCaller.scope}:${caller}`, L.sendPerCaller.limit, L.sendPerCaller.windowSeconds);
-    if (!byCaller.allowed) return { ok: false, error: "rate_limited", retryAfterSeconds: byCaller.retryAfterSeconds };
-
     const now = deps.now();
     const latest = await deps.store.latestChallenge(email);
     if (latest && !latest.consumedAt) {
@@ -141,23 +147,44 @@ export function createIdentity(deps: IdentityDeps) {
       if (resendAt > now) return { ok: false, error: "rate_limited", retryAfterSeconds: secondsUntil(resendAt) };
     }
 
-    const byEmail = await deps.consume(`${L.sendPerEmail.scope}:${emailKey(email)}`, L.sendPerEmail.limit, L.sendPerEmail.windowSeconds);
-    if (!byEmail.allowed) return { ok: false, error: "rate_limited", retryAfterSeconds: byEmail.retryAfterSeconds };
+    // Counted atomically before sending, so parallel requests cannot pass on the same count, and given
+    // back if the send fails, so an outage does not use up anyone's allowance.
+    const budgets = [
+      { ...L.sendPerCaller, key: `${L.sendPerCaller.scope}:${caller}` },
+      { ...L.sendPerEmail, key: `${L.sendPerEmail.scope}:${emailKey(email)}` },
+      { ...L.sendTotal, key: `${L.sendTotal.scope}:all` }
+    ];
+    const taken: string[] = [];
+    const giveBack = () => Promise.all(taken.map((key) => deps.release(key)));
+    for (const budget of budgets) {
+      const decision = await deps.consume(budget.key, budget.limit, budget.windowSeconds);
+      if (!decision.allowed) {
+        await giveBack();
+        if (budget.scope === L.sendTotal.scope) {
+          console.error(`Living Lab identity: the daily limit of ${budget.limit} emails is used up. HRI_IDENTITY_REQUIRED=false lets people start without verifying.`);
+          return { ok: false, error: "unavailable" };
+        }
+        return { ok: false, error: "rate_limited", retryAfterSeconds: decision.retryAfterSeconds };
+      }
+      taken.push(budget.key);
+    }
 
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    const challenge = await deps.store.replaceChallenge({
+    try {
+      await deps.mailer.send({ toEmail: email, code, expiresInMinutes: L.codeTtlSeconds / 60, language });
+    } catch (error) {
+      // The mailer's error holds only a status or a network reason, never the address or the code.
+      console.error("Living Lab identity: sending the code failed:", error instanceof Error ? error.message : "unknown error");
+      await giveBack();
+      // Replaced only after a successful send: a code already in the person's inbox stays valid.
+      return { ok: false, error: "send_failed" };
+    }
+    await deps.store.replaceChallenge({
       email,
       codeHash: codeHash(email, code),
       expiresAt: new Date(now.getTime() + L.codeTtlSeconds * 1000),
       now
     });
-    try {
-      await deps.mailer.send({ toEmail: email, code, expiresInMinutes: L.codeTtlSeconds / 60, language });
-    } catch {
-      // Nothing usable is left behind, and the resend cooldown does not apply to a failed send.
-      await deps.store.discardChallenge(challenge.id);
-      return { ok: false, error: "send_failed" };
-    }
     return { ok: true, resendInSeconds: L.resendCooldownSeconds };
   }
 
@@ -175,8 +202,9 @@ export function createIdentity(deps: IdentityDeps) {
     const now = deps.now();
     if (challenge.expiresAt <= now) return { ok: false, error: "expired" };
 
+    const attempts = await deps.store.claimAttempt(challenge.id, L.maxAttempts);
+    if (attempts === null) return { ok: false, error: "too_many_attempts" };
     if (!CODE_PATTERN.test(code) || !sameHex(codeHash(email, code), challenge.codeHash)) {
-      const attempts = await deps.store.recordFailedAttempt(challenge.id);
       return { ok: false, error: attempts >= L.maxAttempts ? "too_many_attempts" : "wrong_code" };
     }
     if (!(await deps.store.consumeChallenge(challenge.id, now))) return { ok: false, error: "expired" };
@@ -193,25 +221,28 @@ export function createIdentity(deps: IdentityDeps) {
   }
 
   async function readSession(token: string | null | undefined): Promise<Participant | null> {
-    try {
-      if (!token) return null;
-      const parts = token.split(".");
-      if (parts.length !== 4) return null;
-      const [id, expiresRaw, versionRaw, signature] = parts;
-      const payload = `${id}.${expiresRaw}.${versionRaw}`;
-      const expected = Buffer.from(sessionSignature(payload));
-      const given = Buffer.from(signature);
-      if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
-      if (Number(expiresRaw) * 1000 <= deps.now().getTime()) return null;
-      const participant = await deps.store.findParticipant(id);
-      if (!participant || String(participant.sessionVersion) !== versionRaw) return null;
-      return { id: participant.id, email: participant.email };
-    } catch {
-      return null;
-    }
+    if (!token) return null;
+    const parts = token.split(".");
+    if (parts.length !== 4) return null;
+    const [id, expiresRaw, versionRaw, signature] = parts;
+    const payload = `${id}.${expiresRaw}.${versionRaw}`;
+    const expected = Buffer.from(sessionSignature(payload));
+    const given = Buffer.from(signature);
+    if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+    if (Number(expiresRaw) * 1000 <= deps.now().getTime()) return null;
+    const participant = await deps.store.findParticipant(id);
+    if (!participant || String(participant.sessionVersion) !== versionRaw) return null;
+    return { id: participant.id, email: participant.email };
   }
 
-  return { requestCode, verifyCode, readSession };
+  async function deleteParticipant(token: string | null | undefined): Promise<boolean> {
+    const participant = await readSession(token);
+    if (!participant) return false;
+    await deps.store.deleteParticipant(participant.id, participant.email);
+    return true;
+  }
+
+  return { requestCode, verifyCode, readSession, deleteParticipant };
 }
 
 export type Identity = ReturnType<typeof createIdentity>;

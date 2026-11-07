@@ -6,6 +6,7 @@
 // reading the participant's session needs the database, so this runs against Neon dev only.
 // It saves no passport; it creates one test participant per test and deletes it.
 //
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET (see identity-helper.ts)
 //   pnpm build && pnpm start &
 //   NEON_BRANCH=dev PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-voice-flow.spec.ts
 import { test, expect, type Page } from "@playwright/test";

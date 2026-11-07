@@ -5,13 +5,13 @@
 // except as what the person types.
 import { useEffect, useRef, useState } from "react";
 import { BadgeCheck, Mail, ShieldCheck } from "lucide-react";
-import { requestEmailCodeAction, signOutParticipantAction, verifyEmailCodeAction, type ClientIdentity } from "./identity-actions";
+import { deleteMyEmailAction, requestEmailCodeAction, signOutParticipantAction, verifyEmailCodeAction, type ClientIdentity } from "./identity-actions";
 import { identityCopy } from "./identity-copy";
 import type { Lang } from "./copy";
 
 type ErrorKey = keyof (typeof identityCopy)["en"]["errors"];
 
-export default function IdentityCard({ lang, identity, onChange, locked, required = true }: {
+export default function IdentityCard({ lang, identity, onChange, locked, required = true, consent }: {
   lang: Lang;
   identity: ClientIdentity;
   onChange: (identity: ClientIdentity) => void;
@@ -19,6 +19,8 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
   locked: boolean;
   // False under the HRI_IDENTITY_REQUIRED=false fallback: verifying is offered but not needed to start.
   required?: boolean;
+  // The consent box in the panel above. No email is sent or stored until it is ticked.
+  consent: boolean;
 }) {
   const t = identityCopy[lang];
   const [step, setStep] = useState<"email" | "code">("email");
@@ -27,6 +29,8 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [refocusCode, setRefocusCode] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const codeRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -35,6 +39,12 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
     return () => window.clearTimeout(id);
   }, [cooldown]);
   useEffect(() => { if (step === "code") codeRef.current?.focus(); }, [step]);
+  // The input is disabled while checking, so it can only take focus once that has finished.
+  useEffect(() => {
+    if (busy || !refocusCode) return;
+    codeRef.current?.focus();
+    setRefocusCode(false);
+  }, [busy, refocusCode]);
 
   const showError = (key: ErrorKey, retryAfter?: number) =>
     setError(retryAfter ? `${t.errors[key]} ${t.waitSeconds(retryAfter)}` : t.errors[key]);
@@ -43,7 +53,7 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
     if (busy) return;
     setBusy(true); setError(null);
     try {
-      const res = await requestEmailCodeAction(email, lang);
+      const res = await requestEmailCodeAction(email, lang, consent);
       if (res.ok) {
         setStep("code"); setCode(""); setCooldown(res.resendInSeconds);
       } else {
@@ -61,13 +71,13 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
     if (busy) return;
     setBusy(true); setError(null);
     try {
-      const res = await verifyEmailCodeAction(email, code);
+      const res = await verifyEmailCodeAction(email, code, consent);
       if (res.ok) {
         onChange(res.identity);
         setStep("email"); setEmail(""); setCode("");
       } else {
         showError(res.error, "retryAfterSeconds" in res ? res.retryAfterSeconds : undefined);
-        if (res.error === "wrong_code") { setCode(""); codeRef.current?.focus(); }
+        if (res.error === "wrong_code") { setCode(""); setRefocusCode(true); }
       }
     } catch {
       showError("unavailable");
@@ -77,10 +87,35 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
   }
 
   async function signOut() {
-    if (locked) return;
-    await signOutParticipantAction().catch(() => undefined);
-    onChange(null);
-    setError(null);
+    if (locked || busy) return;
+    setBusy(true); setError(null);
+    try {
+      await signOutParticipantAction();
+      onChange(null);
+    } catch {
+      // Still signed in: saying otherwise would save the next passport under this email.
+      showError("unavailable");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteEmail() {
+    if (locked || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await deleteMyEmailAction();
+      if (res.ok) {
+        setConfirmingDelete(false);
+        onChange(null);
+      } else {
+        showError(res.error);
+      }
+    } catch {
+      showError("unavailable");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (identity) {
@@ -92,11 +127,25 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
             <span>{t.signedInAs}</span>
             <strong>{identity.email}</strong>
           </div>
-          <button type="button" className="ll-btn ll-id-switch" onClick={signOut} disabled={locked} title={locked ? t.locked : undefined}>
+          <button type="button" className="ll-btn ll-id-switch" onClick={signOut} disabled={locked || busy} title={locked ? t.locked : undefined}>
             {t.notYou}
           </button>
         </div>
         {locked && <p className="ll-note">{t.locked}</p>}
+        {!locked && (confirmingDelete ? (
+          <div className="ll-id-form">
+            <p className="ll-note">{t.deleteConfirm}</p>
+            <div className="ll-id-links">
+              <button type="button" className="ll-id-link" onClick={deleteEmail} disabled={busy}>{t.deleteYes}</button>
+              <button type="button" className="ll-id-link" onClick={() => setConfirmingDelete(false)} disabled={busy}>{t.deleteNo}</button>
+            </div>
+          </div>
+        ) : (
+          <div className="ll-id-links">
+            <button type="button" className="ll-id-link" onClick={() => setConfirmingDelete(true)} disabled={busy}>{t.deleteEmail}</button>
+          </div>
+        ))}
+        {error && <p className="ll-error" role="alert">{error}</p>}
       </section>
     );
   }
@@ -105,6 +154,7 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
     <section className="ll-id" aria-label={t.title}>
       <h2><ShieldCheck size={20} aria-hidden="true" /> {t.title}</h2>
       <p className="ll-note">{required ? t.why : t.optional}</p>
+      {!consent && <p className="ll-consent-hint">{t.consentFirst}</p>}
 
       {step === "email" ? (
         <form className="ll-id-form" onSubmit={(e) => { e.preventDefault(); send(); }}>
@@ -114,7 +164,7 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
               id="ll-id-email" type="email" inputMode="email" autoComplete="email" required maxLength={254}
               placeholder={t.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy}
             />
-            <button type="submit" className="ll-btn primary" disabled={busy || !email.trim()}>
+            <button type="submit" className="ll-btn primary" disabled={busy || !consent || !email.trim()}>
               <Mail size={18} aria-hidden="true" /> {busy ? t.sending : t.send}
             </button>
           </div>
@@ -129,12 +179,12 @@ export default function IdentityCard({ lang, identity, onChange, locked, require
               pattern="\d{6}" maxLength={6} placeholder="••••••" value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} disabled={busy}
             />
-            <button type="submit" className="ll-btn primary" disabled={busy || code.length !== 6}>
+            <button type="submit" className="ll-btn primary" disabled={busy || !consent || code.length !== 6}>
               {busy ? t.verifying : t.verify}
             </button>
           </div>
           <div className="ll-id-links">
-            <button type="button" className="ll-id-link" onClick={send} disabled={busy || cooldown > 0}>
+            <button type="button" className="ll-id-link" onClick={send} disabled={busy || !consent || cooldown > 0}>
               {cooldown > 0 ? t.resendIn(cooldown) : t.resend}
             </button>
             <button type="button" className="ll-id-link" onClick={() => { setStep("email"); setCode(""); setError(null); }} disabled={busy}>

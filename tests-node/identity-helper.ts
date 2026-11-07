@@ -1,7 +1,11 @@
 // Signs a browser context in as a fresh Living Lab participant without sending an email.
 // The session token comes from the real identity module (verifyCode against an in-memory store
-// holding one challenge), so it is signed exactly as the server expects. The server must use the
-// same secret: HRI_IDENTITY_SECRET from the environment, or the dev-only default when unset.
+// holding one challenge), so it is signed exactly as the server expects.
+//
+// The server and this helper must use the same secret. Playwright does not read .env files, and
+// `next start` runs as production, where there is no dev-only default. So export the variables to both:
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET
+// Otherwise every test that signs in stays stuck on a disabled Start button.
 import { randomUUID } from "node:crypto";
 import type { BrowserContext } from "@playwright/test";
 import type pg from "pg";
@@ -18,16 +22,17 @@ export async function signInParticipant(db: pg.Pool, context: BrowserContext) {
     latestChallenge: async () => challenge,
     replaceChallenge: async ({ email: e, codeHash, expiresAt, now }) =>
       (challenge = { id: "c", email: e, codeHash, attempts: 0, expiresAt, consumedAt: null, createdAt: now }),
-    discardChallenge: async () => { challenge = null; },
-    recordFailedAttempt: async () => ++challenge!.attempts,
+    claimAttempt: async () => ++challenge!.attempts,
     consumeChallenge: async (_id, now) => { challenge!.consumedAt = now; return true; },
     upsertParticipant: async () => ({ id, email, sessionVersion: 1 }),
-    findParticipant: async () => ({ id, email, sessionVersion: 1 })
+    findParticipant: async () => ({ id, email, sessionVersion: 1 }),
+    deleteParticipant: async () => undefined
   };
   const identity = createIdentity({
     store,
     mailer: { send: async ({ code }) => { sentCode = code; } },
     consume: async () => ({ allowed: true, remaining: 1, retryAfterSeconds: 0 }),
+    release: async () => undefined,
     now: () => new Date(),
     secret: process.env.HRI_IDENTITY_SECRET?.trim() || DEV_ONLY_IDENTITY_SECRET
   });
