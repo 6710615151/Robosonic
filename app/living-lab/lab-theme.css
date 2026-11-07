@@ -606,6 +606,28 @@ html[lang="th"] .lab .mt-eyebrow { font-family: var(--font-thai-stack); letter-s
 html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--font-thai-stack) !important; letter-spacing: 0; text-transform: none; }
 .lab-bar-value .lab-small { margin-left: 6px; }
 
+/* Findings for everyone, then a clearly separate researcher section. */
+.lab-findings { display: grid; gap: var(--ll-space-4); }
+.lab-findings header { display: grid; gap: 4px; }
+.lab-findings h3 { margin: 0; font: 600 var(--ll-text-xl)/1.2 var(--ll-font-display); }
+.lab-findings-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--ll-space-4); }
+.lab-finding { display: grid; gap: var(--ll-space-3); align-content: start; padding: var(--ll-space-5); border-radius: var(--ll-radius-lg); background: var(--surface); border: 1px solid var(--border); }
+.lab-finding.is-main { background: var(--ll-navy); border-color: var(--ll-navy); color: #c4cbd4; }
+.lab-finding h4 { margin: 0; font: 600 var(--ll-text-lg)/1.3 var(--ll-font-display); color: var(--lab-ink); }
+.lab-finding.is-main h4 { color: var(--ll-ivory); }
+.lab-finding.is-main .lab-note { color: #aab3bf; }
+.lab-finding-big { margin: 0; font: 500 clamp(18px, 1.8vw, 22px)/1.45 var(--ll-font-display); color: var(--ll-green); }
+.lab-finding.is-main .lab-not-comparable { background: rgba(228, 154, 101, .12); border-left-color: var(--ll-orange); margin: 0; }
+.lab-finding.is-main .lab-not-comparable strong { color: var(--ll-orange); }
+.lab-finding.is-main .lab-not-comparable .lab-note { color: #d9dde3; }
+.lab .lab-finding.is-main .lab-link { color: var(--ll-ivory); text-decoration-color: var(--ll-green); }
+.lab-finding.is-main :focus-visible { outline-color: var(--ll-green); }
+.lab-asks { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: var(--ll-text-md); line-height: 1.5; color: var(--lab-ink); }
+.lab-researcher-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--ll-space-3) var(--ll-space-5); padding-top: var(--ll-space-6); border-top: 2px solid var(--ll-navy); }
+.lab-researcher-head > div { flex: 1 1 360px; min-width: 0; display: grid; gap: 4px; }
+.lab-researcher-head h3 { margin: 0; font: 600 var(--ll-text-xl)/1.2 var(--ll-font-display); }
+@media (max-width: 860px) { .lab-findings-grid { grid-template-columns: minmax(0, 1fr); } }
+
 /* ---------------- Journey entry (/living-lab/meet) ---------------- */
 .lab-meet { max-width: 1100px; grid-template-columns: minmax(0, 1fr); }
 .lab-meet-head { display: grid; gap: var(--ll-space-3); max-width: 720px; }

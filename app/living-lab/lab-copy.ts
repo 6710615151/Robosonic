@@ -182,6 +182,25 @@ const en = {
     paired: "Within-person difference",
     pairedSub: (n: number) => `Passport minus default, same person and station · ${n} pair${n === 1 ? "" : "s"}`,
     pairedNone: "No paired ratings yet. Pairs come from the counterbalanced journey.",
+    findings: {
+      title: "What we have found so far",
+      lead: "The short version, in plain words. Every number below comes from real ratings in this period.",
+      helpTitle: "Does a passport make robots more comfortable?",
+      helpResult: (diff: number, pairs: number) => diff > 0
+        ? `Across ${pairs} paired ratings, people rated the robot that had read their passport ${diff.toFixed(2)} points more comfortable, on a 1–5 scale.`
+        : diff < 0
+          ? `Across ${pairs} paired ratings, people rated the robot that had read their passport ${Math.abs(diff).toFixed(2)} points less comfortable, on a 1–5 scale.`
+          : `Across ${pairs} paired ratings, people rated both versions the same on average.`,
+      helpCaveat: "A browser simulation with self-selected visitors: a signal to study further, not proof.",
+      askTitle: "What people ask robots to change",
+      ask: (pct: string, label: string) => `${pct} asked for ${label.toLowerCase()}`,
+      askEmpty: "No passports in this period yet.",
+      hidden: (label: string, min: number) => `${label}: hidden until at least ${min} people share it`
+    },
+    researcher: {
+      title: "For researchers",
+      lead: "Every aggregate behind the findings, with sample sizes, data quality, limits and the privacy rules. Download the CSV for your own analysis."
+    },
     notComparable: {
       title: "Not comparable yet",
       body: (passport: number, plain: number, pairs: number, min: number) =>
@@ -403,6 +422,25 @@ const th: typeof en = {
     paired: "ผลต่างภายในบุคคล",
     pairedSub: (n: number) => `พาสปอร์ตลบหุ่นปกติ คนเดียวกัน สถานีเดียวกัน · ${n} คู่`,
     pairedNone: "ยังไม่มีคะแนนแบบจับคู่ คู่คะแนนมาจากเส้นทางที่สลับลำดับ",
+    findings: {
+      title: "สิ่งที่ค้นพบจนถึงตอนนี้",
+      lead: "ฉบับสั้นด้วยภาษาง่าย ๆ ทุกตัวเลขด้านล่างมาจากคะแนนจริงในช่วงเวลานี้",
+      helpTitle: "พาสปอร์ตทำให้หุ่นยนต์น่าอยู่ใกล้ขึ้นไหม?",
+      helpResult: (diff: number, pairs: number) => diff > 0
+        ? `จากคะแนนจับคู่ ${pairs} คู่ ผู้คนให้คะแนนหุ่นที่อ่านพาสปอร์ตแล้วว่าสบายใจกว่า ${diff.toFixed(2)} คะแนน (สเกล 1–5)`
+        : diff < 0
+          ? `จากคะแนนจับคู่ ${pairs} คู่ ผู้คนให้คะแนนหุ่นที่อ่านพาสปอร์ตแล้วว่าสบายใจน้อยกว่า ${Math.abs(diff).toFixed(2)} คะแนน (สเกล 1–5)`
+          : `จากคะแนนจับคู่ ${pairs} คู่ ผู้คนให้คะแนนหุ่นทั้งสองแบบเท่ากันโดยเฉลี่ย`,
+      helpCaveat: "เป็นการจำลองในเบราว์เซอร์และผู้เข้าร่วมเลือกมาเอง จึงเป็นสัญญาณให้ศึกษาต่อ ไม่ใช่ข้อพิสูจน์",
+      askTitle: "ผู้คนขอให้หุ่นยนต์เปลี่ยนอะไร",
+      ask: (pct: string, label: string) => `${pct} ขอ${label}`,
+      askEmpty: "ยังไม่มีพาสปอร์ตในช่วงเวลานี้",
+      hidden: (label: string, min: number) => `${label}: ซ่อนไว้จนกว่าจะมีอย่างน้อย ${min} คน`
+    },
+    researcher: {
+      title: "สำหรับนักวิจัย",
+      lead: "ตัวเลขรวมทั้งหมดที่อยู่เบื้องหลังผลการค้นพบ พร้อมขนาดตัวอย่าง คุณภาพข้อมูล ข้อจำกัด และกฎความเป็นส่วนตัว ดาวน์โหลด CSV ไปวิเคราะห์ต่อได้"
+    },
     notComparable: {
       title: "ยังเปรียบเทียบไม่ได้",
       body: (passport: number, plain: number, pairs: number, min: number) =>

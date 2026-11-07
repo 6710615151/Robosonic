@@ -221,6 +221,8 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
   const range = stats?.window ?? "all";
   // Only one condition has ratings: per-station and per-robot bars would all be one-sided.
   const oneSided = !stats || stats.comfort.passport.n === 0 || stats.comfort.default.n === 0;
+  // A result is stated only with both versions rated and at least MIN_CARE_CELL within-person pairs.
+  const comparable = Boolean(stats) && !oneSided && stats!.paired.n >= MIN_CARE_CELL;
   return (
     <section className="lab-section" aria-labelledby="research">
       <SectionHead id="research" eyebrow={r.eyebrow} title={r.title} lead={r.lead} />
@@ -235,15 +237,51 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
             </Link>
           ))}
         </div>
-        {stats && (
-          <button type="button" className="lab-btn-quiet" onClick={() => download(stats)}><Download size={16} aria-hidden="true" /> {r.export}</button>
-        )}
       </div>
 
       {!stats ? (
         <p className="ll-error">{r.offline}</p>
       ) : (
         <>
+        {/* For everyone: the findings in plain words. */}
+        <section className="lab-findings" aria-labelledby="findings-title" data-testid="research-findings">
+          <header>
+            <h3 id="findings-title">{r.findings.title}</h3>
+            <p className="lab-note">{r.findings.lead}</p>
+          </header>
+          <div className="lab-findings-grid">
+            <article className="lab-finding is-main">
+              <h4>{r.findings.helpTitle}</h4>
+              {comparable && stats.paired.meanDifference !== null ? (
+                <>
+                  <p className="lab-finding-big" data-testid="research-result">{r.findings.helpResult(stats.paired.meanDifference, stats.paired.n)}</p>
+                  <p className="lab-note">{r.findings.helpCaveat}</p>
+                </>
+              ) : (
+                <div className="lab-not-comparable" role="note" data-testid="research-not-comparable">
+                  <strong>{r.notComparable.title}</strong>
+                  <p className="lab-note">{r.notComparable.body(stats.comfort.passport.n, stats.comfort.default.n, stats.paired.n, MIN_CARE_CELL)}</p>
+                  <Link className="lab-link" href="/living-lab/meet">{r.notComparable.action} <ArrowRight size={16} aria-hidden="true" /></Link>
+                </div>
+              )}
+            </article>
+            <article className="lab-finding">
+              <h4>{r.findings.askTitle}</h4>
+              {stats.preferences.passports === 0 ? <p className="lab-note">{r.findings.askEmpty}</p> : (
+                <ul className="lab-asks">
+                  {(Object.keys(r.prefs) as (keyof typeof r.prefs)[])
+                    .map((key) => ({ key, value: stats.preferences[key] }))
+                    .sort((x, y) => (y.value.share ?? -1) - (x.value.share ?? -1))
+                    .slice(0, 3)
+                    .map(({ key, value }) => (
+                      <li key={key}>{value.suppressed || value.share === null ? r.findings.hidden(r.prefs[key], MIN_CARE_CELL) : r.findings.ask(pct(value.share), r.prefs[key])}</li>
+                    ))}
+                </ul>
+              )}
+            </article>
+          </div>
+        </section>
+
         <section className="lab-glance" aria-labelledby="glance-title">
           <h3 id="glance-title">{r.glanceTitle}</h3>
           <dl>
@@ -253,6 +291,14 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
             <div><dt>{r.glance.pairs}</dt><dd>{stats.paired.n}</dd></div>
           </dl>
         </section>
+        {/* For researchers: every aggregate, with sample sizes, quality, limits, privacy and the CSV. */}
+        <header className="lab-researcher-head">
+          <div>
+            <h3>{r.researcher.title}</h3>
+            <p className="lab-note">{r.researcher.lead}</p>
+          </div>
+          <button type="button" className="lab-btn-quiet" onClick={() => download(stats)}><Download size={16} aria-hidden="true" /> {r.export}</button>
+        </header>
         <div className="lab-obs">
           <article className="lab-panel lab-span-2">
             <p className="lab-q-kicker">{r.comfortTitle}</p>
@@ -262,14 +308,6 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
               <span><i className="is-passport" /> {r.passport}</span>
               <span><i className="is-default" /> {r.default}</span>
             </div>
-            {/* Fewer than MIN_CARE_CELL pairs, or one side empty: say plainly why no comparison can be read yet. */}
-            {(stats.paired.n < MIN_CARE_CELL || stats.comfort.passport.n === 0 || stats.comfort.default.n === 0) && (
-              <div className="lab-not-comparable" role="note" data-testid="research-not-comparable">
-                <strong>{r.notComparable.title}</strong>
-                <p className="lab-note">{r.notComparable.body(stats.comfort.passport.n, stats.comfort.default.n, stats.paired.n, MIN_CARE_CELL)}</p>
-                <Link className="lab-link" href="/living-lab/meet">{r.notComparable.action} <ArrowRight size={16} aria-hidden="true" /></Link>
-              </div>
-            )}
             <ComparisonGroup comparison={stats.comfort} lang={lang} />
             <div className="lab-paired">
               <strong className="lab-paired-value">{stats.paired.meanDifference === null ? "–" : `${stats.paired.meanDifference > 0 ? "+" : ""}${stats.paired.meanDifference.toFixed(2)}`}</strong>

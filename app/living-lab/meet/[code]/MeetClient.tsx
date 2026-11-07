@@ -103,6 +103,7 @@ const ui = {
     compareTitle: "Side by side",
     compareSub: "Same station, same robot. Highlighted rows are what your passport changed.",
     colDefault: "Without passport",
+    baLabel: "Your comfort at each station, without and with your passport",
     colPassport: "With passport",
     yourRating: "Your comfort",
     adaptedTitle: "Adapted to this robot's hardware",
@@ -178,6 +179,7 @@ const ui = {
     compareTitle: "เปรียบเทียบเคียงกัน",
     compareSub: "สถานีเดียวกัน หุ่นตัวเดียวกัน แถวที่ไฮไลต์คือสิ่งที่พาสปอร์ตของคุณเปลี่ยน",
     colDefault: "ไม่มีพาสปอร์ต",
+    baLabel: "ความสบายใจของคุณในแต่ละจุด เมื่อไม่มีและมีพาสปอร์ต",
     colPassport: "มีพาสปอร์ต",
     yourRating: "ความสบายใจของคุณ",
     adaptedTitle: "ปรับตามฮาร์ดแวร์ของหุ่นตัวนี้",
@@ -646,26 +648,32 @@ export default function MeetClient({
           </div>
         </section>
       ) : done ? (
-        <section className="mt-panel mt-done">
-          <h2>{t.doneTitle}</h2>
+        <section className="mt-panel mt-done" aria-label={t.doneTitle}>
           <p className="muted">{t.doneBody}</p>
           <dl className="mt-avgs">
             <div className="is-passport"><dt>{t.avgPassport}</dt><dd>{avgPassport === null ? "–" : avgPassport.toFixed(1)}<small>/5</small></dd></div>
             <div className="is-default"><dt>{t.avgDefault}</dt><dd>{avgDefault === null ? "–" : avgDefault.toFixed(1)}<small>/5</small></dd></div>
             <div><dt>{t.difference}</dt><dd>{avgPassport === null || avgDefault === null ? "–" : `${avgPassport - avgDefault >= 0 ? "+" : ""}${(avgPassport - avgDefault).toFixed(1)}`}</dd></div>
           </dl>
-          <table className="mt-table">
-            <thead><tr><th scope="col">{t.journey}</th><th scope="col">{t.colDefault}</th><th scope="col">{t.colPassport}</th></tr></thead>
-            <tbody>
-              {stations.map((s, i) => (
-                <tr key={`${s.robotId}-${i}`}>
-                  <th scope="row">{stationCopy[lang][s.task].title}<span>{s.name}</span></th>
-                  <td>{ratings[i]?.default ?? "–"}/5</td>
-                  <td>{ratings[i]?.passport ?? "–"}/5</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Before and after, station by station: this journey's own saved ratings, values always in text. */}
+          <ul className="mt-ba" aria-label={t.baLabel} data-testid="journey-before-after">
+            {stations.map((s, i) => {
+              const before = ratings[i]?.default;
+              const after = ratings[i]?.passport;
+              const diff = typeof before === "number" && typeof after === "number" ? after - before : null;
+              return (
+                <li key={`${s.robotId}-${i}`}>
+                  <div className="mt-ba-head">
+                    <strong>{stationCopy[lang][s.task].title}</strong>
+                    <span>{s.name}</span>
+                    {diff !== null && <em className={diff > 0 ? "is-up" : diff < 0 ? "is-down" : ""}>{diff > 0 ? "+" : ""}{diff}</em>}
+                  </div>
+                  <div className="mt-ba-bar is-default"><span>{t.colDefault}</span><i style={{ width: `${((before ?? 0) / 5) * 100}%` }} /><b>{before ?? "–"}/5</b></div>
+                  <div className="mt-ba-bar is-passport"><span>{t.colPassport}</span><i style={{ width: `${((after ?? 0) / 5) * 100}%` }} /><b>{after ?? "–"}/5</b></div>
+                </li>
+              );
+            })}
+          </ul>
           {avgPassport !== null && avgDefault !== null && (
             <p className="mt-verdict" data-testid="journey-verdict">{t.verdict(Math.round((avgPassport - avgDefault) * 10) / 10)} <span className="muted">{t.verdictNote}</span></p>
           )}
@@ -859,6 +867,19 @@ const css = `
 .mt-error { color: var(--warning); font-weight: 700; margin: 0; }
 .mt-done { border-color: var(--accent); }
 .mt-done h2 { margin: 0; }
+.mt-ba { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.mt-ba li { display: grid; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.mt-ba-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.mt-ba-head strong { font-size: 15px; color: var(--lab-ink); }
+.mt-ba-head span { font-size: 12.5px; color: var(--text-secondary); }
+.mt-ba-head em { margin-left: auto; font-style: normal; font: 600 13px/1 var(--lab-mono); padding: 3px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--text-secondary); }
+.mt-ba-head em.is-up { background: var(--ll-green-tint); color: var(--ll-green-ink); }
+.mt-ba-head em.is-down { background: var(--ll-orange-tint); color: var(--ll-orange-ink); }
+.mt-ba-bar { display: grid; grid-template-columns: 120px minmax(0, 1fr) 44px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-secondary); }
+.mt-ba-bar i { display: block; height: 12px; border-radius: 6px; background: var(--ll-data-default); min-width: 2px; }
+.mt-ba-bar.is-passport i { background: var(--ll-data-passport); }
+.mt-ba-bar b { font: 600 13px/1 var(--lab-mono); color: var(--lab-ink); text-align: right; }
+@media (max-width: 480px) { .mt-ba-bar { grid-template-columns: 96px minmax(0, 1fr) 40px; } }
 .mt-verdict { margin: 0; font-size: 15px; line-height: 1.6; color: var(--lab-ink); }
 .mt-verdict .muted { display: block; font-size: 13px; }
 .mt-next { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -924,7 +945,7 @@ html[lang="th"] .mt-table thead th { font-family: inherit; letter-spacing: 0; te
 .mt-avgs dd { margin: 0; font: 600 26px/1.1 var(--lab-mono); color: var(--lab-ink); }
 .mt-avgs dd small { font-size: 13px; color: var(--text-secondary); }
 .mt-avgs .is-passport dt::before, .mt-avgs .is-default dt::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-.mt-avgs .is-passport dt::before { background: #0089a8; }
-.mt-avgs .is-default dt::before { background: #c0742c; }
+.mt-avgs .is-passport dt::before { background: var(--ll-data-passport); }
+.mt-avgs .is-default dt::before { background: var(--ll-data-default); }
 @media (max-width: 560px) { .mt-protocol ol, .mt-avgs { grid-template-columns: 1fr; } .mt-avgs div + div { padding-left: 0; border-left: none; border-top: 1px solid var(--border); } }
 `;
