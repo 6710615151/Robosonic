@@ -1188,7 +1188,7 @@ td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text
    ========================================================================== */
 .lab {
   --accent-fill: var(--lab-cyan);
-  --focus-halo: rgba(0, 163, 196, 0.16);
+  --focus-halo: rgba(95, 130, 69, 0.18);
   --btn-primary-hover: var(--lab-ink);
   --btn-primary-hover-ink: #ffffff;
   --heading-ink: var(--text-primary);

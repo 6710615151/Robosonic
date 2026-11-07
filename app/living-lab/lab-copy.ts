@@ -3,7 +3,18 @@
 import type { Lang } from "./copy";
 
 const en = {
-  nav: { label: "Living Lab sections", calibrate: "Create a passport", robots: "Robots", journey: "Hospital journey", research: "Research" },
+  shell: {
+    name: "Living Lab",
+    tagline: "Human-robot interaction research environment",
+    navLabel: "Living Lab",
+    nav: { overview: "Overview", create: "Create Passport", mine: "My Passport", robot: "Robot Lab", journey: "Hospital Journey", research: "Research" },
+    statusLabel: "Lab status",
+    sim: { label: "Simulation", pending: "checking…", ok: "running in this browser", off: "3D not available on this device" },
+    hardware: { label: "Physical robot", off: "not connected" },
+    ai: { label: "AI assistant", ok: "configured", off: "not configured" },
+    // Phone-width chips: still a word for every state, never colour alone.
+    short: { sim: { pending: "3D sim …", ok: "3D sim on", off: "3D sim off" }, hardware: "No physical robot", ai: { ok: "AI on", off: "AI off" } }
+  },
   hero: {
     eyebrow: "HRI Wellness Living Lab",
     title: "One profile. Every robot understands you.",
@@ -122,7 +133,17 @@ const en = {
 };
 
 const th: typeof en = {
-  nav: { label: "ส่วนต่าง ๆ ของ Living Lab", calibrate: "สร้างพาสปอร์ต", robots: "หุ่นยนต์", journey: "เส้นทางโรงพยาบาล", research: "งานวิจัย" },
+  shell: {
+    name: "Living Lab",
+    tagline: "สภาพแวดล้อมวิจัยปฏิสัมพันธ์ระหว่างมนุษย์กับหุ่นยนต์",
+    navLabel: "Living Lab",
+    nav: { overview: "ภาพรวม", create: "สร้างพาสปอร์ต", mine: "พาสปอร์ตของฉัน", robot: "ห้องทดลองหุ่นยนต์", journey: "เส้นทางโรงพยาบาล", research: "งานวิจัย" },
+    statusLabel: "สถานะแล็บ",
+    sim: { label: "การจำลอง", pending: "กำลังตรวจสอบ…", ok: "ทำงานในเบราว์เซอร์นี้", off: "อุปกรณ์นี้แสดงภาพ 3 มิติไม่ได้" },
+    hardware: { label: "หุ่นยนต์จริง", off: "ไม่ได้เชื่อมต่อ" },
+    ai: { label: "ผู้ช่วย AI", ok: "ตั้งค่าแล้ว", off: "ยังไม่ได้ตั้งค่า" },
+    short: { sim: { pending: "จำลอง 3D …", ok: "จำลอง 3D ทำงาน", off: "จำลอง 3D ใช้ไม่ได้" }, hardware: "ไม่มีหุ่นยนต์จริง", ai: { ok: "AI พร้อม", off: "AI ปิด" } }
+  },
   hero: {
     eyebrow: "HRI Wellness Living Lab",
     title: "โปรไฟล์เดียว หุ่นยนต์ทุกตัวเข้าใจคุณ",

@@ -67,20 +67,6 @@ export function LabHero({ lang }: { lang: Lang }) {
   );
 }
 
-export function LabNav({ lang }: { lang: Lang }) {
-  const t = labCopy[lang].nav;
-  const items = [["calibrate", t.calibrate], ["robots", t.robots], ["journey", t.journey], ["research", t.research]] as const;
-  return (
-    <nav className="lab-nav" aria-label={t.label}>
-      <ol>
-        {items.map(([id, label], i) => (
-          <li key={id}><a href={`#${id}`}><span className="lab-mono">0{i + 1}</span> {label}</a></li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
 // Progress through the calibration. Phases come from LivingLabClient's state machine, unchanged.
 const MANUAL_STEPS = ["greet", "approach", "care", "gaze", "voice", "confirm", "done"] as const;
 const AUTO_STEPS = ["auto", "review", "done"] as const;

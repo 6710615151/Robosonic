@@ -23,7 +23,7 @@ import AutoInterview from "./AutoInterview";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
 import { labCopy } from "./lab-copy";
-import { CalibrationProgress, JourneyOverview, LabHero, LabNav, ResearchObservatory, RobotEcosystem, SectionHead } from "./LabSections";
+import { CalibrationProgress, JourneyOverview, LabHero, ResearchObservatory, RobotEcosystem, SectionHead } from "./LabSections";
 import type { ObservatoryStats } from "@/lib/hri/observatory";
 
 export type LabRobot = { id: string; name: string; type: string; org: string | null };
@@ -810,7 +810,6 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
     <main className="ll">
       <style dangerouslySetInnerHTML={{ __html: styles }} />
       <LabHero lang={lang} />
-      <LabNav lang={lang} />
 
       <div className="lab-section" id="calibrate-wrap">
       <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />
