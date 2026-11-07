@@ -7,12 +7,39 @@ export const copy = {
     subtitle: "Hospital robots are arriving in Thailand, and many patients find them stressful. Register once with a reception robot: it learns your comfortable distance, pace, eye contact and care needs. Every care robot on your hospital journey then reads your Care Passport and looks after you the same way.",
     haveCode: "I already have a passport",
     robotConsole: "Robot console",
-    consoleLink: "See it in the robot console",
+    consoleLink: "See it in the Robot Lab",
+    // Guided start (intro screen) and the progress bar across creation.
+    ready: {
+      stagesLabel: "Creating your Care Passport",
+      stages: ["Get ready", "Meet the robot", "Review", "Your passport"],
+      whatTitle: "What will happen",
+      whatSummary: "Show the steps",
+      agreeTitle: "Agree to save your passport",
+      emailHint: "Optional: verify your email in the box below to keep this passport and find it again later.",
+      chooseTitle: "Choose how to answer",
+      chooseLead: "Pick whichever is easiest. You can start again at any time.",
+      locked: "Tick the box in step 2 to unlock these.",
+      needs: "Needs",
+      methods: {
+        buttons: { title: "Buttons", body: "Tap your answers. Turn on the camera too, if you like, so the robot can see your wai.", needs: "nothing extra · camera optional" },
+        voice: { title: "Voice or typing", body: "Say or type each answer. Buttons stay on every step.", needs: "microphone, or a keyboard" },
+        auto: { title: "Auto", body: "One tap. The robot watches for your wai, how you react as it comes closer, and where you look. Feelings are never guessed from your face.", needs: "camera" }
+      },
+      aiNote: "After Auto you can also talk with the robot about what the camera cannot measure. That needs the AI assistant; if it is not available, you save with the measured values."
+    },
+    nextSteps: {
+      title: "What next?",
+      journey: "Start the hospital journey",
+      journeyBody: (code: string) => `Meet each robot twice and rate how comfortable you feel. Your code is ${code}.`,
+      robot: "See Robot A and Robot B read it",
+      robotBody: "Opens the Robot Lab with this passport already loaded.",
+      card: "Share, edit or delete it from the passport card."
+    },
     robotLabel: "Living Lab robot",
     cameraPreview: "Camera preview (on-device only)",
     introSpeech: "Hello. When you are ready, press Start. I will follow your lead.",
     statusIdle: "Ready",
-    introTitle: "How it works (about 1 minute)",
+    introTitle: "Before you start (about 1 minute)",
     introSteps: [
       "Greet the robot with a wai. It waits for you first.",
       "It steps closer one step at a time. Tell it when it is too close, too fast, or just right.",
@@ -158,7 +185,7 @@ export const copy = {
     editKeyHint: "Keep it to edit or delete this passport from another browser. This browser has already saved it.",
     copyKey: "Copy edit key",
     copied: "Copied",
-    meetNow: "Start the hospital journey (3 robots)",
+    meetNow: "Start the hospital journey",
     again: "Start again",
     // Auto mode (camera does the rest after one tap)
     autoStart: "Auto: just stand in front of the camera",
@@ -286,12 +313,38 @@ export const copy = {
     subtitle: "หุ่นยนต์กำลังเข้ามาในโรงพยาบาลไทย และผู้ป่วยจำนวนมากรู้สึกเครียดกับมัน ลงทะเบียนครั้งเดียวกับหุ่นจุดคัดกรอง หุ่นจะเรียนรู้ระยะ ความเร็ว การสบตา และความต้องการด้านการดูแลของคุณ จากนั้นหุ่นดูแลทุกตัวตลอดเส้นทางในโรงพยาบาลจะอ่าน Care Passport และดูแลคุณแบบเดียวกัน",
     haveCode: "ฉันมีพาสปอร์ตแล้ว",
     robotConsole: "คอนโซลหุ่นยนต์",
-    consoleLink: "ดูในคอนโซลหุ่นยนต์",
+    consoleLink: "ดูในห้องทดลองหุ่นยนต์",
+    ready: {
+      stagesLabel: "กำลังสร้าง Care Passport",
+      stages: ["เตรียมตัว", "พบหุ่นยนต์", "ตรวจทาน", "พาสปอร์ตของคุณ"],
+      whatTitle: "จะเกิดอะไรขึ้นบ้าง",
+      whatSummary: "ดูขั้นตอน",
+      agreeTitle: "ยินยอมให้บันทึกพาสปอร์ต",
+      emailHint: "ไม่บังคับ: ยืนยันอีเมลในกล่องด้านล่าง เพื่อเก็บพาสปอร์ตนี้และหากลับมาเจอได้ภายหลัง",
+      chooseTitle: "เลือกวิธีตอบ",
+      chooseLead: "เลือกแบบที่สะดวกที่สุด เริ่มใหม่ได้ทุกเมื่อ",
+      locked: "ติ๊กช่องในขั้นที่ 2 ก่อน จึงจะเริ่มได้",
+      needs: "ต้องใช้",
+      methods: {
+        buttons: { title: "ปุ่ม", body: "แตะเพื่อตอบ จะเปิดกล้องด้วยก็ได้ เพื่อให้หุ่นเห็นการไหว้ของคุณ", needs: "ไม่ต้องใช้อะไรเพิ่ม · กล้องไม่บังคับ" },
+        voice: { title: "พูดหรือพิมพ์", body: "พูดหรือพิมพ์คำตอบทีละข้อ ทุกขั้นยังมีปุ่มให้กด", needs: "ไมโครโฟน หรือคีย์บอร์ด" },
+        auto: { title: "อัตโนมัติ", body: "แตะครั้งเดียว หุ่นจะดูการไหว้ ปฏิกิริยาเมื่อมันเข้าใกล้ และทิศที่คุณมอง ไม่มีการเดาความรู้สึกจากใบหน้า", needs: "กล้อง" }
+      },
+      aiNote: "หลังโหมดอัตโนมัติ คุณคุยกับหุ่นเรื่องที่กล้องวัดไม่ได้ได้ด้วย ซึ่งต้องใช้ผู้ช่วย AI หากใช้ไม่ได้ จะบันทึกด้วยค่าที่วัดได้"
+    },
+    nextSteps: {
+      title: "ต่อไปทำอะไร",
+      journey: "เริ่มเส้นทางโรงพยาบาล",
+      journeyBody: (code: string) => `พบหุ่นแต่ละตัวสองครั้ง แล้วให้คะแนนความสบายใจ รหัสของคุณคือ ${code}`,
+      robot: "ดู Robot A และ Robot B อ่านพาสปอร์ต",
+      robotBody: "เปิดห้องทดลองหุ่นยนต์โดยโหลดพาสปอร์ตนี้ไว้แล้ว",
+      card: "แชร์ แก้ไข หรือลบได้ที่การ์ดพาสปอร์ต"
+    },
     robotLabel: "หุ่นยนต์ Living Lab",
     cameraPreview: "ภาพจากกล้อง (ประมวลผลในเครื่องเท่านั้น)",
     introSpeech: "สวัสดีครับ พร้อมเมื่อไหร่กด เริ่ม ได้เลย ผมจะทำตามจังหวะของคุณ",
     statusIdle: "พร้อม",
-    introTitle: "ขั้นตอน (ประมาณ 1 นาที)",
+    introTitle: "ก่อนเริ่ม (ประมาณ 1 นาที)",
     introSteps: [
       "ไหว้ทักทายหุ่นยนต์ หุ่นจะรอให้คุณทักก่อน",
       "หุ่นจะขยับเข้าใกล้ทีละก้าว บอกได้ว่าใกล้ไป เร็วไป หรือกำลังดี",
@@ -437,7 +490,7 @@ export const copy = {
     editKeyHint: "เก็บไว้เพื่อแก้ไขหรือลบพาสปอร์ตจากเบราว์เซอร์อื่น เบราว์เซอร์นี้บันทึกไว้แล้ว",
     copyKey: "คัดลอกคีย์แก้ไข",
     copied: "คัดลอกแล้ว",
-    meetNow: "เริ่มเส้นทางในโรงพยาบาล (หุ่น 3 ตัว)",
+    meetNow: "เริ่มเส้นทางโรงพยาบาล",
     again: "เริ่มใหม่",
     // โหมดอัตโนมัติ (กดครั้งเดียว กล้องทำที่เหลือ)
     autoStart: "อัตโนมัติ: แค่ยืนหน้ากล้อง",

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { BadgeCheck, Camera, CameraOff, Hand, HeartHandshake, Mic, MicOff, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
+import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
@@ -23,7 +23,7 @@ import AutoInterview from "./AutoInterview";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
 import { labCopy } from "./lab-copy";
-import { CalibrationProgress, SectionHead } from "./LabSections";
+import { CalibrationProgress, CreationStages, SectionHead } from "./LabSections";
 
 
 type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "confirm" | "auto" | "review" | "saving" | "done";
@@ -42,6 +42,14 @@ const DISTANCE_CHOICES = { close: 1.3, medium: -0.4, far: -1.3 } as const;
 const REVIEW_SLOWER_SPEED = 0.5;
 // The care questions are asked one at a time when answering by voice or text.
 const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
+
+// The four stages people see across the top; the detailed step list stays inside the panel.
+function stageOf(phase: Phase): number {
+  if (phase === "intro") return 0;
+  if (phase === "confirm" || phase === "review" || phase === "saving") return 2;
+  if (phase === "done") return 3;
+  return 1;
+}
 
 export default function LivingLabClient({ lang, initialIdentity, identityRequired = false }: {
   lang: Lang; initialIdentity: ClientIdentity;
@@ -108,6 +116,17 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  // On narrow screens the robot stays pinned above the questions (lab-theme.css). When a session starts,
+  // bring the first question into view just below it, so people see both the robot and what to do.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const wasIntro = useRef(true);
+  useEffect(() => {
+    const leavingIntro = wasIntro.current && phase !== "intro";
+    wasIntro.current = phase === "intro";
+    if (!leavingIntro || window.innerWidth > 960) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    panelRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  }, [phase]);
   const stepRef = useRef(step);
   stepRef.current = step;
   const counters = useRef({ tooClose: 0, tooFast: 0, leanBack: 0 });
@@ -810,6 +829,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
 
       <div className="lab-section" id="calibrate-wrap">
       <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />
+      <CreationStages label={t.ready.stagesLabel} stages={t.ready.stages} current={stageOf(phase)} />
       <section className="ll-grid">
         <div className="ll-stage-card">
           <div className="ll-bubble" aria-live="polite">{speech}</div>
@@ -824,39 +844,66 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         </div>
 
         <div className="ll-side">
-        <div className="ll-panel">
+        <div className="ll-panel" ref={panelRef}>
           <CalibrationProgress lang={lang} phase={phase} auto={inputMode === "auto"} />
           {phase === "intro" && (
-            <div className="ll-step">
+            <div className="ll-step ll-ready">
               <h2>{t.introTitle}</h2>
-              <ol className="ll-list">{t.introSteps.map((s) => <li key={s}>{s}</li>)}</ol>
-              <p className="ll-note">{t.privacy}</p>
-              <label className="ll-consent">
-                <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
-                <span>{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</span>
-              </label>
-              {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
-              {!identityOk && <p className="ll-consent-hint">{idT.required}</p>}
-              {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
-              <div className="ll-auto-offer">
-                <button className="ll-btn big primary" onClick={() => begin(true)} disabled={!ready || !consent || !identityOk}>
-                  <Mic size={20} aria-hidden="true" /> {t.voiceInput.start}
-                </button>
-                <p className="ll-note">{t.voiceInput.startHint}</p>
-              </div>
-              <div className="ll-row">
-                <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent || !identityOk}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
-                <button className="ll-btn" onClick={toggleCamera} disabled={!consent || cameraState === "loading"}>
-                  {cameraState === "on" ? <CameraOff size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />} {cameraState === "on" ? t.cameraOff : t.cameraOn}
-                </button>
-              </div>
-              <div className="ll-auto-offer">
-                <button className="ll-btn big auto" onClick={startAuto} disabled={!ready || !consent || !identityOk || cameraState === "loading"}>
-                  <ScanFace size={20} aria-hidden="true" /> {t.autoStart}
-                </button>
-                <p className="ll-note">{t.autoHint}</p>
-              </div>
-              {cameraState === "error" && <p className="ll-error">{t.cameraError}: {cameraInfo}</p>}
+              <ol className="ll-stages">
+                <li>
+                  <h3><span className="ll-stage-no" aria-hidden="true">1</span> {t.ready.whatTitle}</h3>
+                  <details className="ll-what">
+                    <summary>{t.ready.whatSummary}</summary>
+                    <ol className="ll-list">{t.introSteps.map((s) => <li key={s}>{s}</li>)}</ol>
+                  </details>
+                  <p className="ll-note">{t.privacy}</p>
+                </li>
+                <li>
+                  <h3><span className="ll-stage-no" aria-hidden="true">2</span> {t.ready.agreeTitle}</h3>
+                  <label className="ll-consent">
+                    <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
+                    <span>{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</span>
+                  </label>
+                  {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
+                  {!identityOk ? <p className="ll-consent-hint">{idT.required}</p> : !identity && <p className="ll-note">{t.ready.emailHint}</p>}
+                </li>
+                <li>
+                  <h3><span className="ll-stage-no" aria-hidden="true">3</span> {t.ready.chooseTitle}</h3>
+                  <p className="ll-note">{consent ? t.ready.chooseLead : t.ready.locked}</p>
+                  {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
+                  <div className="ll-methods">
+                    <section className="ll-method" aria-labelledby="ll-m-buttons">
+                      <h4 id="ll-m-buttons">{t.ready.methods.buttons.title}</h4>
+                      <p>{t.ready.methods.buttons.body}</p>
+                      <p className="ll-needs"><span>{t.ready.needs}:</span> {t.ready.methods.buttons.needs}</p>
+                      <div className="ll-row">
+                        <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent || !identityOk}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
+                        <button className="ll-btn" onClick={toggleCamera} disabled={!consent || cameraState === "loading"}>
+                          {cameraState === "on" ? <CameraOff size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />} {cameraState === "on" ? t.cameraOff : t.cameraOn}
+                        </button>
+                      </div>
+                      {cameraState === "error" && <p className="ll-error">{t.cameraError}: {cameraInfo}</p>}
+                    </section>
+                    <section className="ll-method" aria-labelledby="ll-m-voice">
+                      <h4 id="ll-m-voice">{t.ready.methods.voice.title}</h4>
+                      <p>{t.ready.methods.voice.body}</p>
+                      <p className="ll-needs"><span>{t.ready.needs}:</span> {t.ready.methods.voice.needs}</p>
+                      <button className="ll-btn primary" onClick={() => begin(true)} disabled={!ready || !consent || !identityOk}>
+                        <Mic size={18} aria-hidden="true" /> {t.voiceInput.start}
+                      </button>
+                    </section>
+                    <section className="ll-method" aria-labelledby="ll-m-auto">
+                      <h4 id="ll-m-auto">{t.ready.methods.auto.title}</h4>
+                      <p>{t.ready.methods.auto.body}</p>
+                      <p className="ll-needs"><span>{t.ready.needs}:</span> {t.ready.methods.auto.needs}</p>
+                      <button className="ll-btn auto" onClick={startAuto} disabled={!ready || !consent || !identityOk || cameraState === "loading"}>
+                        <ScanFace size={18} aria-hidden="true" /> {t.autoStart}
+                      </button>
+                      <p className="ll-note">{t.ready.aiNote}</p>
+                    </section>
+                  </div>
+                </li>
+              </ol>
             </div>
           )}
 
@@ -1147,11 +1194,24 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                 </div>
                 <p className="ll-note">{t.editKeyHint}</p>
               </div>
-              <div className="ll-row">
-                <Link className="ll-btn primary" href={`/living-lab/passport/${accessToken}`}>{t.cardLink}</Link>
-                <Link className="ll-btn" href={`/living-lab/meet/${passportCode}`}>🏥 {t.meetNow}</Link>
-                <Link className="ll-btn" href="/living-lab/robot">{t.consoleLink}</Link>
-                <button className="ll-btn" onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
+              <div className="ll-next" data-testid="passport-next">
+                <h3>{t.nextSteps.title}</h3>
+                <ul>
+                  <li>
+                    <Link className="ll-btn primary" href={`/living-lab/meet/${passportCode}`}><Hospital size={18} aria-hidden="true" /> {t.meetNow}</Link>
+                    <p className="ll-note">{t.nextSteps.journeyBody(passportCode)}</p>
+                  </li>
+                  <li>
+                    {/* The token travels in the fragment, which browsers never send to the server. */}
+                    <Link className="ll-btn" href={`/living-lab/robot#token=${accessToken}`}><Bot size={18} aria-hidden="true" /> {t.nextSteps.robot}</Link>
+                    <p className="ll-note">{t.nextSteps.robotBody}</p>
+                  </li>
+                  <li>
+                    <Link className="ll-btn" href={`/living-lab/passport/${accessToken}`}><IdCard size={18} aria-hidden="true" /> {t.cardLink}</Link>
+                    <p className="ll-note">{t.nextSteps.card}</p>
+                  </li>
+                </ul>
+                <button className="ll-btn ll-again" onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
               </div>
             </div>
           )}

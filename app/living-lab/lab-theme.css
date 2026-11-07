@@ -435,3 +435,55 @@ a.lab-btn-quiet { text-decoration: none; border-radius: var(--ll-radius-sm); }
 /* Thai: mono + wide tracking breaks up tone marks and vowels, so Thai labels use the Thai face. */
 html[lang="th"] .lab :is(.lab-eyebrow, .llo-step-meta, .llo-sample-kicker, .lab-subhead, .lab-filter-label) { font-family: var(--font-thai-stack) !important; letter-spacing: 0; text-transform: none; }
 html[lang="th"] .llo-hero h1, html[lang="th"] .llo h2 { letter-spacing: 0; line-height: 1.3; }
+
+/* ---------------- Guided flows: stage bar (LabSections CreationStages) ---------------- */
+.lab-stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--ll-space-2); counter-reset: none; }
+.lab-stages li { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 var(--ll-space-3); border-radius: var(--ll-radius); background: var(--ll-soft); border: 1px solid var(--border); color: var(--text-secondary); font-size: var(--ll-text-sm); font-weight: 600; transition: background var(--ll-dur) var(--ll-ease), color var(--ll-dur) var(--ll-ease); }
+.lab-stages-dot { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ll-line-strong); font: 700 12px/1 var(--ll-font-mono); color: var(--text-secondary); background: var(--surface); }
+.lab-stages li.done { color: var(--ll-green-ink); background: var(--ll-green-tint); border-color: var(--lab-tint-border); }
+.lab-stages li.done .lab-stages-dot { border-color: var(--ll-green-ink); background: var(--ll-green-ink); color: #fff; }
+.lab-stages li.current { color: #fff; background: var(--ll-navy); border-color: var(--ll-navy); }
+.lab-stages li.current .lab-stages-dot { border-color: var(--ll-green); background: var(--ll-green); color: var(--ll-navy); }
+@media (max-width: 640px) {
+  .lab-stages { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .lab-stages li { flex-direction: column; justify-content: center; gap: 4px; min-height: 58px; padding: 6px 4px; text-align: center; font-size: 11.5px; line-height: 1.2; }
+}
+
+/* ---------------- Passport creation (LivingLabClient) ---------------- */
+.lab .ll-stage-card { background: radial-gradient(110% 60% at 20% 0%, #fffdf6 0%, rgba(255, 253, 246, 0) 60%), linear-gradient(180deg, var(--ll-soft), var(--ll-sunken)); border-color: var(--ll-line); border-radius: var(--ll-radius-lg); }
+.lab .ll-panel { border-radius: var(--ll-radius-lg); padding: clamp(16px, 2vw, 24px); }
+.ll-ready h2 { font: 600 var(--ll-text-xl)/1.2 var(--ll-font-display); }
+.ll-stages { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ll-space-5); }
+.ll-stages > li { display: grid; gap: var(--ll-space-2); padding-top: var(--ll-space-4); border-top: 1px solid var(--border); }
+.ll-stages > li:first-child { padding-top: 0; border-top: none; }
+.ll-stages h3 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: var(--ll-text-md); font-weight: 650; color: var(--lab-ink); }
+.ll-stage-no { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--ll-navy); color: var(--ll-ivory); font: 700 12px/1 var(--ll-font-mono); flex: none; }
+.ll-ready .ll-note, .ll-ready .ll-consent-hint { margin: 0 !important; }
+.ll-what summary { cursor: pointer; min-height: 32px; display: inline-flex; align-items: center; font-weight: 600; color: var(--accent); }
+.ll-what[open] summary { margin-bottom: 6px; }
+.ll-methods { display: grid; gap: var(--ll-space-3); }
+.ll-method { display: grid; gap: var(--ll-space-2); padding: var(--ll-space-4); border: 1px solid var(--border); border-radius: var(--ll-radius); background: var(--ll-soft); }
+.ll-method h4 { margin: 0; font: 600 16px/1.3 var(--ll-font-display); color: var(--lab-ink); }
+.ll-method p { margin: 0 !important; font-size: var(--ll-text-sm); line-height: 1.55; color: var(--text-secondary); }
+.ll-method .ll-needs { font-size: 12.5px; color: var(--text-primary); }
+.ll-needs span { font-weight: 650; }
+.ll-method .ll-btn { justify-self: start; }
+.ll-method .ll-btn.auto { width: auto; }
+
+.ll-next { display: grid; gap: var(--ll-space-3); margin-top: var(--ll-space-4); padding-top: var(--ll-space-4); border-top: 1px solid var(--border); }
+.ll-next h3 { margin: 0; font: 600 var(--ll-text-lg)/1.3 var(--ll-font-display); }
+.ll-next ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ll-space-3); }
+.ll-next li { display: grid; gap: 4px; justify-items: start; }
+.ll-next li .ll-note { margin: 0 !important; }
+.ll-next .ll-again { justify-self: start; margin-top: var(--ll-space-2); }
+@media (max-width: 560px) { .ll-method .ll-btn, .ll-next li .ll-btn { justify-self: stretch; } }
+.ll-ready h2 { margin-bottom: var(--ll-space-3) !important; }
+/* Phones and small tablets: keep the robot in sight while answering below it. */
+/* Anything scrolled into view (focus, find, scrollIntoView) stops below the pinned robot and above the
+   bottom tab bar, so it is never hidden behind them (WCAG 2.4.11). */
+@media (max-width: 960px) {
+  .lab .ll-stage-card { position: sticky; top: var(--ll-pin-top, 112px); z-index: 4; height: max(38vh, 240px); box-shadow: var(--ll-shadow-2); }
+  .lab .ll-bubble { font-size: 15px; padding: 10px 12px; }
+  html:has(.lab .ll-stage-card) { scroll-padding-top: calc(var(--ll-pin-top, 112px) + max(38vh, 240px) + 12px); scroll-padding-bottom: 96px; }
+}
+@media (min-width: 861px) and (max-width: 960px) { html:has(.lab .ll-stage-card) { --ll-pin-top: 52px; scroll-padding-bottom: 16px; } }

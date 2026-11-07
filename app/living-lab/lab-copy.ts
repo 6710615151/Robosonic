@@ -80,9 +80,9 @@ const en = {
     }
   },
   calibrate: {
-    eyebrow: "01 · Care Passport",
+    eyebrow: "Care Passport",
     title: "Teach the robot once",
-    lead: "Verify your email if you want to keep the passport, give consent, then greet the robot. Every answer changes its behaviour right away, so you can feel the difference before you save.",
+    lead: "Agree, choose how you want to answer, then greet the robot with a wai. Every answer changes how it behaves right away, so you can feel the difference before anything is saved.",
     progressLabel: "Calibration progress",
     stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
     steps: { greet: "Greet", approach: "Distance & pace", care: "Care needs", gaze: "Eye contact", voice: "Voice", confirm: "Review", done: "Passport", auto: "Camera reads you", review: "Review" },
@@ -90,7 +90,7 @@ const en = {
     previewNote: "This is what robots will read. Nothing is saved until you press Save."
   },
   robots: {
-    eyebrow: "02 · Robot ecosystem",
+    eyebrow: "Robot ecosystem",
     title: "Different hardware, same respect",
     lead: "A Care Passport describes the person. A capability profile describes the robot. The adapter translates one into the other, and safety rules always come first.",
     capabilities: { mobile: "Moves", head: "Head & gaze", arms: "Arms", speaker: "Speaker", screen: "Screen", maxSpeed: "Max speed" },
@@ -105,7 +105,7 @@ const en = {
     meet: "Meet with my passport"
   },
   journey: {
-    eyebrow: "03 · Hospital journey",
+    eyebrow: "Hospital journey",
     title: "Three stations, two robots each",
     lead: "At every station you meet the same robot twice: once as a default robot that has not read your passport, once after it has. You rate each from 1 to 5. The order alternates between stations, so the comparison is fair.",
     stations: [
@@ -120,7 +120,7 @@ const en = {
     needPassport: "You need a Care Passport first, or enter an existing code."
   },
   research: {
-    eyebrow: "04 · Research Observatory",
+    eyebrow: "Research Observatory",
     title: "What the Living Lab is learning",
     provenance: "Simulation data. Visitors rated three.js robots in a web browser, not physical robots, under uncontrolled conditions. This is not a clinical study and should not be cited as one.",
     window: "Period",
@@ -248,9 +248,9 @@ const th: typeof en = {
     }
   },
   calibrate: {
-    eyebrow: "01 · Care Passport",
+    eyebrow: "Care Passport",
     title: "สอนหุ่นยนต์เพียงครั้งเดียว",
-    lead: "ยืนยันอีเมลหากต้องการเก็บพาสปอร์ตไว้ ให้ความยินยอม แล้วทักทายหุ่นยนต์ ทุกคำตอบเปลี่ยนพฤติกรรมของหุ่นทันที คุณจึงรู้สึกถึงความต่างได้ก่อนกดบันทึก",
+    lead: "ให้ความยินยอม เลือกวิธีตอบ แล้วไหว้ทักทายหุ่นยนต์ ทุกคำตอบเปลี่ยนพฤติกรรมของหุ่นทันที คุณจึงรู้สึกถึงความต่างได้ก่อนจะบันทึกอะไร",
     progressLabel: "ความคืบหน้าการปรับเทียบ",
     stepOf: (n: number, total: number) => `ขั้นที่ ${n} จาก ${total}`,
     steps: { greet: "ทักทาย", approach: "ระยะและความเร็ว", care: "การดูแล", gaze: "การสบตา", voice: "เสียง", confirm: "ตรวจทาน", done: "พาสปอร์ต", auto: "กล้องอ่านท่าทาง", review: "ตรวจทาน" },
@@ -258,7 +258,7 @@ const th: typeof en = {
     previewNote: "นี่คือสิ่งที่หุ่นยนต์จะอ่าน ยังไม่มีอะไรถูกบันทึกจนกว่าคุณจะกดบันทึก"
   },
   robots: {
-    eyebrow: "02 · ระบบนิเวศหุ่นยนต์",
+    eyebrow: "ระบบนิเวศหุ่นยนต์",
     title: "ฮาร์ดแวร์ต่างกัน แต่เคารพคุณเหมือนกัน",
     lead: "Care Passport อธิบายตัวคน โปรไฟล์ความสามารถอธิบายตัวหุ่น ตัวแปลง (adapter) แปลงสิ่งหนึ่งเป็นอีกสิ่ง และกฎความปลอดภัยมาก่อนเสมอ",
     capabilities: { mobile: "เคลื่อนที่", head: "หัวและการมอง", arms: "แขน", speaker: "ลำโพง", screen: "หน้าจอ", maxSpeed: "ความเร็วสูงสุด" },
@@ -273,7 +273,7 @@ const th: typeof en = {
     meet: "พบด้วยพาสปอร์ตของฉัน"
   },
   journey: {
-    eyebrow: "03 · เส้นทางโรงพยาบาล",
+    eyebrow: "เส้นทางโรงพยาบาล",
     title: "สามสถานี สถานีละสองรอบ",
     lead: "ในแต่ละสถานีคุณจะพบหุ่นตัวเดิมสองครั้ง ครั้งหนึ่งเป็นหุ่นแบบปกติที่ยังไม่ได้อ่านพาสปอร์ต และอีกครั้งหลังจากอ่านแล้ว คุณให้คะแนนแต่ละครั้ง 1 ถึง 5 ลำดับจะสลับกันในแต่ละสถานีเพื่อให้การเปรียบเทียบยุติธรรม",
     stations: [
@@ -288,7 +288,7 @@ const th: typeof en = {
     needPassport: "ต้องมี Care Passport ก่อน หรือใส่รหัสที่มีอยู่แล้ว"
   },
   research: {
-    eyebrow: "04 · หอสังเกตการณ์งานวิจัย",
+    eyebrow: "หอสังเกตการณ์งานวิจัย",
     title: "สิ่งที่ Living Lab กำลังเรียนรู้",
     provenance: "ข้อมูลจากการจำลอง ผู้เข้าชมให้คะแนนหุ่น three.js ในเว็บเบราว์เซอร์ ไม่ใช่หุ่นจริง และไม่ได้ควบคุมสภาพแวดล้อม นี่ไม่ใช่การศึกษาทางคลินิกและไม่ควรอ้างอิงในฐานะนั้น",
     window: "ช่วงเวลา",

@@ -25,6 +25,21 @@ export function SectionHead({ id, eyebrow, title, lead }: { id: string; eyebrow:
   );
 }
 
+// The few big stages of a guided flow, shown across the top so people always know where they are.
+// Used by passport creation; each stage is a word and a number, never colour alone.
+export function CreationStages({ label, stages, current }: { label: string; stages: readonly string[]; current: number }) {
+  return (
+    <ol className="lab-stages" aria-label={label}>
+      {stages.map((stage, i) => (
+        <li key={stage} className={i < current ? "done" : i === current ? "current" : ""} aria-current={i === current ? "step" : undefined}>
+          <span className="lab-stages-dot" aria-hidden="true">{i < current ? <Check size={13} /> : i + 1}</span>
+          <span className="lab-stages-label">{stage}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 // Progress through the calibration. Phases come from LivingLabClient's state machine, unchanged.
 const MANUAL_STEPS = ["greet", "approach", "care", "gaze", "voice", "confirm", "done"] as const;
 const AUTO_STEPS = ["auto", "review", "done"] as const;
