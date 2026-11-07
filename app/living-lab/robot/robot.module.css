@@ -141,7 +141,7 @@
 .linkBtn { min-height: 44px; padding: 0 6px; border: 0; background: none; font: inherit; font-weight: 650; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 /* No passport yet / one in this browser: the first thing to do on this page. */
 .callout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--lab-tint-border); background: var(--lab-tint); }
-.callout > div { flex: 1 1 320px; display: grid; gap: 4px; }
+.callout > div { flex: 1 1 min(100%, 320px); min-width: 0; display: grid; gap: 4px; }
 .calloutTitle { margin: 0; font: 600 16px/1.3 var(--ll-font-display); color: var(--lab-ink); }
 .adaptations li[hidden] { display: none; }
 /* What to do next with a loaded passport. */

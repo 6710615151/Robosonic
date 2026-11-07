@@ -85,6 +85,15 @@ test("without a passport, the Robot Lab and the journey entry say why one is nee
   await expect(page.getByTestId("meet-empty").getByRole("link", { name: /Create a passport/ })).toHaveAttribute("href", "/living-lab/create");
   await expect(page.getByRole("textbox", { name: "Passport code" })).toBeVisible();
   await context.close();
+
+  // Both "you need a passport" states fit a phone screen.
+  const phone = await open(browser, { width: 390 });
+  for (const path of ["/living-lab/meet", "/living-lab/robot"]) {
+    await phone.page.goto(path);
+    await expect(phone.page.getByTestId(path.endsWith("meet") ? "meet-empty" : "console-empty")).toBeVisible();
+    expect(await phone.page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `${path} fits 390 px`).toBe(true);
+  }
+  await phone.context.close();
 });
 
 test("a loaded token is masked until asked for, and the Robot Lab continues to the journey without a token in any URL", async ({ browser }) => {

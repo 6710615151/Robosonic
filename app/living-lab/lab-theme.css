@@ -532,19 +532,19 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
 .lab-bar-value .lab-small { margin-left: 6px; }
 
 /* ---------------- Journey entry (/living-lab/meet) ---------------- */
-.lab-meet { max-width: 1100px; }
+.lab-meet { max-width: 1100px; grid-template-columns: minmax(0, 1fr); }
 .lab-meet-head { display: grid; gap: var(--ll-space-3); max-width: 720px; }
 .lab-meet-head h1 { margin: 0; font: 600 var(--ll-text-2xl)/1.15 var(--ll-font-display); letter-spacing: -0.02em; }
-.lab-meet-card { display: grid; gap: var(--ll-space-4); max-width: 520px; padding: var(--ll-space-5); border: 1px solid var(--border); border-radius: var(--ll-radius-lg); background: var(--surface); box-shadow: var(--ll-shadow-1); }
+.lab-meet-card { min-width: 0; display: grid; gap: var(--ll-space-4); max-width: 520px; padding: var(--ll-space-5); border: 1px solid var(--border); border-radius: var(--ll-radius-lg); background: var(--surface); box-shadow: var(--ll-shadow-1); }
 .lab-meet-form { display: grid; gap: var(--ll-space-2); }
 .lab-meet-form label { font-weight: 650; }
-.lab-meet-form input { min-height: 60px; font: 600 28px/1 var(--ll-font-mono); letter-spacing: .3em; text-transform: uppercase; text-align: center; border-radius: var(--ll-radius); }
+.lab-meet-form input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 60px; font: 600 28px/1 var(--ll-font-mono); letter-spacing: .3em; text-transform: uppercase; text-align: center; border-radius: var(--ll-radius); }
 .lab-meet-form input::placeholder { color: #a9adb3; letter-spacing: .3em; }
 .lab-meet-form .lab-cta { justify-content: center; border: none; cursor: pointer; margin-top: var(--ll-space-2); }
 .lab-meet-alert.is-info { max-width: 720px; border-color: #e9c3a5; background: var(--ll-orange-tint); color: var(--ll-orange-ink); }
 /* "You need a passport" / "use the one in this browser": the first action on pages that need one. */
-.lab-callout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ll-space-3) var(--ll-space-5); max-width: 1100px; padding: var(--ll-space-4) var(--ll-space-5); border: 1px solid var(--lab-tint-border); border-radius: var(--ll-radius-lg); background: var(--ll-green-tint); }
-.lab-callout > div { flex: 1 1 340px; display: grid; gap: var(--ll-space-1); }
+.lab-callout { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ll-space-3) var(--ll-space-5); max-width: 1100px; padding: var(--ll-space-4) var(--ll-space-5); border: 1px solid var(--lab-tint-border); border-radius: var(--ll-radius-lg); background: var(--ll-green-tint); }
+.lab-callout > div { flex: 1 1 min(100%, 340px); min-width: 0; display: grid; gap: var(--ll-space-1); }
 .lab-callout h2 { margin: 0; font: 600 var(--ll-text-lg)/1.3 var(--ll-font-display); }
 .lab-callout form { margin: 0; }
 .lab-callout .lab-cta { border: none; cursor: pointer; }
