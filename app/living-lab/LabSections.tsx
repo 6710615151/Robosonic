@@ -160,14 +160,20 @@ export function JourneyOverview({ lang, passportCode, showAction = true }: { lan
 
 // ---------------- Research Observatory ----------------
 
-function MeanBar({ label, value, kind, n }: { label: string; value: Mean; kind: "passport" | "default"; n: string }) {
+function MeanBar({ label, value, kind, n, lang }: { label: string; value: Mean; kind: "passport" | "default"; n: string; lang: Lang }) {
+  const r = labCopy[lang].research;
   const width = value.mean === null ? 0 : (value.mean / 5) * 100;
-  const text = `${label}: ${fmt(value.mean)} / 5, ${n}`;
+  const small = value.n > 0 && value.n < MIN_CARE_CELL;
+  const text = value.n === 0 ? `${label}: ${r.noRatings}` : `${label}: ${fmt(value.mean)} / 5, ${n}${small ? `, ${r.smallSample(MIN_CARE_CELL)}` : ""}`;
   return (
     <div className="lab-bar-row" tabIndex={0} aria-label={text} data-tip={text}>
       <span className="lab-bar-label">{label}</span>
-      <span className="lab-bar-track"><span className={`lab-bar is-${kind}`} style={{ width: `${width}%` }} /></span>
-      <span className="lab-bar-value"><strong>{fmt(value.mean)}</strong> <small>{n}</small></span>
+      {value.n === 0 ? (
+        <span className="lab-bar-empty">{r.noRatings}</span>
+      ) : (
+        <span className="lab-bar-track"><span className={`lab-bar is-${kind}`} style={{ width: `${width}%` }} /></span>
+      )}
+      <span className="lab-bar-value"><strong>{fmt(value.mean)}</strong> <small>{n}</small>{small && <em className="lab-small" title={r.smallSample(MIN_CARE_CELL)}>{r.smallShort(MIN_CARE_CELL)}</em>}</span>
     </div>
   );
 }
@@ -177,8 +183,8 @@ function ComparisonGroup({ title, comparison, lang }: { title?: string; comparis
   return (
     <div className="lab-compare">
       {title && <h4>{title}</h4>}
-      <MeanBar label={r.passport} value={comparison.passport} kind="passport" n={r.n(comparison.passport.n)} />
-      <MeanBar label={r.default} value={comparison.default} kind="default" n={r.n(comparison.default.n)} />
+      <MeanBar label={r.passport} value={comparison.passport} kind="passport" n={r.n(comparison.passport.n)} lang={lang} />
+      <MeanBar label={r.default} value={comparison.default} kind="default" n={r.n(comparison.default.n)} lang={lang} />
     </div>
   );
 }
@@ -211,7 +217,7 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
   const range = stats?.window ?? "all";
   return (
     <section className="lab-section" aria-labelledby="research">
-      <SectionHead id="research" eyebrow={r.eyebrow} title={r.title} />
+      <SectionHead id="research" eyebrow={r.eyebrow} title={r.title} lead={r.lead} />
       <p className="lab-provenance" role="note"><span className="lab-tier sim">{labCopy[lang].tiers.sim}</span> {r.provenance}</p>
 
       <div className="lab-filters">
@@ -231,9 +237,20 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
       {!stats ? (
         <p className="ll-error">{r.offline}</p>
       ) : (
+        <>
+        <section className="lab-glance" aria-labelledby="glance-title">
+          <h3 id="glance-title">{r.glanceTitle}</h3>
+          <dl>
+            <div><dt>{r.glance.passports}</dt><dd>{stats.preferences.passports}</dd></div>
+            <div><dt>{r.glance.participants}</dt><dd>{stats.quality.linkedParticipants}</dd></div>
+            <div><dt>{r.glance.ratings}</dt><dd>{stats.quality.stationSessions}</dd></div>
+            <div><dt>{r.glance.pairs}</dt><dd>{stats.paired.n}</dd></div>
+          </dl>
+        </section>
         <div className="lab-obs">
           <article className="lab-panel lab-span-2">
-            <h3>{r.comfortTitle}</h3>
+            <p className="lab-q-kicker">{r.comfortTitle}</p>
+            <h3>{r.questions.comfort}</h3>
             <p className="lab-note">{r.comfortSub}</p>
             <div className="lab-legend" aria-hidden="true">
               <span><i className="is-passport" /> {r.passport}</span>
@@ -245,8 +262,10 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
               <div>
                 <span>{r.paired}</span>
                 <span className="lab-note">{stats.paired.n ? r.pairedSub(stats.paired.n) : r.pairedNone}</span>
+                {stats.paired.n > 0 && stats.paired.n < MIN_CARE_CELL && <span className="lab-small">{r.pairedSmall(MIN_CARE_CELL)}</span>}
               </div>
             </div>
+            {(stats.byStation.length > 0 || stats.byRobot.length > 0) && <h4 className="lab-q-sub">{r.questions.where}</h4>}
             {stats.byStation.length > 0 && (
               <>
                 <h4 className="lab-subhead">{r.byStation}</h4>
@@ -267,7 +286,8 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
           </article>
 
           <article className="lab-panel">
-            <h3>{r.prefsTitle}</h3>
+            <p className="lab-q-kicker">{r.prefsTitle}</p>
+            <h3>{r.questions.prefs}</h3>
             <p className="lab-note">{r.prefsSub(stats.preferences.passports)}</p>
             {stats.preferences.passports === 0 ? <p className="lab-note">{r.empty}</p> : (
               <>
@@ -283,7 +303,8 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
           </article>
 
           <article className="lab-panel">
-            <h3>{r.calibrationTitle}</h3>
+            <p className="lab-q-kicker">{r.calibrationTitle}</p>
+            <h3>{r.questions.calibration}</h3>
             <p className="lab-note">{r.calibrationSub(stats.calibration.sessions)}</p>
             {(Object.keys(stats.calibration.inputModes) as (keyof typeof stats.calibration.inputModes)[]).map((mode) => (
               <ShareBar
@@ -297,7 +318,8 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
           </article>
 
           <article className="lab-panel">
-            <h3>{r.qualityTitle}</h3>
+            <p className="lab-q-kicker">{r.qualityTitle}</p>
+            <h3>{r.questions.quality}</h3>
             <dl className="lab-kv">
               <div><dt>{r.quality.participants}</dt><dd className="lab-mono">{stats.quality.linkedParticipants}</dd></div>
               <div><dt>{r.quality.unlinked}</dt><dd className="lab-mono">{stats.quality.unlinkedPassports}</dd></div>
@@ -310,7 +332,13 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
             <h3>{r.limitsTitle}</h3>
             <ul className="lab-limits">{r.limits.map((item) => <li key={item}>{item}</li>)}</ul>
           </article>
+
+          <article className="lab-panel lab-span-2 lab-privacy" data-testid="research-privacy">
+            <h3>{r.privacyTitle}</h3>
+            <ul className="lab-limits">{r.privacy(MIN_CARE_CELL).map((item) => <li key={item}>{item}</li>)}</ul>
+          </article>
         </div>
+        </>
       )}
     </section>
   );

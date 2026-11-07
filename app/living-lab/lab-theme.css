@@ -498,3 +498,21 @@ html[lang="th"] .llo-hero h1, html[lang="th"] .llo h2 { letter-spacing: 0; line-
 .mt-intro-list { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: var(--ll-text-md); line-height: 1.6; color: var(--text-primary); }
 .lab .mt-scale button { min-width: 48px; min-height: 48px; }
 html[lang="th"] .lab .mt-eyebrow { font-family: var(--font-thai-stack); letter-spacing: 0; text-transform: none; }
+
+/* ---------------- Research Observatory (/living-lab/research) ---------------- */
+.lab-glance { display: grid; gap: var(--ll-space-3); padding: var(--ll-space-4) var(--ll-space-5); border: 1px solid var(--border); border-radius: var(--ll-radius-lg); background: var(--surface); }
+.lab-glance h3 { margin: 0; font: 600 11px/1.4 var(--ll-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-secondary); }
+.lab-glance dl { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ll-space-4); }
+.lab-glance dl div { display: grid; gap: 2px; }
+.lab-glance dt { font-size: var(--ll-text-sm); color: var(--text-secondary); }
+.lab-glance dd { margin: 0; font: 600 28px/1.1 var(--ll-font-display); color: var(--lab-ink); font-variant-numeric: tabular-nums; }
+.lab-q-kicker { margin: 0; font: 600 11px/1.4 var(--ll-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ll-green-ink); }
+.lab-panel h3 { font-family: var(--ll-font-display); }
+.lab-q-sub { margin: var(--ll-space-4) 0 0 !important; font-size: var(--ll-text-md) !important; font-weight: 650; color: var(--lab-ink); }
+.lab-bar-empty { font-size: 12.5px; font-style: italic; color: var(--text-secondary); border-left: 1px solid var(--lab-muted-line); padding-left: 8px; }
+.lab-small { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--ll-orange-tint); color: var(--ll-orange-ink); font-size: 11px; font-style: normal; font-weight: 600; white-space: nowrap; }
+.lab-paired .lab-small { margin: 4px 0 0; justify-self: start; }
+.lab-privacy { background: var(--ll-green-tint); border-color: var(--lab-tint-border); }
+@media (max-width: 760px) { .lab-glance dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--font-thai-stack) !important; letter-spacing: 0; text-transform: none; }
+.lab-bar-value .lab-small { margin-left: 6px; }

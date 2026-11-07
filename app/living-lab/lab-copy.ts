@@ -122,6 +122,27 @@ const en = {
   research: {
     eyebrow: "Research Observatory",
     title: "What the Living Lab is learning",
+    lead: "Anonymous group results from everyone who has used the lab. Each panel answers one research question and says how much data it rests on.",
+    glanceTitle: "Sample in this period",
+    glance: { passports: "Passports", participants: "Verified participants", ratings: "Station ratings", pairs: "Paired comparisons" },
+    questions: {
+      comfort: "Does reading the passport make a robot feel more comfortable?",
+      where: "Is it the same at every station and robot?",
+      prefs: "What do people ask robots to change?",
+      calibration: "How do people prefer to answer?",
+      quality: "How far can these numbers be trusted?"
+    },
+    noRatings: "no ratings yet",
+    smallSample: (min: number) => `fewer than ${min}: read with caution`,
+    smallShort: (min: number) => `n < ${min}`,
+    pairedSmall: (min: number) => `Fewer than ${min} pairs: too few to draw conclusions yet.`,
+    privacyTitle: "Privacy",
+    privacy: (min: number) => [
+      "Only group totals and averages leave the server. No one's individual answers are shown or exported.",
+      `Care preferences are hidden in any group of fewer than ${min} people.`,
+      "The CSV download holds the same aggregates as this page, nothing more.",
+      "When an owner deletes a passport it is removed completely; its earlier ratings stay only as rows with no link to any passport."
+    ],
     provenance: "Simulation data. Visitors rated three.js robots in a web browser, not physical robots, under uncontrolled conditions. This is not a clinical study and should not be cited as one.",
     window: "Period",
     windows: { all: "All time", "30d": "Last 30 days", "7d": "Last 7 days" },
@@ -290,6 +311,27 @@ const th: typeof en = {
   research: {
     eyebrow: "หอสังเกตการณ์งานวิจัย",
     title: "สิ่งที่ Living Lab กำลังเรียนรู้",
+    lead: "ผลรวมของกลุ่มแบบไม่ระบุตัวตนจากทุกคนที่ใช้แล็บ แต่ละส่วนตอบคำถามวิจัยหนึ่งข้อ และบอกว่ามีข้อมูลรองรับมากน้อยแค่ไหน",
+    glanceTitle: "กลุ่มตัวอย่างในช่วงเวลานี้",
+    glance: { passports: "พาสปอร์ต", participants: "ผู้เข้าร่วมที่ยืนยันแล้ว", ratings: "คะแนนจากแต่ละจุด", pairs: "คู่เปรียบเทียบ" },
+    questions: {
+      comfort: "หุ่นที่อ่านพาสปอร์ตแล้ว ทำให้รู้สึกสบายใจกว่าหรือไม่",
+      where: "ผลเหมือนกันทุกจุดและทุกหุ่นหรือไม่",
+      prefs: "คนขอให้หุ่นเปลี่ยนอะไรบ้าง",
+      calibration: "คนชอบตอบด้วยวิธีไหน",
+      quality: "ตัวเลขเหล่านี้เชื่อถือได้แค่ไหน"
+    },
+    noRatings: "ยังไม่มีคะแนน",
+    smallSample: (min: number) => `น้อยกว่า ${min}: ควรอ่านอย่างระมัดระวัง`,
+    smallShort: (min: number) => `n < ${min}`,
+    pairedSmall: (min: number) => `มีน้อยกว่า ${min} คู่ ยังน้อยเกินกว่าจะสรุปได้`,
+    privacyTitle: "ความเป็นส่วนตัว",
+    privacy: (min: number) => [
+      "ส่งออกจากเซิร์ฟเวอร์เฉพาะยอดรวมและค่าเฉลี่ยของกลุ่ม ไม่มีการแสดงหรือส่งออกคำตอบของใครเป็นรายบุคคล",
+      `ความต้องการด้านการดูแลจะถูกซ่อนในกลุ่มที่มีไม่ถึง ${min} คน`,
+      "ไฟล์ CSV มีข้อมูลสรุปชุดเดียวกับหน้านี้ ไม่มีอะไรมากกว่านั้น",
+      "เมื่อเจ้าของลบพาสปอร์ต ข้อมูลจะถูกลบทั้งหมด คะแนนก่อนหน้าจะเหลือเป็นแถวที่ไม่ผูกกับพาสปอร์ตใด"
+    ],
     provenance: "ข้อมูลจากการจำลอง ผู้เข้าชมให้คะแนนหุ่น three.js ในเว็บเบราว์เซอร์ ไม่ใช่หุ่นจริง และไม่ได้ควบคุมสภาพแวดล้อม นี่ไม่ใช่การศึกษาทางคลินิกและไม่ควรอ้างอิงในฐานะนั้น",
     window: "ช่วงเวลา",
     windows: { all: "ทั้งหมด", "30d": "30 วันล่าสุด", "7d": "7 วันล่าสุด" },

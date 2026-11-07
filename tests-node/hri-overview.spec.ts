@@ -48,3 +48,13 @@ test("the overview has no horizontal overflow at phone width", async ({ page }) 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("the research page states its sample size and its privacy rule", async ({ page }) => {
+  await page.goto("/living-lab/research");
+  await expect(page.getByRole("heading", { level: 2, name: "What the Living Lab is learning" })).toBeVisible();
+  // Either the aggregates (with sample sizes and the privacy rule) or an honest offline message.
+  const offline = page.getByText("The research database is not reachable right now");
+  if (await offline.count()) return;
+  await expect(page.getByRole("heading", { name: "Sample in this period" })).toBeVisible();
+  await expect(page.getByTestId("research-privacy")).toContainText("hidden in any group of fewer than 5 people");
+});
