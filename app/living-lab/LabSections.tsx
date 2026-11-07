@@ -219,6 +219,8 @@ function download(stats: ObservatoryStats) {
 export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: ObservatoryStats | null }) {
   const r = labCopy[lang].research;
   const range = stats?.window ?? "all";
+  // Only one condition has ratings: per-station and per-robot bars would all be one-sided.
+  const oneSided = !stats || stats.comfort.passport.n === 0 || stats.comfort.default.n === 0;
   return (
     <section className="lab-section" aria-labelledby="research">
       <SectionHead id="research" eyebrow={r.eyebrow} title={r.title} lead={r.lead} />
@@ -260,6 +262,14 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
               <span><i className="is-passport" /> {r.passport}</span>
               <span><i className="is-default" /> {r.default}</span>
             </div>
+            {/* Fewer than MIN_CARE_CELL pairs, or one side empty: say plainly why no comparison can be read yet. */}
+            {(stats.paired.n < MIN_CARE_CELL || stats.comfort.passport.n === 0 || stats.comfort.default.n === 0) && (
+              <div className="lab-not-comparable" role="note" data-testid="research-not-comparable">
+                <strong>{r.notComparable.title}</strong>
+                <p className="lab-note">{r.notComparable.body(stats.comfort.passport.n, stats.comfort.default.n, stats.paired.n, MIN_CARE_CELL)}</p>
+                <Link className="lab-link" href="/living-lab/meet">{r.notComparable.action} <ArrowRight size={16} aria-hidden="true" /></Link>
+              </div>
+            )}
             <ComparisonGroup comparison={stats.comfort} lang={lang} />
             <div className="lab-paired">
               <strong className="lab-paired-value">{stats.paired.meanDifference === null ? "–" : `${stats.paired.meanDifference > 0 ? "+" : ""}${stats.paired.meanDifference.toFixed(2)}`}</strong>
@@ -270,7 +280,8 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
               </div>
             </div>
             {(stats.byStation.length > 0 || stats.byRobot.length > 0) && <h4 className="lab-q-sub">{r.questions.where}</h4>}
-            {stats.byStation.length > 0 && (
+            {oneSided && (stats.byStation.length > 0 || stats.byRobot.length > 0) && <p className="lab-note">{r.notComparable.split}</p>}
+            {!oneSided && stats.byStation.length > 0 && (
               <>
                 <h4 className="lab-subhead">{r.byStation}</h4>
                 <div className="lab-groups">
@@ -278,7 +289,7 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
                 </div>
               </>
             )}
-            {stats.byRobot.length > 0 && (
+            {!oneSided && stats.byRobot.length > 0 && (
               <>
                 <h4 className="lab-subhead">{r.byRobot}</h4>
                 <div className="lab-groups">

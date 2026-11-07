@@ -170,6 +170,13 @@ const en = {
     paired: "Within-person difference",
     pairedSub: (n: number) => `Passport minus default, same person and station · ${n} pair${n === 1 ? "" : "s"}`,
     pairedNone: "No paired ratings yet. Pairs come from the counterbalanced journey.",
+    notComparable: {
+      title: "Not comparable yet",
+      body: (passport: number, plain: number, pairs: number, min: number) =>
+        `So far there are ${passport} rating${passport === 1 ? "" : "s"} of robots that read a passport and ${plain} of robots that did not, and ${pairs} paired. A fair comparison needs both versions rated by the same person at the same station, which the hospital journey collects; at least ${min} pairs are needed before reading anything into it.`,
+      split: "Per-station and per-robot comparisons appear once both versions have ratings. The CSV holds the one-sided figures.",
+      action: "Walk the hospital journey"
+    },
     byStation: "By station",
     byRobot: "By robot",
     stationNames: { reception: "Reception", delivery: "Medicine delivery", telepresence: "Doctor call", unknown: "Unlabelled" } as Record<string, string>,
@@ -373,6 +380,13 @@ const th: typeof en = {
     paired: "ผลต่างภายในบุคคล",
     pairedSub: (n: number) => `พาสปอร์ตลบหุ่นปกติ คนเดียวกัน สถานีเดียวกัน · ${n} คู่`,
     pairedNone: "ยังไม่มีคะแนนแบบจับคู่ คู่คะแนนมาจากเส้นทางที่สลับลำดับ",
+    notComparable: {
+      title: "ยังเปรียบเทียบไม่ได้",
+      body: (passport: number, plain: number, pairs: number, min: number) =>
+        `ตอนนี้มีคะแนนหุ่นที่อ่านพาสปอร์ต ${passport} ครั้ง หุ่นที่ไม่ได้อ่าน ${plain} ครั้ง และคะแนนจับคู่ ${pairs} คู่ การเปรียบเทียบที่ยุติธรรมต้องมีคะแนนทั้งสองแบบจากคนเดียวกันที่จุดเดียวกัน ซึ่งได้จากเส้นทางโรงพยาบาล และต้องมีอย่างน้อย ${min} คู่ก่อนจะตีความได้`,
+      split: "การเปรียบเทียบแยกตามจุดและตามหุ่นจะแสดงเมื่อมีคะแนนทั้งสองแบบ ตัวเลขฝั่งเดียวยังอยู่ในไฟล์ CSV",
+      action: "เดินเส้นทางโรงพยาบาล"
+    },
     byStation: "แยกตามสถานี",
     byRobot: "แยกตามหุ่นยนต์",
     stationNames: { reception: "ต้อนรับ", delivery: "ส่งยา", telepresence: "พบแพทย์ทางไกล", unknown: "ไม่ระบุ" } as Record<string, string>,
