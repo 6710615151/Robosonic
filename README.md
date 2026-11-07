@@ -173,6 +173,8 @@ PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-
 - **Speech input depends on the browser.** Without support, or with the microphone blocked, the same flow works by typing or with buttons. Thai recognition has not been measured in a noisy venue.
 - **Speech may leave the device.** The browser's speech service may process what is said. This site stores neither audio nor transcripts, only the chosen preferences.
 - **Auto mode is unvalidated.** Camera calibration runs on-device, but its accuracy on real people has not been measured. It never infers feelings.
+- **Talking with the robot uses an AI service (optional).** After Auto mode, the person may start a spoken interview. What they say is turned into text by the browser's speech service, then sent as text to this site's server and on to Google Gemini, with a short summary of what the camera measured (no images, no audio, no anxiety level; the request has no field for them). Nothing from the conversation is stored: only counts are saved in the session summary. A value is recorded only when the person's own words back it up (`lib/hri/interview-guard.ts`), otherwise the robot asks again. It is off unless `GEMINI_API_KEY` is set; without it the robot falls back to the measured values. The robot console's AI chat (`/api/hri/voice-chat`) works the same way.
+- **Spoken safety words during Auto mode** ("stop", "too close", "too fast") are opt-in and matched on the device against a fixed vocabulary, never by an AI. The browser's speech service may still process the audio.
 - **Preferences, not medical data.** A passport is what the person says they prefer, not a diagnosis.
 
 ---

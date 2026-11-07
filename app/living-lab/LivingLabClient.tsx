@@ -3,16 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { Camera, CameraOff, Hand, HeartHandshake, Mic, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
+import { Camera, CameraOff, Hand, HeartHandshake, Mic, MicOff, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
 import { describeDistance, type PassportInput } from "@/lib/hri/passport";
-import { AutoCalibrator, type AutoEvent, type AutoEvidence, type AutoResult, type AutoStage, type PauseReason } from "@/lib/hri/auto-calibration";
+import { AutoCalibrator, type AutoEvent, type AutoEvidence, type AutoResult, type AutoStage, type PauseReason, type VoiceCue } from "@/lib/hri/auto-calibration";
+import { applyInterviewUpdates, initialReview, pendingTopics, type FieldKey, type InterviewUpdates, type ReviewValues, type Source, type Sources } from "@/lib/hri/interview-ai";
+import { findSpeechRecognition, listenOnce } from "@/lib/hri/speech-input";
+import { matchFirstVoiceAnswer } from "@/lib/hri/voice-answers";
 import type { PoseFrame } from "@/lib/hri/camera";
 import { CameraSession } from "@/lib/hri/camera-session";
 import { createPassportAction } from "./actions";
 import PassportCardVisual from "./PassportCardVisual";
+import AutoInterview from "./AutoInterview";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
 
@@ -37,6 +41,9 @@ type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "confi
 type InputMode = "buttons" | "camera" | "voice" | "auto";
 type SessionSummary = Record<string, string | number | boolean | null>;
 const REVIEW_SECONDS = 10;
+// After the camera finishes, offer a spoken interview about what it cannot measure. While it is on offer the
+// automatic save waits for the person to choose (talk, or skip and save with the measured values).
+const INTERVIEW_OFFERED = true;
 type LogEvent = { t: number; src: "robot" | "human"; type: string; [key: string]: unknown };
 
 // Distances the robot steps through while approaching (higher = closer to the person).
@@ -85,6 +92,21 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const [autoNotice, setAutoNotice] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const autoRef = useRef<AutoCalibrator | null>(null);
+  // Camera + voice: spoken safety words while the robot approaches, and the Gemini interview afterwards.
+  const [voiceSafety, setVoiceSafety] = useState(false);
+  const [heardCue, setHeardCue] = useState<string | null>(null);
+  const [micSupported, setMicSupported] = useState(false);
+  const [autoValues, setAutoValues] = useState<ReviewValues | null>(null);
+  const [autoSources, setAutoSources] = useState<Sources | null>(null);
+  const [interviewTurns, setInterviewTurnsState] = useState(0);
+  const interviewTurnsRef = useRef(0);
+  const setInterviewTurns = (next: number | ((n: number) => number)) => {
+    interviewTurnsRef.current = typeof next === "function" ? next(interviewTurnsRef.current) : next;
+    setInterviewTurnsState(interviewTurnsRef.current);
+  };
+  const autoValuesRef = useRef<ReviewValues | null>(null);
+  const autoSourcesRef = useRef<Sources | null>(null);
+  const spokeAt = useRef(0); // when the robot last started to speak: the mic must not hear it
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -108,7 +130,10 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     record({ t: +(robotRef.current?.time ?? 0).toFixed(3), src: "human", type, ...detail });
   const onRobotEvent = useCallback((e: RobotEvent) => record({ ...e, src: "robot" }), [record]);
 
+  useEffect(() => { setMicSupported(findSpeechRecognition(window) !== null); }, []);
+
   const say = (text: string) => {
+    spokeAt.current = Date.now();
     setSpeech(text);
     if (voiceRef.current && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -411,6 +436,8 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     setCountdown(null);
     changeConsent(false);
     setAnxiety("low"); setAccessible(false); setNoReach(false); setGreeting("wai");
+    setVoiceSafety(false); setHeardCue(null); setAutoValues(null); setAutoSources(null); setInterviewTurns(0);
+    autoValuesRef.current = null; autoSourcesRef.current = null;
     setPhase("intro");
     setStatus(t.statusIdle);
     setSpeech(t.introSpeech);
@@ -505,6 +532,9 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     setPassportCode(null); setAccessToken(null); setEditToken(null); setKeyCopied(false); setQr(null); setError(null);
     setAutoNotice(null); setAutoResult(null); setCountdown(null); setAutoLeans(0); setAutoWai(null); setAutoPaused(null);
     setAutoStage("baseline"); setAutoPerson(false);
+    // A new visitor: nothing of the last one's voice choices carries over.
+    setVoiceSafety(false); setHeardCue(null); setAutoValues(null); setAutoSources(null); setInterviewTurns(0);
+    autoValuesRef.current = null; autoSourcesRef.current = null;
     // Safe defaults for what the camera does not measure. Anxiety is never guessed.
     setGaze("direct"); setAnxiety("low"); setAccessible(false); setNoReach(true); setGreeting("wai");
     // Auto mode talks (and shows the text), so the person can follow without reading the screen.
@@ -523,6 +553,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
 
   function stopAuto() {
     autoRef.current = null;
+    setVoiceSafety(false); setHeardCue(null);
     stopCam();
     clearTimers();
     window.speechSynthesis?.cancel();
@@ -579,20 +610,21 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
         human("auto_step", { index: e.index, distance: e.distance });
         break;
       case "too_fast":
-        counters.current.tooFast++; counters.current.leanBack++;
-        setAutoLeans((n) => n + 1);
+        counters.current.tooFast++;
+        // A spoken correction is not a camera lean-back: keep the two counted apart.
+        if (e.source !== "voice") { counters.current.leanBack++; setAutoLeans((n) => n + 1); }
         robot.setSpeed(e.speed); robot.setDistance(e.retreatTo); robot.expression("sorry"); robot.nod(1);
         setSpeed(e.speed);
         say(t.autoTooFast);
-        human("too_fast", { source: "auto", speed: e.speed });
+        human("too_fast", { source: e.source ?? "auto", speed: e.speed });
         break;
       case "too_close":
-        counters.current.tooClose++; counters.current.leanBack++;
-        setAutoLeans((n) => n + 1);
+        counters.current.tooClose++;
+        if (e.source !== "voice") { counters.current.leanBack++; setAutoLeans((n) => n + 1); }
         robot.setDistance(e.backTo); robot.moveArm("R", "handOnChest"); robot.expression("sorry"); robot.lean("back");
         say(t.sorryLean);
         later(1700, () => { robot.lean("upright"); robot.moveArm("R", "relaxed"); });
-        human("too_close", { source: "auto", distance: e.backTo });
+        human("too_close", { source: e.source ?? "auto", distance: e.backTo });
         break;
       case "lean_in":
         robot.expression("happy");
@@ -602,7 +634,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
       case "distance_set":
         setComfort(e.distance); setSpeed(e.speed);
         robot.setSpeed(e.speed); robot.setDistance(e.distance); robot.nod(1); robot.setGlow(0.9, "teal");
-        human("distance_set", { source: "auto", distance: e.distance, reason: e.reason });
+        human("distance_set", { source: e.source ?? "auto", distance: e.distance, reason: e.reason });
         break;
       case "gaze_check":
         robot.lookAt(0, 0);
@@ -613,9 +645,15 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
         stopCam(); // sensing ends as soon as it is no longer needed
         setGaze(e.result.gaze);
         setAutoResult({ result: e.result, evidence: e.evidence });
+        {
+          const review = initialReview(e.result, e.evidence);
+          autoValuesRef.current = review.values; autoSourcesRef.current = review.sources;
+          setAutoValues(review.values); setAutoSources(review.sources); setInterviewTurns(0);
+        }
         setPhase("review");
         setStatus(t.reviewTitle);
-        setCountdown(REVIEW_SECONDS);
+        // With the interview on offer, saving waits until the person chooses to talk or to skip.
+        setCountdown(INTERVIEW_OFFERED ? null : REVIEW_SECONDS);
         robot.expression("happy"); robot.bothArms("wai");
         later(1600, () => robot.bothArms("relaxed"));
         say(t.reviewTitle);
@@ -639,18 +677,55 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     if (!autoResult || phaseRef.current !== "review") return;
     setCountdown(null);
     const { result, evidence } = autoResult;
+    // The values after the interview (if any). A ref, so a save triggered in the same turn as the
+    // last spoken answer already sees that answer.
+    const v = autoValuesRef.current ?? initialReview(result, evidence).values;
+    const sources = autoSourcesRef.current;
     await savePassport(
-      result,
+      {
+        greeting: v.greeting, comfortDistance: v.comfortDistance, speed: v.speed, gaze: v.gaze, voice: v.voice,
+        language: v.language, anxiety: "low", captions: v.captions, speechPace: v.speechPace, noReach: v.noReach
+      },
       {
         ...evidence,
         tooClose: counters.current.tooClose,
         tooFast: counters.current.tooFast,
         leanBack: counters.current.leanBack,
-        finalDistance: result.comfortDistance,
-        finalSpeed: result.speed
+        finalDistance: v.comfortDistance,
+        finalSpeed: v.speed,
+        // Counts only. No words from the conversation are saved.
+        interviewTurns: interviewTurnsRef.current,
+        fieldsFromVoice: sources ? Object.values(sources).filter((s) => s === "voice").length : 0
       },
       "auto"
     );
+  }
+
+  // The interview calls this with values that passed the server's check. Apply them to the review, show
+  // them on the robot, and remember where each came from.
+  function applyInterview(update: InterviewUpdates): FieldKey[] {
+    const current = autoValuesRef.current;
+    const sources = autoSourcesRef.current;
+    if (!current || !sources) return [];
+    const out = applyInterviewUpdates(current, sources, update, { allowClosest: autoResult?.evidence.leanIn ?? false });
+    autoValuesRef.current = out.values; autoSourcesRef.current = out.sources;
+    setAutoValues(out.values); setAutoSources(out.sources);
+    setInterviewTurns((n) => n + 1);
+    const robot = robotRef.current;
+    if (robot && out.changed.length) {
+      robot.nod(1);
+      if (out.changed.includes("distance")) robot.setDistance(out.values.comfortDistance);
+      if (out.changed.includes("speed")) robot.setSpeed(out.values.speed);
+      if (out.changed.includes("voice")) { voiceRef.current = out.values.voice; setVoice(out.values.voice); }
+    }
+    human("interview_update", { fields: out.changed.join(",") });
+    return out.changed;
+  }
+
+  function interviewActive(active: boolean, failed?: boolean) {
+    // While talking, saving waits. If the AI cannot be reached, the normal countdown takes over.
+    if (active) setCountdown(null);
+    else if (failed) setCountdown(REVIEW_SECONDS);
   }
 
   // The review screen saves by itself after a visible countdown, so Auto mode needs no second tap.
@@ -662,7 +737,59 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, countdown]);
 
+  // Spoken safety words while the robot approaches ("stop", "too close", "too fast"). Matched on this device
+  // against the closed vocabulary of voice-answers.ts and fed into the same state machine as the camera:
+  // never sent to an AI. Opt-in, because browsers may send audio to their own speech service.
+  useEffect(() => {
+    if (phase !== "auto" || !voiceSafety) return;
+    const Recognition = findSpeechRecognition(window);
+    if (!Recognition) return;
+    let stopped = false;
+    let cancel: (() => void) | null = null;
+    let timer = 0;
+    const loop = () => {
+      if (stopped) return;
+      // Never listen while the robot talks: it would hear itself.
+      if (window.speechSynthesis?.speaking || Date.now() - spokeAt.current < 900) {
+        timer = window.setTimeout(loop, 300);
+        return;
+      }
+      const startedAt = Date.now();
+      cancel = listenOnce(Recognition, lang, ({ alternatives, problem }) => {
+        cancel = null;
+        if (stopped) return;
+        if (problem === "denied" || problem === "unavailable") {
+          setVoiceSafety(false);
+          setAutoNotice(t.interview.micDenied2);
+          return;
+        }
+        // Discard anything heard while the robot started to speak in the meantime.
+        if (!problem && spokeAt.current < startedAt) {
+          const calibrator = autoRef.current;
+          const greeted = calibrator?.stage === "greet" ? matchFirstVoiceAnswer("greet", alternatives) : null;
+          const approach = matchFirstVoiceAnswer("approach", alternatives);
+          const match = greeted ?? approach;
+          if (calibrator && match) {
+            const cue: VoiceCue = greeted ? "greeted" : (approach!.answer as VoiceCue);
+            setHeardCue(match.transcript);
+            human("voice_cue", { cue });
+            calibrator.applyVoice(cue).forEach(applyAutoEvent);
+          }
+        }
+        timer = window.setTimeout(loop, 150);
+      });
+    };
+    loop();
+    return () => { stopped = true; cancel?.(); window.clearTimeout(timer); };
+    // The handlers read refs and setters only; restarting on every render would drop the microphone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, voiceSafety, lang]);
+
   const pct = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
+
+  const sourceLabel = (source: Source) =>
+    source === "camera" ? t.interview.sourceCamera : source === "voice" ? t.interview.sourceVoice : t.interview.sourceDefault;
+  const Src = ({ of }: { of: Source }) => <em className={`ll-src ll-src-${of}`}>{sourceLabel(of)}</em>;
 
   return (
     <main className="ll">
@@ -808,27 +935,68 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
                 <span>{t.autoSignalWai}: {autoWai === null ? "…" : autoWai ? "✓" : "–"}</span>
                 <span>{t.autoSignalLean}: {autoLeans}</span>
               </div>
+              {micSupported && (
+                <div className="ll-mic" data-testid="auto-mic">
+                  <button
+                    className="ll-btn" aria-pressed={voiceSafety} data-testid="auto-mic-toggle"
+                    onClick={() => { setVoiceSafety((on) => !on); setHeardCue(null); human(voiceSafety ? "voice_safety_off" : "voice_safety_on"); }}
+                  >
+                    {voiceSafety ? <MicOff size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />} {voiceSafety ? t.interview.micOff : t.interview.micOn}
+                  </button>
+                  <p className="ll-note" role="status">
+                    {voiceSafety
+                      ? heardCue ? `${t.interview.micHeard}: “${heardCue}”` : t.interview.micListening
+                      : `${t.interview.micHint} ${t.interview.micDisclosure}`}
+                  </p>
+                </div>
+              )}
               <button className="ll-btn" onClick={stopAuto}>{t.autoStop}</button>
             </div>
           )}
 
-          {(phase === "review" || (phase === "saving" && inputMode === "auto")) && autoResult && (
+          {(phase === "review" || (phase === "saving" && inputMode === "auto")) && autoResult && autoValues && autoSources && (
             <div className="ll-step">
               <h2>{t.reviewTitle}</h2>
               <ul className="ll-facts">
-                <li>{t.factDistance}: {describeDistance(autoResult.result.comfortDistance)[lang]}</li>
-                <li>{t.factSpeed}: {autoResult.result.speed < 1 ? t.slow : t.normal}</li>
-                <li>{t.factGaze}: {autoResult.result.gaze === "soft" ? t.soft : t.direct}</li>
-                <li>{t.factVoice}: {t.on}</li>
+                <li>{t.factDistance}: {describeDistance(autoValues.comfortDistance)[lang]} <Src of={autoSources.distance} /></li>
+                <li>{t.factSpeed}: {autoValues.speed < 1 ? t.slow : t.normal} <Src of={autoSources.speed} /></li>
+                <li>{t.factGaze}: {autoValues.gaze === "soft" ? t.soft : t.direct} <Src of={autoSources.gaze} /></li>
+                <li>{t.factVoice}: {autoValues.voice ? t.on : t.interview.textOnly} <Src of={autoSources.voice} /></li>
+                {interviewTurns > 0 && (
+                  <>
+                    <li>{t.interview.factCaptions}: {autoValues.captions === "large" ? t.interview.large : t.interview.normal} <Src of={autoSources.captions} /></li>
+                    <li>{t.interview.factPace}: {autoValues.speechPace === "slow" ? t.interview.slow : t.interview.normal} <Src of={autoSources.speechPace} /></li>
+                    <li>{t.interview.factHandover}: {autoValues.noReach ? t.interview.place : t.interview.hand} <Src of={autoSources.handover} /></li>
+                  </>
+                )}
               </ul>
               <p className="ll-q">{t.reviewEvidence}</p>
               <ul className="ll-list">
                 <li>{autoResult.evidence.waiDetected ? t.reviewWaiYes : t.reviewWaiNo}</li>
                 <li>{t.reviewLeans(autoResult.evidence.leanBacks)}</li>
+                {autoResult.evidence.voiceCorrections > 0 && <li>{t.interview.evidenceVoice(autoResult.evidence.voiceCorrections)}</li>}
                 {autoResult.evidence.leanIn && <li>{t.reviewLeanIn}</li>}
                 <li>{t.reviewGaze(autoResult.evidence.avertShare)}</li>
               </ul>
-              <p className="ll-note">{t.reviewDefaults}</p>
+              {pendingTopics(autoSources).length > 0 && <p className="ll-note">{t.reviewDefaults}</p>}
+              {INTERVIEW_OFFERED && phase === "review" && (
+                <AutoInterview
+                  lang={lang}
+                  values={autoValues}
+                  sources={autoSources}
+                  camera={{
+                    waiDetected: autoResult.evidence.waiDetected, leanBacks: autoResult.evidence.leanBacks,
+                    tooFast: autoResult.evidence.tooFast, voiceCorrections: autoResult.evidence.voiceCorrections,
+                    leanIn: autoResult.evidence.leanIn, gazeMeasured: autoResult.evidence.gazeMeasured,
+                    avertShare: autoResult.evidence.avertShare
+                  }}
+                  say={say}
+                  onUpdates={applyInterview}
+                  onSave={saveAuto}
+                  onActive={interviewActive}
+                  onSkip={() => setCountdown(REVIEW_SECONDS)}
+                />
+              )}
               {phase === "saving" ? (
                 <p className="ll-countdown" role="status">{t.statusSaving}</p>
               ) : countdown !== null ? (
@@ -1108,6 +1276,23 @@ const styles = `
 .ll-auto-signals .ok { background: #e8f5ec; border-color: #9cc9aa; }
 .ll-auto-signals .warn { background: #fdf1e7; border-color: #e3b48c; }
 .ll-countdown { font-weight: 700; color: var(--accent-strong); margin: 4px 0 10px; }
+/* Where each value came from: a text tag, never colour alone. */
+.ll-src { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 700; border: 1px solid var(--border); background: #f4f0e8; color: #5b5b55; white-space: nowrap; }
+.ll-src-camera { background: #e8f5ec; border-color: #9cc9aa; color: #1d5c33; }
+.ll-src-voice { background: #0b1a15; border-color: #0b1a15; color: #d9b45a; }
+.ll-mic { display: grid; gap: 6px; margin: 0 0 12px; }
+.ll-mic .ll-note { margin: 0; }
+.ll-interview { display: grid; gap: 10px; margin: 14px 0; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #fcfbf8; }
+.ll-interview h3 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 16px; }
+.ll-interview p { margin: 0; }
+.ll-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.ll-topics li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: #fff; }
+.ll-topics li.done { background: #e8f5ec; border-color: #9cc9aa; color: #1d5c33; font-weight: 700; }
+.ll-chat { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; max-height: 240px; overflow: auto; }
+.ll-chat li { padding: 8px 11px; border-radius: 10px; font-size: 14px; line-height: 1.5; border: 1px solid var(--border); background: #fff; }
+.ll-chat li.robot { background: #eef6f0; border-color: #cfe3d5; }
+.ll-chat li b { margin-right: 6px; font-size: 12px; }
+.ll-type input { flex: 1 1 200px; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); font: inherit; background: #fff; }
 @media (prefers-reduced-motion: reduce) {
   .ll-btn, .ll-consent input { transition: none; }
 }

@@ -8,7 +8,15 @@ import { adapt, DEFAULT_PLAN, type BehaviourPlan } from "@/lib/hri/adapt";
 import type { RobotBehavior } from "@/lib/hri/behavior-engine";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES, type RobotCapabilities, type RobotProfile } from "@/lib/hri/robot-profiles";
+import {
+  NOT_UNDERSTOOD_REPLY,
+  parseVoiceCommand,
+  runVoiceIntent,
+  type RobotState,
+  type VoiceIntent
+} from "@/lib/hri/voice-commands";
 import { greetings, robotCopy, type RobotLang } from "./copy";
+import VoiceControl, { type VoiceLogEntry } from "./VoiceControl";
 import styles from "./robot.module.css";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -93,6 +101,20 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   const profileRef = useRef<PublicProfile | null>(null);
   const robots = useRef<Record<string, RobotBehavior | null>>({});
   const timers = useRef<Record<string, number[]>>({});
+  const [voiceLog, setVoiceLog] = useState<VoiceLogEntry[]>([]);
+  const [speakReplies, setSpeakReplies] = useState(true);
+  const speakRepliesRef = useRef(true);
+  const logId = useRef(0);
+  const [aiMode, setAiMode] = useState(true);
+  const aiModeRef = useRef(true);
+  const [thinking, setThinking] = useState(false);
+  const [aiNotice, setAiNotice] = useState(false);
+  const chatHistory = useRef<Array<{ role: "user" | "robot"; text: string }>>([]);
+  // Running distance/speed per robot, so "come closer" and "slower" accumulate.
+  const motion = useRef<Record<string, RobotState>>({
+    a: { distance: 0, speed: 1 },
+    b: { distance: 0, speed: 1 }
+  });
 
   const performOn = useCallback((key: string, plan: BehaviourPlan, caps: RobotCapabilities) => {
     const robot = robots.current[key];
@@ -172,6 +194,112 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Run one action on both simulated robots; each obeys within its own hardware.
+  function applyIntent(intent: VoiceIntent): VoiceLogEntry["results"] {
+    const results: VoiceLogEntry["results"] = [];
+    for (const target of [
+      { key: "a", robot: ROBOT_PROFILES[0] },
+      { key: "b", robot: ROBOT_PROFILES[1] }
+    ]) {
+      const instance = robots.current[target.key];
+      if (!instance) continue;
+      // A voice command takes over from the scripted passport demo.
+      for (const timer of timers.current[target.key] ?? []) window.clearTimeout(timer);
+      timers.current[target.key] = [];
+      const result = runVoiceIntent(instance, target.robot.capabilities, intent, motion.current[target.key]);
+      results.push({ key: target.key, name: target.robot.name[lang], done: result.done, reply: result.reply });
+    }
+    return results;
+  }
+
+  // Public passport preferences only. Never anxiety, nickname, code, token or logs.
+  function aiPreferences() {
+    const current = profileRef.current;
+    if (!current) return undefined;
+    const plan = adapt(current, ROBOT_PROFILES[0]);
+    return { language: plan.language, greeting: plan.greeting, voice: plan.voice, captions: plan.captions };
+  }
+
+  async function askAi(text: string): Promise<{ say: string; intent: VoiceIntent | null } | null> {
+    try {
+      const response = await fetch("/api/hri/voice-chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, history: chatHistory.current.slice(-6), preferences: aiPreferences() })
+      });
+      if (!response.ok) return null;
+      const body = (await response.json()) as { say?: string; intent?: VoiceIntent | null };
+      return body.say ? { say: body.say, intent: body.intent ?? null } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // A spoken or typed Thai phrase. In AI mode the model answers and may pick an action; otherwise (or when
+  // the AI is unavailable) the built-in keyword parser handles it.
+  async function handleUtterance(text: string) {
+    let intent: VoiceIntent | null = null;
+    let results: VoiceLogEntry["results"] = [];
+    let say: string | null = null;
+    let viaAi = false;
+
+    if (aiModeRef.current) {
+      setThinking(true);
+      const answer = await askAi(text);
+      setThinking(false);
+      if (answer) {
+        viaAi = true;
+        setAiNotice(false);
+        intent = answer.intent;
+        say = answer.say;
+        const moved = intent ? applyIntent(intent) : [];
+        results = moved.length
+          ? moved.map((entry) => ({ ...entry, reply: entry.done ? answer.say : entry.reply }))
+          : [{ key: "a", name: ROBOT_PROFILES[0].name[lang], done: true, reply: answer.say }];
+        chatHistory.current.push({ role: "user", text }, { role: "robot", text: answer.say });
+        chatHistory.current = chatHistory.current.slice(-12);
+      } else {
+        setAiNotice(true);
+      }
+    }
+
+    if (!viaAi) {
+      intent = parseVoiceCommand(text);
+      if (intent) {
+        results = applyIntent(intent);
+        say = results[0]?.reply ?? null;
+      } else {
+        results = [{ key: "a", name: ROBOT_PROFILES[0].name[lang], done: false, reply: NOT_UNDERSTOOD_REPLY }];
+        say = NOT_UNDERSTOOD_REPLY;
+      }
+    }
+
+    logId.current += 1;
+    const entry: VoiceLogEntry = { id: logId.current, heard: text, intent, results, ai: viaAi };
+    setVoiceLog((current) => [entry, ...current].slice(0, 8));
+
+    // One voice answers, so the replies do not talk over each other.
+    if (speakRepliesRef.current && say) {
+      const rate = profileRef.current ? adapt(profileRef.current, ROBOT_PROFILES[0]).speechRate : 1;
+      speak(say, "th", rate);
+    }
+  }
+
+  function toggleAi() {
+    const next = !aiModeRef.current;
+    aiModeRef.current = next;
+    setAiMode(next);
+    setAiNotice(false);
+    if (!next) chatHistory.current = [];
+  }
+
+  function toggleSpeakReplies() {
+    const next = !speakRepliesRef.current;
+    speakRepliesRef.current = next;
+    setSpeakReplies(next);
+    if (!next) window.speechSynthesis?.cancel();
   }
 
   function speakPlan(key: string, plan: BehaviourPlan) {
@@ -357,6 +485,18 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
         </form>
         {error ? <p className={styles.error} role="alert" data-testid="console-error">{error}</p> : null}
       </section>
+
+      <VoiceControl
+        lang={lang}
+        log={voiceLog}
+        speakReplies={speakReplies}
+        onToggleSpeak={toggleSpeakReplies}
+        onUtterance={handleUtterance}
+        aiMode={aiMode}
+        onToggleAi={toggleAi}
+        thinking={thinking}
+        aiNotice={aiNotice}
+      />
 
       {profile && <p className={styles.legend}><span className={styles.changedTag}>{t.changed}</span> {t.legend}</p>}
       <section className={styles.grid} aria-label={t.eyebrow}>
