@@ -33,6 +33,29 @@ Use the `llo-` / `lab-` class prefixes: `.ov-*` collides with the site overview 
 Server reads for these pages: `app/living-lab/data.ts`. New specs: `hri-overview`, `hri-journey`, plus a handoff test
 in `hri-robot-console`.
 
+**Verification after the redesign (2026-11-07, `feat/living-lab-ux` @ `3ccf62a`):**
+`pnpm test` **211/211**, `tsc --noEmit` **0 errors**, production build passes (verified in a separate copy).
+Playwright: every runnable spec passes on the `dev` server — HRI batch **39 passed / 5 skipped / 1 flake** and the
+map+network+smoke batch **10/10**; the flake (robot-console handoff) passed alone in 8.3 s. Total **50/50 runnable
+tests pass, 5 skipped by design**. The 5 skips are `hri-identity-card` (it needs a server with no DB and no identity
+secret; when `.env.local` is sourced, `NEON_BRANCH` makes it skip on purpose).
+Batch timings and evidence: `/private/tmp/hri-run/` (this machine only). The Thai report is
+`docs/HRI-LIVING-LAB-UX-REPORT-TH.md`.
+
+**How to run the suite without false failures:** use `--workers=1` against one warm `next dev`, and give the legacy
+admin crawl more than Playwright's 30 s default — `npx playwright test --workers=1 --timeout=120000`. A parallel run
+once killed the dev server (all 6 failures then passed alone), and a cold dev compile on a memory-tight laptop
+(≈70 MB free with VS Code + Chromium open) can make one page take minutes. This is an environment limit, not an app
+bug; never weaken an assertion to get green. Do not run `next build` in the same folder while `next dev` is running —
+build in a copy (they share `.next`).
+
+**Visual audit (2026-11-07):** `node scratch/capture-living-lab.mjs` (untracked) opens the 6 routes × 1440 / 768 /
+390 px in Thai, with a temporary passport it deletes afterwards, and fails on horizontal page overflow, console
+errors, uncaught exceptions, broken images, or missing Thai text. Result **18/18 clean**; images and
+`manifest.json` are in `screenshots/living-lab/` (untracked). The mobile tab row scrolls sideways inside its own
+container by design; that is not page overflow. The fixed bottom tab bar appears mid-page in full-page captures —
+a screenshot artifact, not a layout bug.
+
 ## 1. Ground rules from the user (non-negotiable)
 
 - **Extend, never rebuild.** HRI Passport already exists in the Living Lab (`app/living-lab/`, `lib/hri/`).
