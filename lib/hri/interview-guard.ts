@@ -9,7 +9,7 @@ import type { InterviewReply, InterviewRequest, InterviewUpdates, PendingTopic, 
 type Field = keyof InterviewUpdates;
 type Evidence = Partial<Record<Field, string>>;
 
-const strip = (value: string) => value.toLowerCase().replace(/[\s.,!?;:'"()\-–—…ๆ]/g, "");
+export const strip = (value: string) => value.toLowerCase().replace(/[\s.,!?;:'"()\-–—…ๆ]/g, "");
 const PARTICLES = /(ครับผม|ครับ|ค่ะ|คะ|นะครับ|นะคะ|นะ)+$/;
 
 const YES = ["ใช่", "ได้", "โอเค", "ตกลง", "เอา", "yes", "yeah", "yep", "ok", "okay", "sure"];
@@ -28,9 +28,10 @@ export function yesNo(text: string): "yes" | "no" | null {
 export const isHedge = (text: string) => HEDGES.some((word) => strip(text).includes(strip(word)));
 
 // A cue word counts as a request only when it is not negated just before: "ไม่ต้องตัวใหญ่" refuses large text.
-const NEGATION = /(ไม่ต้องการ|ไม่ต้อง|ไม่เอา|ไม่อยากได้|ไม่อยาก|ไม่ใช่|ไม่ใช้|ไม่ขอ|ไม่|dont|donot|notneed|not|never|without)$/;
+// A short classifier may sit between the negation and the word: "ไม่ต้องตัวใหญ่" refuses "ใหญ่".
+const NEGATION = /(ไม่ต้องการ|ไม่ต้อง|ไม่เอา|ไม่อยากได้|ไม่อยาก|ไม่ใช่|ไม่ใช้|ไม่ขอ|ไม่|dont|donot|notneed|not|never|without)(ตัว|แบบ|ขนาด|อัน|การ)?$/;
 
-function mention(text: string, words: string[]): "yes" | "no" | "conflict" | undefined {
+export function mention(text: string, words: string[]): "yes" | "no" | "conflict" | undefined {
   const t = strip(text);
   let yes = false;
   let no = false;

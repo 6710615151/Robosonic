@@ -244,3 +244,12 @@ test("pending: answering either text size or pace closes the readability topic",
   assert.deepEqual(pendingTopics({ ...base, captions: "voice" }), []);
   assert.deepEqual(pendingTopics({ ...base, speechPace: "voice" }), []);
 });
+
+test("guard: a short classifier between the negation and the word does not hide the refusal", async () => {
+  const { mention } = await import("../lib/hri/interview-guard");
+  assert.equal(mention("ไม่ต้องตัวใหญ่", ["ใหญ่"]), "no");
+  assert.equal(mention("ไม่เอาแบบเร็ว", ["เร็ว"]), "no");
+  assert.equal(mention("ไม่ต้องใหญ่", ["ใหญ่"]), "no");
+  assert.equal(mention("ตัวใหญ่ครับ", ["ใหญ่"]), "yes");
+  assert.equal(mention("ตัวใหญ่ก็ได้ ไม่ต้องตัวใหญ่ก็ได้", ["ใหญ่"]), "conflict");
+});
