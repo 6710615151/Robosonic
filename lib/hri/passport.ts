@@ -26,7 +26,7 @@ export const sessionEventSchema = z.object({
 
 export const sessionSchema = z.object({
   protocol: z.enum(["wai_first_calibration", "passport_meeting", "care_journey_station"]),
-  inputMode: z.enum(["buttons", "camera", "auto"]),
+  inputMode: z.enum(["buttons", "camera", "voice", "auto"]),
   robotModelId: z.string().max(40).optional().nullable(),
   events: z.array(sessionEventSchema).max(400),
   summary: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).default({})

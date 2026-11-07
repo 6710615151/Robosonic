@@ -32,6 +32,7 @@ Related documents: `docs/hri-passport-api.md` (API contract, unit standard, roll
 | 11 | List of changed files | §5 below | ✅ |
 | 12 | Known issues and limitations | §6 below | ✅ |
 | + | Auto calibration (camera, one tap) | "Auto" button in `/living-lab` | ✅ in software · ⚠️ not yet tested with real people |
+| + | Voice and typed answers, review before saving | "Talk or type your answers" in `/living-lab` | ✅ wiring tested with a stand-in recogniser · ⚠️ not yet tested with a real microphone |
 
 ### What the user gets
 
@@ -74,6 +75,9 @@ Related documents: `docs/hri-passport-api.md` (API contract, unit standard, roll
 ---
 
 ## 3. Automated test results (run 2026-11-07, against `next start` + Neon `dev`)
+
+> **These results predate the review fixes and the voice flow.** The current status, including what has
+> not been re-run, is in `docs/BASELINE-AUDIT.md`.
 
 | Suite | Command | Result |
 |---|---|---|
@@ -179,7 +183,8 @@ two migrations; unit tests `test/hri-{api,owner,adapt,auto}.test.ts`; Playwright
 - **Auto mode accuracy on real people is unmeasured.** Run the go/no-go protocol in
   `HRI_FEASIBILITY_SPIKE.md` §3.4 (5 people, 2 distances, 2 lighting conditions, demo laptop) and tune
   `AUTO_TIMING` / `AUTO_THRESHOLDS` in `lib/hri/auto-calibration.ts`. Keep button mode as the fallback.
-- **Production migration pending** (see §4). All work is uncommitted on `main`'s working tree.
+- **Production migration pending** (see §4). Confirm it has been applied before relying on production.
+- **Voice input is untested with a real microphone**, and Thai recognition varies by browser and background noise. Typing and buttons are the fallback.
 - Rate limiting keys on `x-forwarded-for`; correct on Vercel, spoofable on a self-hosted server without a trusted proxy.
 - No REST `PATCH`/`DELETE` with a bearer edit token (owner edits go through server actions on the card).
 - No in-app QR scanner; a phone camera opens the card URL.

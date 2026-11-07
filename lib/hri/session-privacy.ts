@@ -5,7 +5,7 @@
 // Answers to the care questions: their events are dropped whole, whatever their fields are called.
 const SENSITIVE_EVENT_TYPES = new Set(["anxiety", "care_needs_set", "communication", "reach"]);
 // Stripped from every summary and from every event that is kept.
-const SENSITIVE_KEYS = new Set(["anxiety", "nickname", "code", "captions", "speechPace", "accessible", "noReach"]);
+const SENSITIVE_KEYS = new Set(["anxiety", "nickname", "code", "captions", "speechPace", "accessible", "noReach", "transcript"]);
 
 const withoutSensitiveKeys = <T extends Record<string, unknown>>(record: T) =>
   Object.fromEntries(Object.entries(record).filter(([key]) => !SENSITIVE_KEYS.has(key)));
