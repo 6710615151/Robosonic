@@ -50,6 +50,39 @@ export class WaiDetector {
 export const shoulderWidth = (lm: Landmark[] | undefined) =>
   visible(lm?.[POSE.lShoulder]) && visible(lm?.[POSE.rShoulder]) ? dist2(lm![POSE.lShoulder], lm![POSE.rShoulder]) : NaN;
 
+// Head turn: horizontal offset of the nose from the shoulder midpoint, in shoulder widths.
+// About 0 when the person faces the camera; |value| grows as the head turns away. NaN if not visible.
+export function headTurn(lm: Landmark[] | undefined) {
+  const ls = lm?.[POSE.lShoulder], rs = lm?.[POSE.rShoulder], nose = lm?.[POSE.nose];
+  if (!(visible(ls) && visible(rs) && visible(nose))) return NaN;
+  const sw = dist2(ls, rs);
+  if (sw < 1e-3) return NaN;
+  return (nose.x - (ls.x + rs.x) / 2) / sw;
+}
+
+// Width-based distance cues are only trusted when the person faces the camera: turning sideways
+// also shrinks the apparent shoulder width and must not look like stepping back.
+export function isFrontal(lm: Landmark[] | undefined, maxTurn = 0.35) {
+  const turn = headTurn(lm);
+  return Number.isFinite(turn) && Math.abs(turn) < maxTurn;
+}
+
+// Stillness: the apparent shoulder width varies by less than `maxSpread` (relative) over a full window.
+export class StillnessDetector {
+  private hist: { t: number; w: number }[] = [];
+  constructor(private readonly windowMs = 1500, private readonly maxSpread = 0.05) {}
+  update(tMs: number, width: number) {
+    if (!Number.isFinite(width) || width <= 0) return false;
+    this.hist.push({ t: tMs, w: width });
+    while (this.hist.length && this.hist[0].t < tMs - this.windowMs) this.hist.shift();
+    if (tMs - this.hist[0].t < this.windowMs * 0.9) return false;
+    const ws = this.hist.map((h) => h.w);
+    const mean = ws.reduce((a, b) => a + b, 0) / ws.length;
+    return (Math.max(...ws) - Math.min(...ws)) / mean < this.maxSpread;
+  }
+  reset() { this.hist = []; }
+}
+
 // Lean-back: apparent shoulder width drops quickly (>12% within 1.5 s) relative to the recent peak.
 export class LeanBackDetector {
   private hist: { t: number; w: number }[] = [];
@@ -64,4 +97,5 @@ export class LeanBackDetector {
     if (fired) { this.lastFire = tMs; this.hist = [{ t: tMs, w: width }]; }
     return fired;
   }
+  reset() { this.hist = []; }
 }

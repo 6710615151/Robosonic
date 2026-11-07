@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizePassportCode } from "@/lib/hri/passport";
+import { API_LIMITS } from "@/lib/hri/passport-api";
+import { consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
 import MeetClient, { type Station } from "./MeetClient";
 
 export const dynamic = "force-dynamic";
@@ -29,14 +31,25 @@ export default async function MeetPage({ params, searchParams }: { params: Param
   const code = normalizePassportCode(rawCode);
   const lang = ((await cookies()).get("lang")?.value || "en") as "en" | "th";
 
-  const passport = await prisma.hriPassport.findUnique({
+  // Legacy 6-character code links stay supported, but unknown codes count toward the same
+  // guessing budget as the robot API (lib/hri/passport-api.ts API_LIMITS.misses).
+  const caller = await currentClientId();
+  const { limit, windowSeconds } = API_LIMITS.misses;
+  if (!(await peekRateLimit(`miss:${caller}`, limit, windowSeconds)).allowed) redirect("/living-lab/meet?error=rate_limited");
+
+  const found = await prisma.hriPassport.findUnique({
     where: { code },
     select: {
       code: true, greeting: true, comfortDistance: true, speed: true, gaze: true, voice: true, language: true,
-      anxiety: true, captions: true, speechPace: true, noReach: true
+      anxiety: true, captions: true, speechPace: true, noReach: true, status: true, expiresAt: true
     }
   });
-  if (!passport) redirect("/living-lab/meet?error=not_found");
+  const usable = found && found.status === "active" && (!found.expiresAt || found.expiresAt > new Date());
+  if (!usable) {
+    await consumeRateLimit(`miss:${caller}`, limit, windowSeconds);
+    redirect("/living-lab/meet?error=not_found");
+  }
+  const { status: _status, expiresAt: _expiresAt, ...passport } = found;
 
   const robots = await prisma.robotModel.findMany({
     select: { id: true, canonicalName: true, robotType: true, developerOrg: true, manufacturer: true }
