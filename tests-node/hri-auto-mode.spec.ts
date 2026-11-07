@@ -4,6 +4,7 @@
 // It cannot prove detection accuracy on real people: that needs the venue test in
 // HRI_FEASIBILITY_SPIKE.md §3.4. The full decision logic is unit-tested in test/hri-auto.test.ts.
 //
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET (see identity-helper.ts)
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-auto-mode.spec.ts
 import { test, expect } from "@playwright/test";
 import pg from "pg";

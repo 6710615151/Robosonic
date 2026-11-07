@@ -6,6 +6,7 @@
 // reading the participant's session needs the database, so this runs against Neon dev only.
 // It saves no passport; it creates one test participant per test and deletes it.
 //
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET (see identity-helper.ts)
 //   pnpm build && pnpm start &
 //   NEON_BRANCH=dev PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-voice-flow.spec.ts
 import { test, expect, type Page } from "@playwright/test";
@@ -172,6 +173,7 @@ test("without speech support the same flow works by typing", async ({ page }) =>
 });
 
 test("if saving fails, the answers stay on the review screen and can be saved again", async ({ page }) => {
+  test.skip(process.env.HRI_IDENTITY_REQUIRED?.trim().toLowerCase() !== "true", "Makes saving fail by removing a required owner, so it needs HRI_IDENTITY_REQUIRED=true on both sides.");
   // Saving is made to fail by removing the participant after the flow has started: the server then
   // refuses with "identity_required". (Before identity, this test relied on a server with no database.)
   const participant = await signIn(page);

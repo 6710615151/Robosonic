@@ -9,7 +9,9 @@ import { canSendCodes, currentParticipant, getIdentity, PARTICIPANT_COOKIE, PART
 
 export type ClientIdentity = { email: string } | null;
 
-export async function requestEmailCodeAction(email: string, language: "th" | "en") {
+// Consent comes first: no email is stored for someone who has not agreed to it.
+export async function requestEmailCodeAction(email: string, language: "th" | "en", consent: boolean) {
+  if (consent !== true) return { ok: false as const, error: "consent_required" as const };
   const identity = getIdentity();
   if (!identity || !canSendCodes()) return { ok: false as const, error: "unavailable" as const };
   try {
@@ -20,7 +22,8 @@ export async function requestEmailCodeAction(email: string, language: "th" | "en
   }
 }
 
-export async function verifyEmailCodeAction(email: string, code: string) {
+export async function verifyEmailCodeAction(email: string, code: string, consent: boolean) {
+  if (consent !== true) return { ok: false as const, error: "consent_required" as const };
   const identity = getIdentity();
   if (!identity) return { ok: false as const, error: "unavailable" as const };
   try {
@@ -43,6 +46,22 @@ export async function verifyEmailCodeAction(email: string, code: string) {
 export async function signOutParticipantAction() {
   (await cookies()).set(PARTICIPANT_COOKIE, "", { path: PARTICIPANT_COOKIE_PATH, maxAge: 0 });
   return { ok: true as const };
+}
+
+// The person's own deletion of their email. Passports they saved stay, without an owner, until they
+// delete them on their card (decision 3, docs/hri-living-lab-identity-design.md).
+export async function deleteMyEmailAction() {
+  const identity = getIdentity();
+  if (!identity) return { ok: false as const, error: "unavailable" as const };
+  try {
+    const store = await cookies();
+    await identity.deleteParticipant(store.get(PARTICIPANT_COOKIE)?.value);
+    store.set(PARTICIPANT_COOKIE, "", { path: PARTICIPANT_COOKIE_PATH, maxAge: 0 });
+    return { ok: true as const };
+  } catch (error) {
+    console.error("Living Lab identity: deleting the participant failed", error instanceof Error ? error.message : error);
+    return { ok: false as const, error: "unavailable" as const };
+  }
 }
 
 // For the page: who is signed in, masked for shared screens.

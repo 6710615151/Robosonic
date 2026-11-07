@@ -47,6 +47,11 @@ export async function peekRateLimit(key: string, limit: number, windowSeconds: n
   return decide(rows[0], limit, false);
 }
 
+// Gives back one count taken by consumeRateLimit, when the thing it paid for did not happen.
+export async function releaseRateLimit(key: string): Promise<void> {
+  await prisma.$executeRaw`UPDATE "HriRateLimit" SET "count" = GREATEST("count" - 1, 0) WHERE "key" = ${key}`;
+}
+
 // For server actions and server components, which have no Request object.
 export async function currentClientId() {
   return clientId(await headers());

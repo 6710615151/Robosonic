@@ -50,13 +50,16 @@ const REVIEW_SLOWER_SPEED = 0.5;
 // The care questions are asked one at a time when answering by voice or text.
 const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
 
-export default function LivingLabClient({ lang, stats, robots, initialIdentity }: {
+export default function LivingLabClient({ lang, stats, robots, initialIdentity, identityRequired = false }: {
   lang: Lang; stats: LabStats | null; robots: LabRobot[]; initialIdentity: ClientIdentity;
+  // True only when HRI_IDENTITY_REQUIRED=true: the robot then waits for a verified email.
+  identityRequired?: boolean;
 }) {
   const t = copy[lang];
   const idT = identityCopy[lang];
-  // Verified Living Lab participant (masked email). Required before the robot starts (decision 1).
+  // Verified Living Lab participant (masked email). Optional unless required by configuration (decision 1).
   const [identity, setIdentity] = useState<ClientIdentity>(initialIdentity);
+  const identityOk = Boolean(identity) || !identityRequired;
   const robotRef = useRef<RobotBehavior | null>(null);
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState<Phase>("intro");
@@ -83,6 +86,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
   const [keyCopied, setKeyCopied] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedOwner, setSavedOwner] = useState<string | null>(null);
   // Auto mode
   const [autoStage, setAutoStage] = useState<AutoStage>("baseline");
   const [autoPaused, setAutoPaused] = useState<PauseReason | null>(null);
@@ -141,7 +145,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
   // ---------------- phases ----------------
   function begin(answerByVoice = false) {
     const robot = robotRef.current;
-    if (!robot || !consent || !identity) return;
+    if (!robot || !consent || !identityOk) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
     setLog([]); setStep(0); setSpeed(1); setComfort(null); setGreeting("wai"); setCareQuestion(0);
@@ -392,6 +396,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
         return;
       }
       const { code, accessToken, editToken } = result;
+      setSavedOwner(result.owner);
       // The edit token is the owner's key to the card page. Keep it in this browser so the card
       // unlocks here without asking again; the key is also shown once below for other devices.
       try { window.localStorage.setItem(`hri-passport-edit:${accessToken}`, editToken); } catch { /* private mode */ }
@@ -419,8 +424,9 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
     }
   }
 
-  // "Again" may hand the screen to the next visitor, so nothing of this visitor's carries over:
-  // they must give their own consent and answer the care questions for themselves.
+  // "Again" may hand the screen to the next visitor, so their consent and care answers do not carry
+  // over. The verified email does stay: it is shown on the card with "Not you?", because re-verifying
+  // on a person's own device would spend an email for nothing. A shared device should sign out here.
   function startOver() {
     setCountdown(null);
     changeConsent(false);
@@ -512,7 +518,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
   // ---------------- Auto mode: one tap, then the camera does the rest ----------------
   async function startAuto() {
     const robot = robotRef.current;
-    if (!robot || !consent || !identity) return;
+    if (!robot || !consent || !identityOk) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
     setLog([]); setStep(0); setSpeed(1); setComfort(null);
@@ -715,25 +721,25 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
               <p className="ll-note">{t.privacy}</p>
               <label className="ll-consent">
                 <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
-                <span>{t.consentLabel}</span>
+                <span>{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</span>
               </label>
               {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
-              {!identity && <p className="ll-consent-hint">{idT.required}</p>}
+              {!identityOk && <p className="ll-consent-hint">{idT.required}</p>}
               {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
               <div className="ll-auto-offer">
-                <button className="ll-btn big primary" onClick={() => begin(true)} disabled={!ready || !consent || !identity}>
+                <button className="ll-btn big primary" onClick={() => begin(true)} disabled={!ready || !consent || !identityOk}>
                   <Mic size={20} aria-hidden="true" /> {t.voiceInput.start}
                 </button>
                 <p className="ll-note">{t.voiceInput.startHint}</p>
               </div>
               <div className="ll-row">
-                <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent || !identity}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
+                <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent || !identityOk}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
                 <button className="ll-btn" onClick={toggleCamera} disabled={!consent || cameraState === "loading"}>
                   {cameraState === "on" ? <CameraOff size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />} {cameraState === "on" ? t.cameraOff : t.cameraOn}
                 </button>
               </div>
               <div className="ll-auto-offer">
-                <button className="ll-btn big auto" onClick={startAuto} disabled={!ready || !consent || !identity || cameraState === "loading"}>
+                <button className="ll-btn big auto" onClick={startAuto} disabled={!ready || !consent || !identityOk || cameraState === "loading"}>
                   <ScanFace size={20} aria-hidden="true" /> {t.autoStart}
                 </button>
                 <p className="ll-note">{t.autoHint}</p>
@@ -967,7 +973,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
                 <li><span>{t.factComm}</span><strong>{accessible ? t.commAccessible : t.commNormal}</strong></li>
                 <li><span>{t.factReach}</span><strong>{noReach ? t.reachAvoid : t.reachOk}</strong></li>
               </ul>
-              {identity && <p className="ll-owner"><BadgeCheck size={16} aria-hidden="true" /> {idT.savedUnder(identity.email)}</p>}
+              {savedOwner && <p className="ll-owner"><BadgeCheck size={16} aria-hidden="true" /> {idT.savedUnder(savedOwner)}</p>}
               <p className="ll-note">{t.scanHint}</p>
               <div className="ll-editkey">
                 <p><strong>{t.editKeyTitle}</strong></p>
@@ -993,7 +999,7 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity }
             </div>
           </details>
         </div>
-        <IdentityCard lang={lang} identity={identity} onChange={setIdentity} locked={phase !== "intro" && phase !== "done"} />
+        <IdentityCard lang={lang} identity={identity} onChange={setIdentity} locked={phase !== "intro" && phase !== "done"} required={identityRequired} consent={consent} />
         </div>
       </section>
 
