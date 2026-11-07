@@ -79,6 +79,7 @@ test("one passport, created in the Living Lab, read by every robot, edited and d
   await page.getByRole("button", { name: /^Next$/ }).click();
   await page.getByRole("button", { name: /Yes, look at me/ }).click();
   await page.getByRole("button", { name: /Text only/ }).click();
+  await page.getByRole("button", { name: "Save my passport" }).click();
 
   // 2. The passport is issued: code, QR, edit key shown once, link to the card.
   const cardLink = page.getByRole("link", { name: /Open my passport card/ });

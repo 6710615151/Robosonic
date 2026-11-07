@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { Camera, CameraOff, Hand, HeartHandshake, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
+import { Camera, CameraOff, Hand, HeartHandshake, Mic, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
@@ -13,6 +13,7 @@ import type { PoseFrame } from "@/lib/hri/camera";
 import { CameraSession } from "@/lib/hri/camera-session";
 import { createPassportAction } from "./actions";
 import PassportCardVisual from "./PassportCardVisual";
+import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
 
 export type LabStats = {
@@ -32,14 +33,19 @@ export type LabStats = {
 };
 export type LabRobot = { id: string; name: string; type: string; org: string | null };
 
-type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "auto" | "review" | "saving" | "done";
-type InputMode = "buttons" | "camera" | "auto";
+type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "confirm" | "auto" | "review" | "saving" | "done";
+type InputMode = "buttons" | "camera" | "voice" | "auto";
 type SessionSummary = Record<string, string | number | boolean | null>;
 const REVIEW_SECONDS = 10;
 type LogEvent = { t: number; src: "robot" | "human"; type: string; [key: string]: unknown };
 
 // Distances the robot steps through while approaching (higher = closer to the person).
 const STEPS = [-2.2, -1.3, -0.4, 0.5, 1.3];
+// What each choice on the review screen sets the distance to, when the person changes the band.
+const DISTANCE_CHOICES = { close: 1.3, medium: -0.4, far: -1.3 } as const;
+const REVIEW_SLOWER_SPEED = 0.5;
+// The care questions are asked one at a time when answering by voice or text.
+const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
 
 export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; stats: LabStats | null; robots: LabRobot[] }) {
   const t = copy[lang];
@@ -59,6 +65,8 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const [anxiety, setAnxiety] = useState<"low" | "medium" | "high">("low");
   const [accessible, setAccessible] = useState(false);
   const [noReach, setNoReach] = useState(false);
+  const [greeting, setGreeting] = useState<"wai" | "wave" | "none">("wai");
+  const [careQuestion, setCareQuestion] = useState(0);
   const [log, setLog] = useState<LogEvent[]>([]);
   const [consent, setConsent] = useState(false);
   const [passportCode, setPassportCode] = useState<string | null>(null);
@@ -123,22 +131,24 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   }, []);
 
   // ---------------- phases ----------------
-  function begin() {
+  function begin(answerByVoice = false) {
     const robot = robotRef.current;
     if (!robot || !consent) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
-    setLog([]); setStep(0); setSpeed(1); setComfort(null);
+    setLog([]); setStep(0); setSpeed(1); setComfort(null); setGreeting("wai"); setCareQuestion(0);
     setPassportCode(null); setAccessToken(null); setEditToken(null); setKeyCopied(false); setQr(null); setError(null);
     robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); robot.setGlow(0.45, "teal");
+    // A voice conversation needs the robot to talk from the start; the person decides later whether it keeps talking.
+    if (answerByVoice) { voiceRef.current = true; setVoice(true); }
     // After an Auto session the mode must fall back to what is actually on: camera or buttons.
-    const mode: InputMode = cameraState === "on" ? "camera" : "buttons";
+    const mode: InputMode = answerByVoice ? "voice" : cameraState === "on" ? "camera" : "buttons";
     setInputMode(mode);
     setAutoNotice(null);
     human("session_start", { inputMode: mode });
     setPhase("greet");
     // The robot waits quietly with lowered eyes: it does not wave at or stare at the visitor.
-    say(t.waitSpeech);
+    say(answerByVoice ? t.voiceInput.prompts.greet : t.waitSpeech);
     setStatus(mode === "camera" ? t.statusWaitCamera : t.statusWaitButton);
   }
 
@@ -265,18 +275,26 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     say(t.askGaze);
     setStatus(t.statusGaze);
   }
+  // A delayed call must log the answers as they are by then, not as they were when it was scheduled.
+  const careDoneRef = useRef(careDone);
+  careDoneRef.current = careDone;
 
-  function chooseGaze(choice: "direct" | "soft") {
+  function applyGaze(choice: "direct" | "soft") {
     const robot = robotRef.current;
     if (!robot) return;
     setGaze(choice);
     human("gaze_preference", { gaze: choice });
     if (choice === "soft") { robot.lookAt(0.25, 0.35); say(t.gazeSoft); } else { robot.lookAt(0, 0); robot.nod(1); say(t.gazeDirect); }
+  }
+
+  function chooseGaze(choice: "direct" | "soft") {
+    if (!robotRef.current) return;
+    applyGaze(choice);
     setPhase("voice");
     later(1800, () => { say(t.askVoice); setStatus(t.statusVoice); });
   }
 
-  async function chooseVoice(on: boolean) {
+  function chooseVoice(on: boolean) {
     const robot = robotRef.current;
     if (!robot) return;
     setVoice(on);
@@ -285,17 +303,59 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     say(on ? t.voiceOn : t.voiceOff);
     robot.bothArms("wai");
     later(1600, () => robot.bothArms("relaxed"));
+    setPhase("confirm");
+    setStatus(t.statusConfirm);
+    later(2200, () => { if (phaseRef.current === "confirm") say(t.confirmSpeech); });
+  }
+
+  // ---------------- answering by voice or text ----------------
+  function answerApproach(answer: "continue" | "comfortable" | "too_close" | "too_fast") {
+    if (answer === "continue") approachNext();
+    else if (answer === "comfortable") comfortable();
+    else if (answer === "too_close") tooClose("button");
+    else tooFast();
+  }
+
+  // After the robot has responded to an answer, it asks the next care question, then moves on.
+  function afterCareAnswer() {
+    const next = careQuestion + 1;
+    if (next >= CARE_QUESTIONS.length) {
+      later(1800, () => { if (phaseRef.current === "care") careDoneRef.current(); });
+      return;
+    }
+    setCareQuestion(next);
+    later(1800, () => { if (phaseRef.current === "care") say(t.voiceInput.prompts[CARE_QUESTIONS[next]]); });
+  }
+
+  // ---------------- review before saving ----------------
+  function reviewDistance(choice: keyof typeof DISTANCE_CHOICES) {
+    const distance = DISTANCE_CHOICES[choice];
+    setComfort(distance);
+    robotRef.current?.setDistance(distance);
+    human("distance_set", { distance, reason: "review" });
+  }
+
+  function reviewSpeed(next: number) {
+    setSpeed(next);
+    robotRef.current?.setSpeed(next);
+    human("speed_set", { speed: next });
+  }
+
+  async function saveReviewed() {
+    const robot = robotRef.current;
+    if (!robot || phaseRef.current !== "confirm") return;
+    const distance = comfort ?? robot.state.distanceTarget;
     await savePassport(
       {
-        greeting: "wai", comfortDistance: comfort ?? robot.state.distanceTarget, speed: robot.state.speed, gaze, voice: on, language: lang,
+        greeting, comfortDistance: distance, speed, gaze, voice, language: lang,
         anxiety, captions: accessible ? "large" : "normal", speechPace: accessible ? "slow" : "normal", noReach
       },
       {
         tooClose: counters.current.tooClose,
         tooFast: counters.current.tooFast,
         leanBack: counters.current.leanBack,
-        finalDistance: +(comfort ?? robot.state.distanceTarget).toFixed(2),
-        finalSpeed: +robot.state.speed.toFixed(2),
+        finalDistance: +distance.toFixed(2),
+        finalSpeed: +speed.toFixed(2),
         durationSeconds: +robot.time.toFixed(1)
       },
       inputMode
@@ -314,7 +374,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
       );
       if (!result.ok) {
         setError(result.error === "rate_limited" ? t.saveRateLimited(Math.ceil(result.retryAfterSeconds / 60)) : t.saveFailed);
-        setPhase(mode === "auto" ? "review" : "voice");
+        setPhase(mode === "auto" ? "review" : "confirm");
         return;
       }
       const { code, accessToken, editToken } = result;
@@ -332,7 +392,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
       human("passport_created", { code });
     } catch {
       setError(t.saveFailed);
-      setPhase(mode === "auto" ? "review" : "voice");
+      setPhase(mode === "auto" ? "review" : "confirm");
     }
   }
 
@@ -350,7 +410,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   function startOver() {
     setCountdown(null);
     changeConsent(false);
-    setAnxiety("low"); setAccessible(false); setNoReach(false);
+    setAnxiety("low"); setAccessible(false); setNoReach(false); setGreeting("wai");
     setPhase("intro");
     setStatus(t.statusIdle);
     setSpeech(t.introSpeech);
@@ -446,7 +506,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     setAutoNotice(null); setAutoResult(null); setCountdown(null); setAutoLeans(0); setAutoWai(null); setAutoPaused(null);
     setAutoStage("baseline"); setAutoPerson(false);
     // Safe defaults for what the camera does not measure. Anxiety is never guessed.
-    setGaze("direct"); setAnxiety("low"); setAccessible(false); setNoReach(true);
+    setGaze("direct"); setAnxiety("low"); setAccessible(false); setNoReach(true); setGreeting("wai");
     // Auto mode talks (and shows the text), so the person can follow without reading the screen.
     voiceRef.current = true; setVoice(true);
     robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); robot.setGlow(0.45, "teal");
@@ -644,8 +704,14 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
               </label>
               {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
               {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
+              <div className="ll-auto-offer">
+                <button className="ll-btn big primary" onClick={() => begin(true)} disabled={!ready || !consent}>
+                  <Mic size={20} aria-hidden="true" /> {t.voiceInput.start}
+                </button>
+                <p className="ll-note">{t.voiceInput.startHint}</p>
+              </div>
               <div className="ll-row">
-                <button className="ll-btn primary" onClick={begin} disabled={!ready || !consent}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
+                <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
                 <button className="ll-btn" onClick={toggleCamera} disabled={!consent || cameraState === "loading"}>
                   {cameraState === "on" ? <CameraOff size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />} {cameraState === "on" ? t.cameraOff : t.cameraOn}
                 </button>
@@ -664,6 +730,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
             <div className="ll-step">
               <h2>{t.greetTitle}</h2>
               <p>{t.greetHelp}</p>
+              {inputMode === "voice" && <VoiceAnswerBox key="greet" lang={lang} question="greet" onAnswer={() => receiveWai("button")} />}
               <button className="ll-btn primary big" onClick={() => receiveWai("button")}>🙏 {t.waiButton}</button>
             </div>
           )}
@@ -675,6 +742,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
               <div className="ll-meter" aria-label={t.distanceLabel}>
                 {STEPS.slice(1).map((_, i) => <span key={i} className={i < step ? "on" : ""} />)}
               </div>
+              {inputMode === "voice" && <VoiceAnswerBox key="approach" lang={lang} question="approach" onAnswer={answerApproach} />}
               <div className="ll-choices">
                 <button className="ll-btn primary big" onClick={approachNext}><Play size={18} aria-hidden="true" /> {t.continue}</button>
                 <button className="ll-btn big good" onClick={comfortable}><HeartHandshake size={18} aria-hidden="true" /> {t.comfortable}</button>
@@ -687,6 +755,15 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
           {phase === "care" && (
             <div className="ll-step">
               <h2>{t.careTitle}</h2>
+              {inputMode === "voice" && CARE_QUESTIONS[careQuestion] === "anxiety" && (
+                <VoiceAnswerBox key="anxiety" lang={lang} question="anxiety" onAnswer={(answer) => { chooseAnxiety(answer); afterCareAnswer(); }} />
+              )}
+              {inputMode === "voice" && CARE_QUESTIONS[careQuestion] === "communication" && (
+                <VoiceAnswerBox key="communication" lang={lang} question="communication" onAnswer={(answer) => { chooseAccessible(answer === "accessible"); afterCareAnswer(); }} />
+              )}
+              {inputMode === "voice" && CARE_QUESTIONS[careQuestion] === "reach" && (
+                <VoiceAnswerBox key="reach" lang={lang} question="reach" onAnswer={(answer) => { chooseReach(answer === "avoid"); afterCareAnswer(); }} />
+              )}
               <p className="ll-q">{t.qAnxiety}</p>
               <div className="ll-seg" role="group" aria-label={t.qAnxiety}>
                 {(["low", "medium", "high"] as const).map((lvl) => (
@@ -710,6 +787,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
           {phase === "gaze" && (
             <div className="ll-step">
               <h2>{t.gazeTitle}</h2>
+              {inputMode === "voice" && <VoiceAnswerBox key="gaze" lang={lang} question="gaze" onAnswer={chooseGaze} />}
               <div className="ll-choices">
                 <button className="ll-btn big" onClick={() => chooseGaze("direct")}>{t.gazeDirectBtn}</button>
                 <button className="ll-btn big" onClick={() => chooseGaze("soft")}>{t.gazeSoftBtn}</button>
@@ -769,14 +847,74 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
             </div>
           )}
 
-          {(phase === "voice" || (phase === "saving" && inputMode !== "auto")) && (
+          {phase === "voice" && (
             <div className="ll-step">
               <h2>{t.voiceTitle}</h2>
+              {inputMode === "voice" && <VoiceAnswerBox key="voice" lang={lang} question="voice" onAnswer={(answer) => chooseVoice(answer === "on")} />}
               <div className="ll-choices">
-                <button className="ll-btn big" disabled={phase === "saving"} onClick={() => chooseVoice(true)}><Volume2 size={18} aria-hidden="true" /> {t.voiceYes}</button>
-                <button className="ll-btn big" disabled={phase === "saving"} onClick={() => chooseVoice(false)}><VolumeX size={18} aria-hidden="true" /> {t.voiceNo}</button>
+                <button className="ll-btn big" onClick={() => chooseVoice(true)}><Volume2 size={18} aria-hidden="true" /> {t.voiceYes}</button>
+                <button className="ll-btn big" onClick={() => chooseVoice(false)}><VolumeX size={18} aria-hidden="true" /> {t.voiceNo}</button>
               </div>
-              {error && <p className="ll-error">{error}</p>}
+            </div>
+          )}
+
+          {(phase === "confirm" || (phase === "saving" && inputMode !== "auto")) && (
+            <div className="ll-step" data-testid="confirm-step">
+              <h2>{t.confirmTitle}</h2>
+              <p className="ll-note">{t.confirmHint}</p>
+              <fieldset className="ll-review" disabled={phase === "saving"}>
+                <p className="ll-q">{t.factGreeting}</p>
+                <div className="ll-seg" role="group" aria-label={t.factGreeting}>
+                  {(["wai", "wave", "none"] as const).map((g) => (
+                    <button key={g} className={`ll-btn ${greeting === g ? "sel" : ""}`} aria-pressed={greeting === g} onClick={() => setGreeting(g)}>{t.greetingLabels[g]}</button>
+                  ))}
+                </div>
+                <p className="ll-q">{t.factDistance}</p>
+                <div className="ll-seg" role="group" aria-label={t.factDistance}>
+                  {(["close", "medium", "far"] as const).map((band) => {
+                    const selected = describeDistance(comfort ?? robotRef.current?.state.distanceTarget ?? 0).en === band;
+                    return <button key={band} className={`ll-btn ${selected ? "sel" : ""}`} aria-pressed={selected} onClick={() => { if (!selected) reviewDistance(band); }}>{t.distanceLabels[band]}</button>;
+                  })}
+                </div>
+                <p className="ll-q">{t.factSpeed}</p>
+                <div className="ll-seg" role="group" aria-label={t.factSpeed}>
+                  <button className={`ll-btn ${speed >= 1 ? "sel" : ""}`} aria-pressed={speed >= 1} onClick={() => reviewSpeed(1)}>{t.normal}</button>
+                  <button className={`ll-btn ${speed < 1 ? "sel" : ""}`} aria-pressed={speed < 1} onClick={() => { if (speed >= 1) reviewSpeed(REVIEW_SLOWER_SPEED); }}>{t.slow}</button>
+                </div>
+                <p className="ll-q">{t.factGaze}</p>
+                <div className="ll-seg" role="group" aria-label={t.factGaze}>
+                  <button className={`ll-btn ${gaze === "direct" ? "sel" : ""}`} aria-pressed={gaze === "direct"} onClick={() => applyGaze("direct")}>{t.direct}</button>
+                  <button className={`ll-btn ${gaze === "soft" ? "sel" : ""}`} aria-pressed={gaze === "soft"} onClick={() => applyGaze("soft")}>{t.soft}</button>
+                </div>
+                <p className="ll-q">{t.factVoice}</p>
+                <div className="ll-seg" role="group" aria-label={t.factVoice}>
+                  <button className={`ll-btn ${voice ? "sel" : ""}`} aria-pressed={voice} onClick={() => { setVoice(true); voiceRef.current = true; }}>{t.voiceYes}</button>
+                  <button className={`ll-btn ${!voice ? "sel" : ""}`} aria-pressed={!voice} onClick={() => { setVoice(false); voiceRef.current = false; window.speechSynthesis?.cancel(); }}>{t.voiceNo}</button>
+                </div>
+                <p className="ll-q">{t.factAnxiety}</p>
+                <div className="ll-seg" role="group" aria-label={t.factAnxiety}>
+                  {(["low", "medium", "high"] as const).map((lvl) => (
+                    <button key={lvl} className={`ll-btn ${anxiety === lvl ? "sel" : ""}`} aria-pressed={anxiety === lvl} onClick={() => chooseAnxiety(lvl)}>{t.anxietyLabels[lvl]}</button>
+                  ))}
+                </div>
+                <p className="ll-q">{t.factComm}</p>
+                <div className="ll-seg" role="group" aria-label={t.factComm}>
+                  <button className={`ll-btn ${!accessible ? "sel" : ""}`} aria-pressed={!accessible} onClick={() => chooseAccessible(false)}>{t.commNormal}</button>
+                  <button className={`ll-btn ${accessible ? "sel" : ""}`} aria-pressed={accessible} onClick={() => chooseAccessible(true)}>{t.commAccessible}</button>
+                </div>
+                <p className="ll-q">{t.factReach}</p>
+                <div className="ll-seg" role="group" aria-label={t.factReach}>
+                  <button className={`ll-btn ${!noReach ? "sel" : ""}`} aria-pressed={!noReach} onClick={() => chooseReach(false)}>{t.reachOk}</button>
+                  <button className={`ll-btn ${noReach ? "sel" : ""}`} aria-pressed={noReach} onClick={() => chooseReach(true)}>{t.reachAvoid}</button>
+                </div>
+              </fieldset>
+              {inputMode === "voice" && phase === "confirm" && <VoiceAnswerBox key="confirm" lang={lang} question="confirm" onAnswer={() => { void saveReviewed(); }} />}
+              {phase === "saving" && <p className="ll-countdown" role="status">{t.statusSaving}</p>}
+              <div className="ll-row">
+                <button className="ll-btn primary" onClick={saveReviewed} disabled={phase === "saving"}>{t.confirmSave}</button>
+                <button className="ll-btn" disabled={phase === "saving"} onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
+              </div>
+              {error && <p className="ll-error" role="alert">{error}</p>}
             </div>
           )}
 
@@ -807,7 +945,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
               />
               <p className="ll-q">{t.moreTitle}</p>
               <ul className="ll-facts ll-more">
-                <li><span>{t.factGreeting}</span><strong>🙏 {t.wai}</strong></li>
+                <li><span>{t.factGreeting}</span><strong>{t.greetingLabels[greeting]}</strong></li>
                 <li><span>{t.factVoice}</span><strong>{voice ? t.on : t.off}</strong></li>
                 <li><span>{t.factAnxiety}</span><strong>{inputMode === "auto" ? t.factNotAsked : t.anxietyLabels[anxiety]}</strong></li>
                 <li><span>{t.factComm}</span><strong>{accessible ? t.commAccessible : t.commNormal}</strong></li>
@@ -929,6 +1067,13 @@ const styles = `
 .ll-more strong { text-align: right; }
 .ll-error { color: var(--danger); font-size: 14px; }
 .ll-q { margin: 12px 0 6px !important; font-weight: 700; }
+.ll-voice { background: #f4faf6; border: 1px solid #bcd9c6; border-radius: 10px; padding: 12px; margin: 10px 0; display: grid; gap: 8px; }
+.ll-voice .ll-q, .ll-voice .ll-note { margin: 0; }
+.ll-heard { margin: 0; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.ll-type { display: grid; gap: 4px; font-size: 13.5px; }
+.ll-type-row { display: flex; gap: 8px; }
+.ll-type-row input { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 10px; border: 1px solid #9db8a8; border-radius: 8px; font: inherit; background: #fff; color: #07150f; }
+.ll-review { border: 0; margin: 0; padding: 0; min-width: 0; }
 .ll-seg { display: flex; gap: 8px; flex-wrap: wrap; }
 .ll-seg .ll-btn { flex: 1 1 120px; min-height: 48px; }
 .ll-btn.sel { background: #e8f5ec; border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
