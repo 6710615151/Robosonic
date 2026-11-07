@@ -23,10 +23,8 @@ import AutoInterview from "./AutoInterview";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
 import { labCopy } from "./lab-copy";
-import { CalibrationProgress, JourneyOverview, LabHero, ResearchObservatory, RobotEcosystem, SectionHead } from "./LabSections";
-import type { ObservatoryStats } from "@/lib/hri/observatory";
+import { CalibrationProgress, SectionHead } from "./LabSections";
 
-export type LabRobot = { id: string; name: string; type: string; org: string | null };
 
 type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "confirm" | "auto" | "review" | "saving" | "done";
 type InputMode = "buttons" | "camera" | "voice" | "auto";
@@ -45,8 +43,8 @@ const REVIEW_SLOWER_SPEED = 0.5;
 // The care questions are asked one at a time when answering by voice or text.
 const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
 
-export default function LivingLabClient({ lang, stats, robots, initialIdentity, identityRequired = false }: {
-  lang: Lang; stats: ObservatoryStats | null; robots: LabRobot[]; initialIdentity: ClientIdentity;
+export default function LivingLabClient({ lang, initialIdentity, identityRequired = false }: {
+  lang: Lang; initialIdentity: ClientIdentity;
   // True only when HRI_IDENTITY_REQUIRED=true: the robot then waits for a verified email.
   identityRequired?: boolean;
 }) {
@@ -809,7 +807,6 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
   return (
     <main className="ll">
       <style dangerouslySetInnerHTML={{ __html: styles }} />
-      <LabHero lang={lang} />
 
       <div className="lab-section" id="calibrate-wrap">
       <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />
@@ -1172,9 +1169,6 @@ export default function LivingLabClient({ lang, stats, robots, initialIdentity, 
 
       </div>
 
-      <RobotEcosystem lang={lang} robots={robots} />
-      <JourneyOverview lang={lang} passportCode={passportCode} />
-      <ResearchObservatory lang={lang} stats={stats} />
     </main>
   );
 }
@@ -1275,13 +1269,6 @@ const styles = `
 .ll-log b.robot { color: #7fdcf0; } .ll-log b.human { color: #ffd27f; }
 .ll-findings { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
 .ll-findings h2 { margin: 0; font-size: 20px; } .ll-findings h3 { margin: 18px 0 0; font-size: 16px; }
-.ll-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
-.ll-stats div { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: grid; gap: 4px; }
-.ll-stats strong { font-size: 24px; font-weight: 900; } .ll-stats span { font-size: 12px; color: var(--text-secondary); }
-.ll-robots { list-style: none; padding: 0; margin: 10px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.ll-robots li { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 3px; }
-.ll-robots span { font-size: 12px; color: var(--text-secondary); text-transform: capitalize; }
-.ll-robots a { font-size: 13px; font-weight: 700; color: var(--accent); }
 .ll-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 560px) {
   .ll-stage-card { height: 380px; }

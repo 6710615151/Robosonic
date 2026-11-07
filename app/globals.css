@@ -1197,9 +1197,9 @@ td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text
   --table-head-rule: var(--lab-cyan);
   --corner-mark: var(--lab-cyan);
   --h2-mark: var(--lab-cyan);
-  --wb-panel: #1f6fa0;
+  --wb-panel: var(--ll-data-passport, #5f8245);
   --wb-deep: var(--lab-navy);
-  --wb-glow: #4fd6f0;
+  --wb-glow: var(--ll-green, #b5c99a);
 }
 .lab select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4.5 6 8.5l4-4' fill='none' stroke='%23173a6b' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");

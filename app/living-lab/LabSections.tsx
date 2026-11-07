@@ -25,48 +25,6 @@ export function SectionHead({ id, eyebrow, title, lead }: { id: string; eyebrow:
   );
 }
 
-export function LabHero({ lang }: { lang: Lang }) {
-  const t = labCopy[lang].hero;
-  return (
-    <section className="lab-hero" aria-labelledby="lab-hero-title">
-      <div className="lab-hero-text">
-        <p className="lab-eyebrow">{t.eyebrow}</p>
-        <h1 id="lab-hero-title">{t.title}</h1>
-        <p className="lab-lead">{t.lead}</p>
-        <div className="lab-hero-actions">
-          <a className="lab-cta" href="#calibrate">{t.cta} <ArrowRight size={18} aria-hidden="true" /></a>
-          <Link className="lab-link" href="/living-lab/meet">{t.haveOne}</Link>
-          <Link className="lab-link" href="/living-lab/robot">{t.console}</Link>
-        </div>
-        <dl className="lab-facts">
-          {t.facts.map((fact) => (
-            <div key={fact.label}><dt>{fact.value}</dt><dd>{fact.label}</dd></div>
-          ))}
-        </dl>
-      </div>
-
-      <figure className="lab-diagram" aria-label={t.diagramLabel}>
-        <div className="lab-node lab-node-passport">
-          <span className="lab-node-kicker">HRI&lt;TH&lt;&lt;······&lt;&lt;V1</span>
-          <strong>{t.passport}</strong>
-          <span>{t.passportSub}</span>
-        </div>
-        <p className="lab-diagram-reads" aria-hidden="true">{t.reads}</p>
-        <ul className="lab-diagram-robots">
-          {t.nodes.map((node) => (
-            <li key={node.name} className={`lab-node is-${node.tier}`}>
-              <span className={`lab-tier ${node.tier}`}>{t.tiers[node.tier as keyof typeof t.tiers]}</span>
-              <strong>{node.name}</strong>
-              <span className={node.tier === "api" ? "lab-mono" : undefined}>{node.detail}</span>
-            </li>
-          ))}
-        </ul>
-        <figcaption className="lab-note">{t.tierNote}</figcaption>
-      </figure>
-    </section>
-  );
-}
-
 // Progress through the calibration. Phases come from LivingLabClient's state machine, unchanged.
 const MANUAL_STEPS = ["greet", "approach", "care", "gaze", "voice", "confirm", "done"] as const;
 const AUTO_STEPS = ["auto", "review", "done"] as const;
@@ -94,7 +52,7 @@ export function CalibrationProgress({ lang, phase, auto }: { lang: Lang; phase: 
 
 export function RobotEcosystem({ lang, robots }: { lang: Lang; robots: LabRobotEntry[] }) {
   const t = labCopy[lang].robots;
-  const tiers = labCopy[lang].hero.tiers;
+  const tiers = labCopy[lang].tiers;
   const caps = ["mobile", "head", "arms", "speaker", "screen"] as const;
   return (
     <section className="lab-section" aria-labelledby="robots">
@@ -154,7 +112,8 @@ export function RobotEcosystem({ lang, robots }: { lang: Lang; robots: LabRobotE
   );
 }
 
-export function JourneyOverview({ lang, passportCode }: { lang: Lang; passportCode: string | null }) {
+// showAction=false when the page already offers its own way in (the code form on /living-lab/meet).
+export function JourneyOverview({ lang, passportCode, showAction = true }: { lang: Lang; passportCode: string | null; showAction?: boolean }) {
   const t = labCopy[lang].journey;
   return (
     <section className="lab-section" aria-labelledby="journey">
@@ -172,12 +131,12 @@ export function JourneyOverview({ lang, passportCode }: { lang: Lang; passportCo
         <ol>{t.protocol.map((step, i) => <li key={step}><span className="lab-mono">{i + 1}</span> {step}</li>)}</ol>
         <p className="lab-note">{t.protocolNote}</p>
       </div>
-      <div className="lab-hero-actions">
+      {showAction && <div className="lab-hero-actions">
         <Link className="lab-cta" href={passportCode ? `/living-lab/meet/${passportCode}` : "/living-lab/meet"}>
           {passportCode ? t.startWithCode(passportCode) : t.start} <ArrowRight size={18} aria-hidden="true" />
         </Link>
         {!passportCode && <span className="lab-note">{t.needPassport}</span>}
-      </div>
+      </div>}
     </section>
   );
 }
@@ -236,13 +195,13 @@ export function ResearchObservatory({ lang, stats }: { lang: Lang; stats: Observ
   return (
     <section className="lab-section" aria-labelledby="research">
       <SectionHead id="research" eyebrow={r.eyebrow} title={r.title} />
-      <p className="lab-provenance" role="note"><span className="lab-tier sim">{labCopy[lang].hero.tiers.sim}</span> {r.provenance}</p>
+      <p className="lab-provenance" role="note"><span className="lab-tier sim">{labCopy[lang].tiers.sim}</span> {r.provenance}</p>
 
       <div className="lab-filters">
         <div role="group" aria-label={r.window} className="lab-seg">
           <span className="lab-filter-label">{r.window}</span>
           {OBSERVATORY_WINDOWS.map((w) => (
-            <Link key={w} href={w === "all" ? "/living-lab#research" : `/living-lab?window=${w}#research`} scroll={false} aria-current={w === range ? "true" : undefined} className={w === range ? "is-on" : ""}>
+            <Link key={w} href={w === "all" ? "/living-lab/research" : `/living-lab/research?window=${w}`} scroll={false} aria-current={w === range ? "true" : undefined} className={w === range ? "is-on" : ""}>
               {r.windows[w]}
             </Link>
           ))}

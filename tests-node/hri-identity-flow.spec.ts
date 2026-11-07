@@ -40,7 +40,7 @@ async function codeFromServer(email: string) {
 }
 
 async function signIn(page: Page, email: string) {
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   await page.getByLabel(/I agree to save my preferences/).check();
   await page.getByRole("textbox", { name: "Email" }).fill(email);
   await page.getByRole("button", { name: "Send code" }).click();

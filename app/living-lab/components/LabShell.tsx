@@ -9,38 +9,10 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Bot, Box, ChartColumn, Compass, HeartHandshake, Hospital, IdCard, Sparkles, Unplug, UserPlus } from "lucide-react";
 import type { Lang } from "../copy";
 import { labCopy } from "../lab-copy";
+import { findOwnPassport, webglAvailable, type SimState } from "./lab-env";
 
 type NavKey = "overview" | "create" | "mine" | "robot" | "journey" | "research";
 type NavItem = { key: NavKey; href: string; icon: ComponentType<{ size?: number; "aria-hidden"?: boolean }>; active: boolean };
-type SimState = "pending" | "ok" | "off";
-
-// Same key the creation flow and the passport card use for the owner's edit key.
-const EDIT_KEY_PREFIX = "hri-passport-edit:";
-
-function findOwnPassport(): string | null {
-  try {
-    let found: string | null = null;
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const key = window.localStorage.key(i);
-      if (key?.startsWith(EDIT_KEY_PREFIX) && key.length > EDIT_KEY_PREFIX.length) found = key.slice(EDIT_KEY_PREFIX.length);
-    }
-    return found;
-  } catch {
-    return null; // storage blocked (private mode): just no shortcut
-  }
-}
-
-function webglAvailable(): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext | null;
-    if (!gl) return false;
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigured: boolean }) {
   const t = labCopy[lang].shell;
@@ -62,11 +34,11 @@ export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigu
   const under = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
   const items: NavItem[] = [
     { key: "overview", href: "/living-lab", icon: Compass, active: pathname === "/living-lab" },
-    { key: "create", href: "/living-lab#calibrate", icon: UserPlus, active: false },
+    { key: "create", href: "/living-lab/create", icon: UserPlus, active: under("/living-lab/create") },
     ...(ownToken ? [{ key: "mine" as const, href: `/living-lab/passport/${ownToken}`, icon: IdCard, active: under("/living-lab/passport") }] : []),
     { key: "robot", href: "/living-lab/robot", icon: Bot, active: under("/living-lab/robot") },
     { key: "journey", href: "/living-lab/meet", icon: Hospital, active: under("/living-lab/meet") },
-    { key: "research", href: "/living-lab#research", icon: ChartColumn, active: false }
+    { key: "research", href: "/living-lab/research", icon: ChartColumn, active: under("/living-lab/research") }
   ];
 
   return (

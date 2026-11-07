@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { normalizePassportCode } from "@/lib/hri/passport";
+import { JourneyOverview } from "../LabSections";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function MeetEntryPage({ searchParams }: { searchParams: Se
   const th = lang === "th";
 
   return (
+    <main className="lab-page">
     <div style={{ maxWidth: 520, margin: "32px auto", display: "grid", gap: 16 }}>
       <h1>{th ? "พบหุ่นยนต์ด้วย HRI Passport" : "Meet a robot with your HRI Passport"}</h1>
       <p className="muted">
@@ -45,7 +47,10 @@ export default async function MeetEntryPage({ searchParams }: { searchParams: Se
         {params.robot && <input type="hidden" name="robot" value={params.robot} />}
         <button type="submit" className="primary">{th ? "พบหุ่นยนต์" : "Meet the robot"}</button>
       </form>
-      <Link href="/living-lab">{th ? "ยังไม่มีพาสปอร์ต? สร้างใน Living Lab →" : "No passport yet? Create one in the Living Lab →"}</Link>
+      <Link href="/living-lab/create">{th ? "ยังไม่มีพาสปอร์ต? สร้างใน Living Lab →" : "No passport yet? Create one in the Living Lab →"}</Link>
     </div>
+    {/* What the journey involves, moved here from the old single-page Living Lab. */}
+    <JourneyOverview lang={lang} passportCode={null} showAction={false} />
+    </main>
   );
 }

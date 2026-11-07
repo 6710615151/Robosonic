@@ -69,7 +69,7 @@ test("one passport, created in the Living Lab, read by every robot, edited and d
   const api = (t: string) => request.get(`/api/hri/passport/${t}`, { headers: { "x-forwarded-for": `${ip}-api` } });
 
   // 1. Calibration (button mode). Nothing starts without consent.
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   const start = page.getByRole("button", { name: /Loading robot|Start/ }).first();
   await start.waitFor();
   await expect(start).toBeDisabled();

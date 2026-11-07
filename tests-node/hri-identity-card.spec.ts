@@ -13,7 +13,7 @@ const required = process.env.HRI_IDENTITY_REQUIRED?.trim().toLowerCase() === "tr
 const LINKED = /linked to my verified email, which is used only to identify the owner, never for marketing/;
 
 test("no code can be requested before consent", async ({ page }) => {
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   const consent = page.getByLabel(/I agree to save my preferences/);
   const send = page.getByRole("button", { name: "Send code" });
   await page.getByRole("textbox", { name: "Email" }).fill("someone@example.com");
@@ -29,7 +29,7 @@ test("no code can be requested before consent", async ({ page }) => {
 });
 
 test("the consent text and the start buttons match whether verifying is required", async ({ page }) => {
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   const consent = page.getByLabel(/I agree to save my preferences/);
   const start = page.getByRole("button", { name: "Start", exact: true });
   await consent.check();

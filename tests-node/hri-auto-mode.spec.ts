@@ -36,7 +36,7 @@ test.afterAll(async () => {
 // Every mode needs a verified participant before it can start; sign in, then open the page.
 async function openLab(page: import("@playwright/test").Page) {
   participants.push(await signInParticipant(db, page.context()));
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   const start = page.getByRole("button", { name: /Loading robot|Start/ }).first();
   await start.waitFor();
   return page.getByRole("button", { name: /Auto: just stand in front of the camera/ });

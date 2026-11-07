@@ -61,7 +61,7 @@ async function noRecogniser(page: Page) {
 
 async function openVoiceFlow(page: Page) {
   if (!(await page.context().cookies()).some((c) => c.name === "hri_participant")) await signIn(page);
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   const voiceStart = page.getByRole("button", { name: "Talk or type your answers" });
   await expect(voiceStart).toBeDisabled();
   await page.getByLabel(/I agree to save my preferences/).check();
@@ -201,7 +201,7 @@ test("if saving fails, the answers stay on the review screen and can be saved ag
 
 test("the button flow also stops at the review screen, and starting again clears consent and answers", async ({ page }) => {
   await signIn(page);
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/create");
   const start = page.getByRole("button", { name: "Start", exact: true });
   const consent = page.getByLabel(/I agree to save my preferences/);
   await consent.check();

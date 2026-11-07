@@ -15,30 +15,69 @@ const en = {
     // Phone-width chips: still a word for every state, never colour alone.
     short: { sim: { pending: "3D sim …", ok: "3D sim on", off: "3D sim off" }, hardware: "No physical robot", ai: { ok: "AI on", off: "AI off" } }
   },
-  hero: {
-    eyebrow: "HRI Wellness Living Lab",
-    title: "One profile. Every robot understands you.",
-    lead: "Every human has different needs. Every robot should know how to respect them. Teach one care robot your comfortable distance, pace, eye contact and care needs once. Your Care Passport carries them to every robot you meet, and each robot applies them within its own hardware.",
-    cta: "Create my Care Passport",
-    haveOne: "I already have a passport",
-    console: "Open the robot console",
-    facts: [
-      { value: "≈ 1 min", label: "guided calibration" },
-      { value: "4", label: "ways to answer: buttons, voice, camera, auto" },
-      { value: "0", label: "video frames stored or sent" }
-    ],
-    diagramLabel: "One Care Passport is read by several robots, each with different hardware",
-    passport: "Care Passport",
-    passportSub: "Human preferences · schema v1",
-    reads: "reads the same passport",
-    tiers: { sim: "Simulation", api: "API", future: "Future" },
-    nodes: [
-      { tier: "sim", name: "Robot A · full humanoid", detail: "Moves, wais, looks at you, hands items over" },
-      { tier: "sim", name: "Robot B · screen-only", detail: "Fixed base, no arms: adapts on screen" },
-      { tier: "api", name: "Your system", detail: "GET /api/hri/passport/{token}" },
-      { tier: "future", name: "Physical care robots", detail: "Not connected. No hardware is controlled." }
-    ],
-    tierNote: "Simulation: three.js robots running in this browser. API: a live HTTP contract any system can call today. Future: physical robot integration, not built."
+  tiers: { sim: "Simulation", api: "API", future: "Future" },
+  overview: {
+    hero: {
+      eyebrow: "HumanoidTH · HRI Living Lab",
+      title: "Where humans meet robots.",
+      lead: "A human-robot interaction research lab in your browser. Teach a robot how you like to be cared for, once. Then watch different robots respect it, and help us learn what makes a robot feel safe and kind.",
+      cta: "Create your Care Passport",
+      ctaNote: "About 1 minute · camera optional · nothing is saved until you agree",
+      explore: "Explore the Robot Lab",
+      haveOne: "Already have a passport? Start the hospital journey",
+      figureLabel: "Atlas, the Living Lab robot, greeting with a Thai wai",
+      figureCaption: "Every calibration begins with a wai. Illustration: the robots in this lab are 3D simulations.",
+      sampleKicker: "Example passport",
+      sample: [["Distance", "medium"], ["Pace", "gentle"], ["Eye contact", "soft"]] as [string, string][]
+    },
+    resume: {
+      eyebrow: "Continue",
+      title: "Welcome back",
+      body: "This browser keeps the edit key for a Care Passport you created. Open it to share the QR code, change your preferences, or find the code for the hospital journey.",
+      open: "Open my passport"
+    },
+    how: {
+      eyebrow: "How it works",
+      title: "Four parts, one thread",
+      lead: "Your Care Passport is what connects everything here. You create it once; robots read it; the journey tests whether it helps; the research shows what people learned.",
+      forLabel: "For",
+      audiences: { participant: "Participants", researcher: "Researchers", everyone: "Everyone" },
+      steps: [
+        { key: "passport", href: "/living-lab/create", title: "Create a Care Passport", for: ["participant"], meta: "About 1 minute", body: "Greet the robot with a wai, then tell it your comfortable distance, pace, eye contact and care needs, by buttons, voice, camera or Auto.", note: "Saved: your preferences. Never saved: video or audio.", action: "Create my passport" },
+        { key: "robot", href: "/living-lab/robot", title: "See robots read it", for: ["participant", "researcher"], meta: "Robot A and Robot B", body: "A mobile humanoid and a fixed screen robot read the same passport. Each applies it within its own hardware, and safety rules always come first.", note: "Both robots are browser simulations.", action: "Open the Robot Lab" },
+        { key: "journey", href: "/living-lab/meet", title: "Walk the hospital journey", for: ["participant"], meta: "Three stations", body: "At reception, medicine delivery and a doctor call you meet each robot twice, before and after it reads your passport, and rate your comfort from 1 to 5.", note: "Needs your 6-character passport code.", action: "Start the journey" },
+        { key: "research", href: "/living-lab/research", title: "See what the lab learns", for: ["researcher", "everyone"], meta: "Anonymous averages", body: "Ratings are combined into group averages that compare the two versions of each robot. No one's individual answers are shown.", note: "Care details stay hidden until at least 5 people share them.", action: "Explore the research" }
+      ]
+    },
+    status: {
+      eyebrow: "Lab environment",
+      title: "What is real, and what is simulated",
+      lead: "Checked when this page loaded.",
+      states: { ok: "Available", off: "Unavailable", pending: "Checking", none: "Not connected", live: "Live", configured: "Configured", notConfigured: "Not configured" },
+      sim: { label: "Robot simulation", ok: "3D robots run in this browser with three.js. Distances are scene units, not metres.", off: "This device cannot show 3D graphics, so the robots cannot appear. The passport card and research pages still work.", pending: "Checking whether this browser can show 3D robots…" },
+      robots: { label: "Robots in the lab", body: (registry: number | null) => `2 lab robots (Robot A and Robot B)${registry === null ? "" : `, plus ${registry} care robot model${registry === 1 ? "" : "s"} listed in the Atlas registry`}. All of them are simulated.` },
+      hardware: { label: "Physical robots", body: "No physical robot is connected to or controlled by this site." },
+      api: { label: "Passport API", body: "Any system can read a passport with its token at GET /api/hri/passport/{token}. Anxiety, nicknames and session logs are never shared." },
+      data: { label: "Research database", ok: "Passports and ratings are saved here.", off: "The database cannot be reached right now, so nothing can be saved. Please try again later." },
+      ai: { label: "AI assistant", ok: "Gemini is configured for the passport interview and robot conversation. If it is busy, the lab says so and the other methods still work.", off: "AI features are off on this server. Buttons, voice, camera and Auto all still work." }
+    },
+    research: {
+      eyebrow: "Why this research",
+      title: "Care robots should fit people, not the other way around",
+      body: [
+        "Care robots are arriving in hospitals and homes. But people differ: how close is too close, how fast is too fast, whether eye contact feels warm or intrusive. A capable robot that ignores this can still feel threatening.",
+        "The Living Lab asks one question: does a robot that has read your Care Passport feel more comfortable than the same robot that has not?"
+      ],
+      methodTitle: "How we keep the comparison fair",
+      method: [
+        ["Same person, both versions", "Everyone meets each robot with and without the passport, so people are compared with themselves."],
+        ["Balanced order", "The starting version is chosen at random and alternates between stations, to cancel out order effects."],
+        ["One simple rating", "Comfort from 1 (very uncomfortable) to 5 (very comfortable) after each meeting."],
+        ["Privacy first", "No video or audio is stored. Care details are hidden in any group smaller than 5."]
+      ] as [string, string][],
+      disclaimer: "This is simulation research in a web browser, not a clinical study.",
+      action: "Explore the research data"
+    }
   },
   calibrate: {
     eyebrow: "01 · Care Passport",
@@ -144,30 +183,69 @@ const th: typeof en = {
     ai: { label: "ผู้ช่วย AI", ok: "ตั้งค่าแล้ว", off: "ยังไม่ได้ตั้งค่า" },
     short: { sim: { pending: "จำลอง 3D …", ok: "จำลอง 3D ทำงาน", off: "จำลอง 3D ใช้ไม่ได้" }, hardware: "ไม่มีหุ่นยนต์จริง", ai: { ok: "AI พร้อม", off: "AI ปิด" } }
   },
-  hero: {
-    eyebrow: "HRI Wellness Living Lab",
-    title: "โปรไฟล์เดียว หุ่นยนต์ทุกตัวเข้าใจคุณ",
-    lead: "มนุษย์แต่ละคนมีความต้องการต่างกัน หุ่นยนต์ทุกตัวควรรู้วิธีเคารพความต้องการนั้น สอนหุ่นดูแลหนึ่งตัวเพียงครั้งเดียวว่าระยะ ความเร็ว การสบตา และความต้องการด้านการดูแลแบบไหนที่คุณสบายใจ Care Passport จะพาข้อมูลนี้ไปยังหุ่นทุกตัวที่คุณพบ และหุ่นแต่ละตัวจะปรับตามฮาร์ดแวร์ของตัวเอง",
-    cta: "สร้าง Care Passport ของฉัน",
-    haveOne: "ฉันมีพาสปอร์ตแล้ว",
-    console: "เปิดคอนโซลหุ่นยนต์",
-    facts: [
-      { value: "≈ 1 นาที", label: "การปรับเทียบแบบมีผู้นำทาง" },
-      { value: "4", label: "วิธีตอบ: ปุ่ม เสียง กล้อง อัตโนมัติ" },
-      { value: "0", label: "เฟรมวิดีโอที่ถูกเก็บหรือส่งออก" }
-    ],
-    diagramLabel: "Care Passport ใบเดียวถูกอ่านโดยหุ่นหลายตัวที่มีฮาร์ดแวร์ต่างกัน",
-    passport: "Care Passport",
-    passportSub: "ความต้องการของคน · schema v1",
-    reads: "อ่านพาสปอร์ตใบเดียวกัน",
-    tiers: { sim: "จำลอง", api: "API", future: "อนาคต" },
-    nodes: [
-      { tier: "sim", name: "Robot A · หุ่นเต็มรูปแบบ", detail: "เคลื่อนที่ ไหว้ สบตา และยื่นของให้ได้" },
-      { tier: "sim", name: "Robot B · จออย่างเดียว", detail: "ฐานติดที่ ไม่มีแขน ปรับผ่านหน้าจอ" },
-      { tier: "api", name: "ระบบของคุณ", detail: "GET /api/hri/passport/{token}" },
-      { tier: "future", name: "หุ่นดูแลจริง", detail: "ยังไม่ได้เชื่อมต่อ ไม่มีการควบคุมฮาร์ดแวร์" }
-    ],
-    tierNote: "จำลอง: หุ่น three.js ที่ทำงานในเบราว์เซอร์นี้ · API: สัญญาเชื่อมต่อ HTTP ที่ระบบใดก็เรียกใช้ได้วันนี้ · อนาคต: การเชื่อมต่อกับหุ่นจริง ซึ่งยังไม่ได้สร้าง"
+  tiers: { sim: "จำลอง", api: "API", future: "อนาคต" },
+  overview: {
+    hero: {
+      eyebrow: "HumanoidTH · HRI Living Lab",
+      title: "ที่ที่มนุษย์พบกับหุ่นยนต์",
+      lead: "ห้องวิจัยปฏิสัมพันธ์ระหว่างมนุษย์กับหุ่นยนต์ในเบราว์เซอร์ของคุณ สอนหุ่นยนต์เพียงครั้งเดียวว่าคุณอยากได้รับการดูแลแบบไหน แล้วดูหุ่นยนต์แต่ละตัวเคารพสิ่งนั้น และช่วยเราเรียนรู้ว่าอะไรทำให้หุ่นยนต์รู้สึกปลอดภัยและเป็นมิตร",
+      cta: "สร้าง Care Passport ของคุณ",
+      ctaNote: "ประมาณ 1 นาที · ไม่ต้องใช้กล้องก็ได้ · ไม่มีอะไรถูกบันทึกจนกว่าคุณจะยินยอม",
+      explore: "สำรวจห้องทดลองหุ่นยนต์",
+      haveOne: "มีพาสปอร์ตแล้ว? เริ่มเส้นทางโรงพยาบาล",
+      figureLabel: "Atlas หุ่นยนต์ของ Living Lab กำลังไหว้ทักทาย",
+      figureCaption: "การปรับเทียบทุกครั้งเริ่มด้วยการไหว้ ภาพประกอบ: หุ่นยนต์ในแล็บนี้เป็นการจำลอง 3 มิติ",
+      sampleKicker: "ตัวอย่างพาสปอร์ต",
+      sample: [["ระยะ", "ปานกลาง"], ["ความเร็ว", "นุ่มนวล"], ["การสบตา", "เบา ๆ"]] as [string, string][]
+    },
+    resume: {
+      eyebrow: "ทำต่อ",
+      title: "ยินดีต้อนรับกลับมา",
+      body: "เบราว์เซอร์นี้เก็บรหัสแก้ไขของ Care Passport ที่คุณสร้างไว้ เปิดเพื่อแชร์ QR แก้ไขความต้องการ หรือดูรหัสสำหรับเส้นทางโรงพยาบาล",
+      open: "เปิดพาสปอร์ตของฉัน"
+    },
+    how: {
+      eyebrow: "ทำงานอย่างไร",
+      title: "สี่ส่วน เชื่อมด้วยพาสปอร์ตใบเดียว",
+      lead: "Care Passport คือสิ่งที่เชื่อมทุกส่วนเข้าด้วยกัน คุณสร้างครั้งเดียว หุ่นยนต์อ่านมัน เส้นทางโรงพยาบาลทดสอบว่ามันช่วยได้จริงไหม และงานวิจัยแสดงสิ่งที่ได้เรียนรู้",
+      forLabel: "สำหรับ",
+      audiences: { participant: "ผู้เข้าร่วม", researcher: "นักวิจัย", everyone: "ทุกคน" },
+      steps: [
+        { key: "passport", href: "/living-lab/create", title: "สร้าง Care Passport", for: ["participant"], meta: "ประมาณ 1 นาที", body: "ไหว้ทักทายหุ่นยนต์ แล้วบอกระยะ ความเร็ว การสบตา และความต้องการด้านการดูแลที่คุณสบายใจ ผ่านปุ่ม เสียง กล้อง หรือโหมดอัตโนมัติ", note: "บันทึก: ความต้องการของคุณ · ไม่บันทึก: วิดีโอหรือเสียง", action: "สร้างพาสปอร์ตของฉัน" },
+        { key: "robot", href: "/living-lab/robot", title: "ดูหุ่นยนต์อ่านพาสปอร์ต", for: ["participant", "researcher"], meta: "Robot A และ Robot B", body: "หุ่นฮิวแมนนอยด์ที่เคลื่อนที่ได้ และหุ่นจอที่ติดอยู่กับที่ อ่านพาสปอร์ตใบเดียวกัน แต่ละตัวปรับตามฮาร์ดแวร์ของตัวเอง และกฎความปลอดภัยมาก่อนเสมอ", note: "หุ่นทั้งสองเป็นการจำลองในเบราว์เซอร์", action: "เปิดห้องทดลองหุ่นยนต์" },
+        { key: "journey", href: "/living-lab/meet", title: "เดินเส้นทางโรงพยาบาล", for: ["participant"], meta: "สามจุด", body: "ที่จุดต้อนรับ จุดส่งยา และจุดโทรหาแพทย์ คุณจะพบหุ่นแต่ละตัวสองครั้ง ก่อนและหลังที่มันอ่านพาสปอร์ต แล้วให้คะแนนความสบายใจ 1 ถึง 5", note: "ต้องใช้รหัสพาสปอร์ต 6 ตัวอักษร", action: "เริ่มเส้นทาง" },
+        { key: "research", href: "/living-lab/research", title: "ดูสิ่งที่แล็บเรียนรู้", for: ["researcher", "everyone"], meta: "ค่าเฉลี่ยแบบไม่ระบุตัวตน", body: "คะแนนถูกรวมเป็นค่าเฉลี่ยของกลุ่ม เพื่อเปรียบเทียบหุ่นสองแบบ ไม่มีการแสดงคำตอบของใครเป็นรายบุคคล", note: "ข้อมูลด้านการดูแลจะถูกซ่อนจนกว่าจะมีอย่างน้อย 5 คน", action: "สำรวจงานวิจัย" }
+      ]
+    },
+    status: {
+      eyebrow: "สภาพแวดล้อมของแล็บ",
+      title: "อะไรจริง อะไรจำลอง",
+      lead: "ตรวจสอบเมื่อเปิดหน้านี้",
+      states: { ok: "พร้อม", off: "ใช้ไม่ได้", pending: "กำลังตรวจสอบ", none: "ไม่ได้เชื่อมต่อ", live: "ใช้งานได้", configured: "ตั้งค่าแล้ว", notConfigured: "ยังไม่ได้ตั้งค่า" },
+      sim: { label: "การจำลองหุ่นยนต์", ok: "หุ่น 3 มิติทำงานในเบราว์เซอร์นี้ด้วย three.js ระยะทางเป็นหน่วยในฉาก ไม่ใช่เมตร", off: "อุปกรณ์นี้แสดงภาพ 3 มิติไม่ได้ จึงไม่เห็นหุ่นยนต์ แต่หน้าพาสปอร์ตและหน้างานวิจัยยังใช้ได้", pending: "กำลังตรวจว่าเบราว์เซอร์นี้แสดงหุ่น 3 มิติได้หรือไม่…" },
+      robots: { label: "หุ่นยนต์ในแล็บ", body: (registry: number | null) => `หุ่นของแล็บ 2 ตัว (Robot A และ Robot B)${registry === null ? "" : ` และหุ่นดูแล ${registry} รุ่นที่อยู่ในทะเบียน Atlas`} ทั้งหมดเป็นการจำลอง` },
+      hardware: { label: "หุ่นยนต์จริง", body: "ไม่มีหุ่นยนต์จริงตัวใดเชื่อมต่อหรือถูกควบคุมจากเว็บไซต์นี้" },
+      api: { label: "Passport API", body: "ระบบใดก็อ่านพาสปอร์ตได้ด้วย token ที่ GET /api/hri/passport/{token} โดยไม่เปิดเผยระดับความกังวล ชื่อเล่น หรือบันทึกการใช้งาน" },
+      data: { label: "ฐานข้อมูลวิจัย", ok: "พาสปอร์ตและคะแนนถูกบันทึกที่นี่", off: "ตอนนี้เชื่อมต่อฐานข้อมูลไม่ได้ จึงบันทึกอะไรไม่ได้ กรุณาลองใหม่ภายหลัง" },
+      ai: { label: "ผู้ช่วย AI", ok: "ตั้งค่า Gemini แล้ว สำหรับการสัมภาษณ์พาสปอร์ตและการคุยกับหุ่นยนต์ ถ้าระบบไม่ว่าง แล็บจะแจ้ง และวิธีอื่นยังใช้ได้", off: "ปิดฟีเจอร์ AI บนเซิร์ฟเวอร์นี้ ปุ่ม เสียง กล้อง และโหมดอัตโนมัติยังใช้ได้ทั้งหมด" }
+    },
+    research: {
+      eyebrow: "ทำไมต้องวิจัยเรื่องนี้",
+      title: "หุ่นดูแลควรปรับตามคน ไม่ใช่ให้คนปรับตามหุ่น",
+      body: [
+        "หุ่นดูแลกำลังเข้ามาในโรงพยาบาลและบ้าน แต่คนแต่ละคนต่างกัน ใกล้แค่ไหนถึงจะใกล้เกินไป เร็วแค่ไหนถึงจะเร็วเกินไป การสบตาให้ความรู้สึกอบอุ่นหรือรุกล้ำ หุ่นที่เก่งแต่ไม่สนใจเรื่องเหล่านี้ก็ยังทำให้คนรู้สึกไม่ปลอดภัยได้",
+        "Living Lab ถามคำถามเดียว: หุ่นยนต์ที่อ่าน Care Passport ของคุณแล้ว ทำให้รู้สึกสบายใจกว่าหุ่นตัวเดียวกันที่ยังไม่ได้อ่านหรือไม่"
+      ],
+      methodTitle: "เราทำให้การเปรียบเทียบยุติธรรมอย่างไร",
+      method: [
+        ["คนเดิม ทั้งสองแบบ", "ทุกคนพบหุ่นแต่ละตัวทั้งแบบมีและไม่มีพาสปอร์ต จึงเปรียบเทียบกับตัวเอง"],
+        ["ลำดับที่สมดุล", "แบบที่เริ่มก่อนถูกสุ่ม และสลับกันในแต่ละจุด เพื่อตัดผลจากลำดับ"],
+        ["คะแนนเดียวที่เข้าใจง่าย", "ความสบายใจ 1 (ไม่สบายใจมาก) ถึง 5 (สบายใจมาก) หลังพบหุ่นแต่ละครั้ง"],
+        ["ความเป็นส่วนตัวมาก่อน", "ไม่เก็บวิดีโอหรือเสียง ข้อมูลด้านการดูแลจะถูกซ่อนในกลุ่มที่มีไม่ถึง 5 คน"]
+      ] as [string, string][],
+      disclaimer: "นี่คืองานวิจัยด้วยการจำลองในเว็บเบราว์เซอร์ ไม่ใช่การศึกษาทางคลินิก",
+      action: "สำรวจข้อมูลงานวิจัย"
+    }
   },
   calibrate: {
     eyebrow: "01 · Care Passport",
