@@ -143,3 +143,19 @@ test("the console has no horizontal overflow at phone width", async ({ browser }
   expect(overflow).toBe(0);
   await context.close();
 });
+
+test("a link from the passport card opens the Robot Lab with that passport loaded, and drops the token from the address bar", async ({ browser }) => {
+  test.setTimeout(60_000);
+  const row = await seed();
+  const context = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": randomIp() } });
+  const page = await context.newPage();
+  await page.goto(`/living-lab/robot#token=${row.accessToken}`);
+  await waitForRobots(page);
+  await expect(page.getByTestId("robot-card-a")).toContainText("Passport v1");
+  await expect(page.getByTestId("robot-card-b")).toContainText("Passport v1");
+  expect(page.url()).not.toContain(row.accessToken);
+  // Each robot shows its own hardware: Robot B has no arms.
+  await expect(page.getByTestId("robot-card-b").getByRole("list", { name: "Hardware" })).toContainText("Arms");
+  await expect(page.getByTestId("robot-card-b").getByRole("list", { name: "Hardware" }).getByRole("listitem").filter({ hasText: "Arms" })).toContainText("no");
+  await context.close();
+});

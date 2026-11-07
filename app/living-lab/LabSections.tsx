@@ -65,15 +65,17 @@ export function CalibrationProgress({ lang, phase, auto }: { lang: Lang; phase: 
   );
 }
 
-export function RobotEcosystem({ lang, robots }: { lang: Lang; robots: LabRobotEntry[] }) {
+// compact: the Robot Lab already shows each robot's hardware on its own card, so only the adaptation
+// priority and the registry remain.
+export function RobotEcosystem({ lang, robots, compact = false }: { lang: Lang; robots: LabRobotEntry[]; compact?: boolean }) {
   const t = labCopy[lang].robots;
   const tiers = labCopy[lang].tiers;
   const caps = ["mobile", "head", "arms", "speaker", "screen"] as const;
   return (
     <section className="lab-section" aria-labelledby="robots">
       <SectionHead id="robots" eyebrow={t.eyebrow} title={t.title} lead={t.lead} />
-      <div className="lab-eco">
-        {ROBOT_PROFILES.map((robot) => (
+      <div className={compact ? "lab-eco is-compact" : "lab-eco"}>
+        {!compact && ROBOT_PROFILES.map((robot) => (
           <article key={robot.id} className="lab-robot">
             <div className="lab-robot-head">
               <h3>{robot.name[lang]}</h3>
@@ -101,7 +103,7 @@ export function RobotEcosystem({ lang, robots }: { lang: Lang; robots: LabRobotE
           <h3 id="lab-priority-title">{t.priorityTitle}</h3>
           <ol>{t.priority.map((item) => <li key={item}>{item}</li>)}</ol>
           <p className="lab-note">{t.priorityNote}</p>
-          <Link className="lab-link" href="/living-lab/robot">{t.open} <ArrowRight size={16} aria-hidden="true" /></Link>
+          {!compact && <Link className="lab-link" href="/living-lab/robot">{t.open} <ArrowRight size={16} aria-hidden="true" /></Link>}
         </aside>
       </div>
 

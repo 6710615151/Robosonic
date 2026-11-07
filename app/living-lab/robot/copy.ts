@@ -3,10 +3,19 @@ export type RobotLang = "en" | "th";
 
 export const robotCopy = {
   en: {
-    eyebrow: "One profile, every robot",
-    title: "Robot console",
+    eyebrow: "One passport, different robots",
+    title: "Robot Lab",
     subtitle:
-      "This console reads a real HRI Passport through the same public API a robot uses, then shows how two different robots apply the same preferences. Everything here is a browser simulation.",
+      "Read a real Care Passport through the same public API a robot uses, then watch two robots with different hardware apply it, next to a default robot that has not read it. Everything here is a browser simulation.",
+    noPassportYet: "No passport yet? Create one.",
+    robotsTitle: "The robots",
+    robotsLead: "Read a passport above to see how each robot adapts. Until then, all three behave as robots that know nothing about you.",
+    capsLabel: "Hardware",
+    caps: { mobile: "Moves", head: "Head", arms: "Arms", speaker: "Speaker", screen: "Screen" },
+    capYes: "yes",
+    capNo: "no",
+    researchTitle: "Researcher tools: clinical protocol and API response",
+    jsonEmpty: "Read a passport to see the exact API response a robot receives.",
     simNote: "Browser simulation. No real robot is connected or controlled.",
     simShort: "Simulated",
     tokenTitle: "Read a passport",
@@ -150,10 +159,19 @@ export const robotCopy = {
     close: "Close"
   },
   th: {
-    eyebrow: "โปรไฟล์เดียว ทุกหุ่นเข้าใจ",
-    title: "คอนโซลหุ่นยนต์",
+    eyebrow: "พาสปอร์ตเดียว หุ่นต่างรุ่น",
+    title: "ห้องทดลองหุ่นยนต์",
     subtitle:
-      "คอนโซลนี้อ่าน HRI Passport จริงผ่าน API สาธารณะตัวเดียวกับที่หุ่นใช้ แล้วแสดงให้เห็นว่าหุ่นสองรุ่นที่ต่างกันนำข้อกำหนดเดียวกันไปใช้อย่างไร ทั้งหมดนี้คือการจำลองในเบราว์เซอร์",
+      "อ่าน Care Passport จริงผ่าน API สาธารณะตัวเดียวกับที่หุ่นใช้ แล้วดูหุ่นสองรุ่นที่ฮาร์ดแวร์ต่างกันนำไปใช้ เทียบกับหุ่นแบบปกติที่ยังไม่ได้อ่าน ทั้งหมดนี้คือการจำลองในเบราว์เซอร์",
+    noPassportYet: "ยังไม่มีพาสปอร์ต? สร้างเลย",
+    robotsTitle: "หุ่นยนต์",
+    robotsLead: "อ่านพาสปอร์ตด้านบนเพื่อดูว่าหุ่นแต่ละตัวปรับตัวอย่างไร ก่อนหน้านั้น หุ่นทั้งสามทำตัวเหมือนหุ่นที่ไม่รู้จักคุณ",
+    capsLabel: "ฮาร์ดแวร์",
+    caps: { mobile: "เคลื่อนที่", head: "หัว", arms: "แขน", speaker: "ลำโพง", screen: "จอ" },
+    capYes: "มี",
+    capNo: "ไม่มี",
+    researchTitle: "เครื่องมือนักวิจัย: โปรโตคอลทางคลินิกและผลตอบกลับจาก API",
+    jsonEmpty: "อ่านพาสปอร์ตเพื่อดูผลตอบกลับจาก API ที่หุ่นได้รับจริง",
     simNote: "เป็นการจำลองในเบราว์เซอร์ ไม่ได้เชื่อมต่อหรือควบคุมหุ่นจริง",
     simShort: "จำลอง",
     tokenTitle: "อ่านพาสปอร์ต",

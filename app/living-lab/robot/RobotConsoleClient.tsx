@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Play, Radio, Volume2, VolumeX } from "lucide-react";
+import { Check, Minus, Play, Radio, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import { adapt, DEFAULT_PLAN, explainPlan, type BehaviourPlan, type PreferenceKey, type SafetyRule } from "@/lib/hri/adapt";
 import type { RobotBehavior } from "@/lib/hri/behavior-engine";
@@ -171,6 +171,21 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
       setError(t.errorBadToken);
       return;
     }
+    await loadToken(token);
+  }
+
+  // Links from the passport card and the end of creation carry the token in the URL fragment
+  // (#token=…), which browsers never send to the server. Read it once, then drop it from the address bar.
+  useEffect(() => {
+    const match = /^#token=([A-Za-z0-9_-]{43})$/.exec(window.location.hash);
+    if (!match) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    setInput(match[1]);
+    void loadToken(match[1]);
+    // Runs once on arrival; loadToken only uses refs and setters.
+  }, []);
+
+  async function loadToken(token: string) {
     setBusy(true);
     setError(null);
     try {
@@ -387,6 +402,16 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
           )}
         </div>
 
+        <ul className={styles.caps} aria-label={t.capsLabel}>
+          {(["mobile", "head", "arms", "speaker", "screen"] as const).map((cap) => (
+            <li key={cap} className={caps[cap] ? styles.capYes : styles.capNo}>
+              {caps[cap] ? <Check size={12} aria-hidden /> : <Minus size={12} aria-hidden />}
+              <span>{t.caps[cap]}</span>
+              <span className={styles.srOnly}>{caps[cap] ? t.capYes : t.capNo}</span>
+            </li>
+          ))}
+        </ul>
+
         <div className={styles.stage}>
           <RobotStage
             framing="portrait"
@@ -488,43 +513,49 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
           <h1 className={styles.title}>{t.title}</h1>
           <p className={styles.subtitle}>{t.subtitle}</p>
         </div>
-        <div className={styles.headerActions}>
-          <span className={`${styles.badge} ${styles.badgeWarn} ${styles.simBadge}`}>
-            <Radio size={13} aria-hidden /> {t.simNote}
-          </span>
-          <Link className={styles.btn} href="/living-lab">{t.back}</Link>
-        </div>
+        <span className={`${styles.badge} ${styles.badgeWarn} ${styles.simBadge}`}>
+          <Radio size={13} aria-hidden /> {t.simNote}
+        </span>
       </header>
 
-      <section className={styles.panel} aria-labelledby="read-passport">
-        <h2 id="read-passport" className={styles.panelTitle}>{t.tokenTitle}</h2>
+      <section className={`${styles.panel} ${profile ? styles.panelLoaded : ""}`} aria-labelledby="read-passport">
+        <div className={styles.panelHead}>
+          <h2 id="read-passport" className={styles.panelTitle}>{t.tokenTitle}</h2>
+          {profile ? <span className={`${styles.badge} ${styles.badgeActive}`}>{t.loaded(profile.version)}</span> : null}
+        </div>
         <form className={styles.form} onSubmit={readPassport}>
           <label className={styles.label} htmlFor="passport-token">{t.tokenLabel}</label>
-          <input
-            id="passport-token"
-            className={styles.input}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={t.tokenPlaceholder}
-            autoComplete="off"
-            spellCheck={false}
-            inputMode="text"
-          />
-          <p className={styles.hint}>{t.tokenHelp}</p>
-          <div className={styles.formActions}>
+          <div className={styles.tokenRow}>
+            <input
+              id="passport-token"
+              className={styles.input}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder={t.tokenPlaceholder}
+              autoComplete="off"
+              spellCheck={false}
+              inputMode="text"
+            />
             <button type="submit" className={`${styles.btn} ${styles.primary}`} disabled={busy}>
               {busy ? t.reading : t.read}
             </button>
-            {profile ? <span className={`${styles.badge} ${styles.badgeActive}`}>{t.loaded(profile.version)}</span> : null}
           </div>
+          <p className={styles.hint}>{t.tokenHelp} {!profile && <Link href="/living-lab/create">{t.noPassportYet}</Link>}</p>
         </form>
         {error ? <p className={styles.error} role="alert" data-testid="console-error">{error}</p> : null}
-        <div className={styles.protocol}>
-          <label className={styles.protocolLabel}>
-            <input type="checkbox" checked={ward} onChange={(event) => setWard(event.target.checked)} data-testid="ward-protocol" />
-            <span><strong>{t.protocol.title}.</strong> {t.protocol.label}</span>
-          </label>
-          <p className={styles.hint}>{t.protocol.priority}</p>
+      </section>
+
+      <section aria-labelledby="robots-title" className={styles.robots}>
+        <div className={styles.robotsHead}>
+          <h2 id="robots-title" className={styles.panelTitle}>{t.robotsTitle}</h2>
+          <p className={styles.legend}>
+            {profile ? <><span className={styles.changedTag}>{t.changed}</span> {t.legend}</> : t.robotsLead}
+          </p>
+        </div>
+        <div className={styles.grid}>
+          {card(ROBOT_PROFILES[0], plans.a, "a")}
+          {card(ROBOT_PROFILES[1], plans.b, "b")}
+          {card(null, DEFAULT_PLAN, "default")}
         </div>
       </section>
 
@@ -540,20 +571,27 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
         aiNotice={aiNotice}
       />
 
-      {profile && <p className={styles.legend}><span className={styles.changedTag}>{t.changed}</span> {t.legend}</p>}
-      <section className={styles.grid} aria-label={t.eyebrow}>
-        {card(ROBOT_PROFILES[0], plans.a, "a")}
-        {card(ROBOT_PROFILES[1], plans.b, "b")}
-        {card(null, DEFAULT_PLAN, "default")}
-      </section>
-
-      {profile ? (
-        <details className={styles.json}>
-          <summary>{t.jsonTitle}</summary>
-          <p className={styles.hint}>{t.jsonHint}</p>
-          <pre className={styles.pre} data-testid="console-json">{JSON.stringify(profile, null, 2)}</pre>
-        </details>
-      ) : null}
+      <details className={styles.json}>
+        <summary>{t.researchTitle}</summary>
+        <div className={styles.research}>
+          <div className={styles.protocol}>
+            <label className={styles.protocolLabel}>
+              <input type="checkbox" checked={ward} onChange={(event) => setWard(event.target.checked)} data-testid="ward-protocol" />
+              <span><strong>{t.protocol.title}.</strong> {t.protocol.label}</span>
+            </label>
+            <p className={styles.hint}>{t.protocol.priority}</p>
+          </div>
+          {profile ? (
+            <div>
+              <h3 className={styles.subhead}>{t.jsonTitle}</h3>
+              <p className={styles.hint}>{t.jsonHint}</p>
+              <pre className={styles.pre} data-testid="console-json">{JSON.stringify(profile, null, 2)}</pre>
+            </div>
+          ) : (
+            <p className={styles.hint}>{t.jsonEmpty}</p>
+          )}
+        </div>
+      </details>
     </main>
   );
 }

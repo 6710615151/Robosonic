@@ -23,7 +23,7 @@ export default async function RobotConsolePage() {
       <RobotConsoleClient lang={lang} />
       {/* Capability comparison, moved here from the old single-page Living Lab. */}
       <div className="lab-page lab-after">
-        <RobotEcosystem lang={lang} robots={robots ?? []} />
+        <RobotEcosystem lang={lang} robots={robots ?? []} compact />
       </div>
     </>
   );

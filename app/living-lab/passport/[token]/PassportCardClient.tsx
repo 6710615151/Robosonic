@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { Copy, KeyRound, Lock, Pencil, RefreshCw, Share2, ShieldCheck, Trash2, X } from "lucide-react";
+import { Bot, Copy, Hospital, KeyRound, Lock, Pencil, RefreshCw, Share2, ShieldCheck, Trash2, X } from "lucide-react";
 import { describeDistance } from "@/lib/hri/passport";
 import { shouldForgetEditKey } from "@/lib/hri/passport-owner";
 import PassportCardVisual from "../../PassportCardVisual";
@@ -326,7 +326,10 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
         <section className={styles.screen} data-testid="passport-deleted">
           <h1>{t.deletedTitle}</h1>
           <p>{t.deletedBody}</p>
-          <p><Link className={styles.btn} href="/living-lab">{t.backToLab}</Link></p>
+          <p className={styles.row}>
+            <Link className={`${styles.btn} ${styles.primary}`} href="/living-lab/create">{t.createNew}</Link>
+            <Link className={styles.btn} href="/living-lab">{t.backToLab}</Link>
+          </p>
         </section>
       </main>
     );
@@ -410,6 +413,23 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
         </aside>
       </section>
 
+      {live.status === "active" && (
+        <section className={styles.use} aria-labelledby="use-passport" data-testid="passport-use">
+          <h2 id="use-passport" className={styles.sectionTitle}>{t.useTitle}</h2>
+          <ul>
+            <li>
+              <Link className={`${styles.btn} ${styles.primary}`} href={`/living-lab/meet/${live.code}`}><Hospital size={16} aria-hidden="true" /> {t.useJourney}</Link>
+              <p className={styles.note}>{t.useJourneyBody(live.code)}</p>
+            </li>
+            <li>
+              {/* The token travels in the fragment, which browsers never send to the server. */}
+              <Link className={styles.btn} href={`/living-lab/robot#token=${token}`}><Bot size={16} aria-hidden="true" /> {t.useRobot}</Link>
+              <p className={styles.note}>{t.useRobotBody}</p>
+            </li>
+          </ul>
+        </section>
+      )}
+
       <section className={styles.card} aria-labelledby="robot-reads">
         <h2 id="robot-reads" className={styles.sectionTitle}>{t.prefsTitle}</h2>
         <div className={styles.groups}>
@@ -430,6 +450,7 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
             </dl>
           </div>
         </div>
+        <p className={styles.neverShared}><Lock size={14} aria-hidden="true" /> {t.neverShared}</p>
       </section>
 
       <section className={styles.owner} data-testid="owner-section">

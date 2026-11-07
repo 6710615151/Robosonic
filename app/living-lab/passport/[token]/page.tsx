@@ -99,7 +99,9 @@ function Notice({ lang, title, body }: { lang: CardLang; title: string; body: st
       <section className={styles.screen}>
         <h1>{title}</h1>
         <p>{body}</p>
-        <p>
+        <p className={styles.row}>
+          <a className={`${styles.btn} ${styles.primary}`} href="/living-lab/create">{cardCopy[lang].createNew}</a>
+          <a className={styles.btn} href="/living-lab/meet">{cardCopy[lang].enterCode}</a>
           <a className={styles.btn} href="/living-lab">{cardCopy[lang].backToLab}</a>
         </p>
       </section>
