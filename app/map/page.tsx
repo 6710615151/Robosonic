@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     thHeaderSummary: "Ecosystem Summary",
     itemsPrefix: "Items:",
     emptyState: "No ecosystem clusters analyzed yet. An admin can run the AI analysis.",
-    unavailable: "The AI analysis has not run or could not finish, so no clusters are shown. Nothing is filled in with sample data.",
+    unavailable: "The AI analysis has not run or could not finish, so no clusters are shown. Nothing is made up in their place.",
     analysisFailed: "The analysis failed, so the map still shows the last result. Check GEMINI_API_KEY and the server log."
   },
   th: {
