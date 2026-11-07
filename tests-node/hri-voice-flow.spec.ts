@@ -2,11 +2,29 @@
 // recogniser is replaced by a stand-in the test drives, so this proves the wiring (question order,
 // review before saving, fallback), not how well a real recogniser hears Thai. That needs a person,
 // a microphone and the demo browser: see docs/BASELINE-AUDIT.md.
-// Needs no database and saves nothing, unless a test says otherwise.
+// Starting needs a verified Living Lab participant (docs/hri-living-lab-identity-design.md), and
+// reading the participant's session needs the database, so this runs against Neon dev only.
+// It saves no passport; it creates one test participant per test and deletes it.
 //
 //   pnpm build && pnpm start &
-//   PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-voice-flow.spec.ts
+//   NEON_BRANCH=dev PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-voice-flow.spec.ts
 import { test, expect, type Page } from "@playwright/test";
+import pg from "pg";
+import { signInParticipant } from "./identity-helper";
+
+test.skip(process.env.NEON_BRANCH !== "dev", "Needs a signed-in participant, so the dev database: only runs when NEON_BRANCH=dev.");
+const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+const participants: { cleanup: () => Promise<unknown> }[] = [];
+test.afterAll(async () => {
+  for (const p of participants) await p.cleanup();
+  await db.end();
+});
+// Signs this page's browser in as a fresh participant; returns it so a test can remove it early.
+async function signIn(page: Page) {
+  const participant = await signInParticipant(db, page.context());
+  participants.push(participant);
+  return participant;
+}
 
 test.use({ viewport: { width: 1440, height: 1100 } });
 test.describe.configure({ timeout: 120_000 });
@@ -41,6 +59,7 @@ async function noRecogniser(page: Page) {
 }
 
 async function openVoiceFlow(page: Page) {
+  if (!(await page.context().cookies()).some((c) => c.name === "hri_participant")) await signIn(page);
   await page.goto("/living-lab");
   const voiceStart = page.getByRole("button", { name: "Talk or type your answers" });
   await expect(voiceStart).toBeDisabled();
@@ -153,7 +172,9 @@ test("without speech support the same flow works by typing", async ({ page }) =>
 });
 
 test("if saving fails, the answers stay on the review screen and can be saved again", async ({ page }) => {
-  test.skip(Boolean(process.env.NEON_BRANCH), "Needs a server with no database, so that saving fails.");
+  // Saving is made to fail by removing the participant after the flow has started: the server then
+  // refuses with "identity_required". (Before identity, this test relied on a server with no database.)
+  const participant = await signIn(page);
   await noRecogniser(page);
   await openVoiceFlow(page);
   await type(page, "wai");
@@ -168,14 +189,16 @@ test("if saving fails, the answers stay on the review screen and can be saved ag
   await type(page, "text");
   await expect(page.getByRole("heading", { name: "Check your answers before saving" })).toBeVisible();
 
+  await participant.cleanup();
   await type(page, "save");
-  await expect(page.getByText("Your passport could not be saved. Please try again.")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Please verify your email before saving your passport.")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "Check your answers before saving" })).toBeVisible();
   await pressed(page, "Feeling about robots", "Anxious");
   await expect(page.getByRole("button", { name: "Save my passport" })).toBeEnabled();
 });
 
 test("the button flow also stops at the review screen, and starting again clears consent and answers", async ({ page }) => {
+  await signIn(page);
   await page.goto("/living-lab");
   const start = page.getByRole("button", { name: "Start", exact: true });
   const consent = page.getByLabel(/I agree to save my preferences/);

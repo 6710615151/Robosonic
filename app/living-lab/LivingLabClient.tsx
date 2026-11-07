@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { Camera, CameraOff, Hand, HeartHandshake, Mic, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
+import { BadgeCheck, Camera, CameraOff, Hand, HeartHandshake, Mic, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
@@ -12,6 +12,9 @@ import { AutoCalibrator, type AutoEvent, type AutoEvidence, type AutoResult, typ
 import type { PoseFrame } from "@/lib/hri/camera";
 import { CameraSession } from "@/lib/hri/camera-session";
 import { createPassportAction } from "./actions";
+import IdentityCard from "./IdentityCard";
+import { identityCopy } from "./identity-copy";
+import type { ClientIdentity } from "./identity-actions";
 import PassportCardVisual from "./PassportCardVisual";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
@@ -47,8 +50,13 @@ const REVIEW_SLOWER_SPEED = 0.5;
 // The care questions are asked one at a time when answering by voice or text.
 const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
 
-export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; stats: LabStats | null; robots: LabRobot[] }) {
+export default function LivingLabClient({ lang, stats, robots, initialIdentity }: {
+  lang: Lang; stats: LabStats | null; robots: LabRobot[]; initialIdentity: ClientIdentity;
+}) {
   const t = copy[lang];
+  const idT = identityCopy[lang];
+  // Verified Living Lab participant (masked email). Required before the robot starts (decision 1).
+  const [identity, setIdentity] = useState<ClientIdentity>(initialIdentity);
   const robotRef = useRef<RobotBehavior | null>(null);
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState<Phase>("intro");
@@ -133,7 +141,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   // ---------------- phases ----------------
   function begin(answerByVoice = false) {
     const robot = robotRef.current;
-    if (!robot || !consent) return;
+    if (!robot || !consent || !identity) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
     setLog([]); setStep(0); setSpeed(1); setComfort(null); setGreeting("wai"); setCareQuestion(0);
@@ -373,7 +381,13 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
         consent
       );
       if (!result.ok) {
-        setError(result.error === "rate_limited" ? t.saveRateLimited(Math.ceil(result.retryAfterSeconds / 60)) : t.saveFailed);
+        if (result.error === "identity_required") {
+          // The session ended (or was signed out elsewhere) during calibration: ask to verify again.
+          setIdentity(null);
+          setError(idT.errors.identity_required);
+        } else {
+          setError(result.error === "rate_limited" ? t.saveRateLimited(Math.ceil(result.retryAfterSeconds / 60)) : t.saveFailed);
+        }
         setPhase(mode === "auto" ? "review" : "confirm");
         return;
       }
@@ -498,7 +512,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   // ---------------- Auto mode: one tap, then the camera does the rest ----------------
   async function startAuto() {
     const robot = robotRef.current;
-    if (!robot || !consent) return;
+    if (!robot || !consent || !identity) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
     setLog([]); setStep(0); setSpeed(1); setComfort(null);
@@ -692,6 +706,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
           </div>
         </div>
 
+        <div className="ll-side">
         <div className="ll-panel">
           {phase === "intro" && (
             <div className="ll-step">
@@ -703,21 +718,22 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
                 <span>{t.consentLabel}</span>
               </label>
               {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
+              {!identity && <p className="ll-consent-hint">{idT.required}</p>}
               {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
               <div className="ll-auto-offer">
-                <button className="ll-btn big primary" onClick={() => begin(true)} disabled={!ready || !consent}>
+                <button className="ll-btn big primary" onClick={() => begin(true)} disabled={!ready || !consent || !identity}>
                   <Mic size={20} aria-hidden="true" /> {t.voiceInput.start}
                 </button>
                 <p className="ll-note">{t.voiceInput.startHint}</p>
               </div>
               <div className="ll-row">
-                <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
+                <button className="ll-btn primary" onClick={() => begin()} disabled={!ready || !consent || !identity}><Play size={18} aria-hidden="true" /> {ready ? t.start : t.loadingRobot}</button>
                 <button className="ll-btn" onClick={toggleCamera} disabled={!consent || cameraState === "loading"}>
                   {cameraState === "on" ? <CameraOff size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />} {cameraState === "on" ? t.cameraOff : t.cameraOn}
                 </button>
               </div>
               <div className="ll-auto-offer">
-                <button className="ll-btn big auto" onClick={startAuto} disabled={!ready || !consent || cameraState === "loading"}>
+                <button className="ll-btn big auto" onClick={startAuto} disabled={!ready || !consent || !identity || cameraState === "loading"}>
                   <ScanFace size={20} aria-hidden="true" /> {t.autoStart}
                 </button>
                 <p className="ll-note">{t.autoHint}</p>
@@ -951,6 +967,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
                 <li><span>{t.factComm}</span><strong>{accessible ? t.commAccessible : t.commNormal}</strong></li>
                 <li><span>{t.factReach}</span><strong>{noReach ? t.reachAvoid : t.reachOk}</strong></li>
               </ul>
+              {identity && <p className="ll-owner"><BadgeCheck size={16} aria-hidden="true" /> {idT.savedUnder(identity.email)}</p>}
               <p className="ll-note">{t.scanHint}</p>
               <div className="ll-editkey">
                 <p><strong>{t.editKeyTitle}</strong></p>
@@ -975,6 +992,8 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
               {log.map((e, i) => <div key={i}><b className={e.src}>{e.src}</b> {e.t.toFixed(1)}s · {e.type}</div>)}
             </div>
           </details>
+        </div>
+        <IdentityCard lang={lang} identity={identity} onChange={setIdentity} locked={phase !== "intro" && phase !== "done"} />
         </div>
       </section>
 
@@ -1034,6 +1053,31 @@ const styles = `
 .ll-cam.is-on { display: block; }
 .ll-cam video { width: 100%; display: block; transform: scaleX(-1); }
 .ll-cam span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 11px; color: #fff; background: rgba(0,0,0,.55); padding: 2px 6px; }
+.ll-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.ll-owner { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: var(--accent-strong); margin: 0 0 8px !important; }
+.ll-id { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 10px; }
+.ll-id h2 { margin: 0; font-size: 18px; display: inline-flex; align-items: center; gap: 8px; color: #07150f; }
+.ll-id h2 svg { color: var(--accent); }
+.ll-id p { margin: 0; }
+.ll-id-form { display: grid; gap: 6px; }
+.ll-id-form label { font-size: 13px; font-weight: 700; }
+.ll-id-inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.ll-id-inline input { flex: 1 1 200px; min-width: 0; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 16px; background: #fff; color: #07150f; }
+.ll-id-inline input:focus-visible { outline: 3px solid #19c37d; outline-offset: 1px; border-color: var(--accent); }
+.ll-id-inline .ll-btn { flex: 0 0 auto; }
+.ll-id-code { font: 700 22px ui-monospace, monospace !important; letter-spacing: 8px; text-align: center; }
+.ll-id-sent { font-size: 13.5px; line-height: 1.5; background: #f4faf6; border: 1px solid #bcd9c6; border-radius: 10px; padding: 10px 12px; }
+.ll-id-links { display: flex; gap: 16px; flex-wrap: wrap; }
+.ll-id-link { background: none !important; border: none !important; box-shadow: none !important; padding: 4px 0 !important; min-height: 0 !important; color: var(--accent) !important; font: inherit; font-size: 13.5px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.ll-id-link:disabled { color: var(--text-secondary) !important; text-decoration: none; cursor: default; }
+.ll-id-privacy { font-size: 12.5px; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 10px; }
+.ll-id.is-verified { background: #f4faf6; border-color: #9cc9aa; padding: 12px 14px; }
+.ll-id-row { display: flex; align-items: center; gap: 10px; }
+.ll-id-check { color: var(--accent); flex: none; }
+.ll-id-who { display: grid; min-width: 0; flex: 1; }
+.ll-id-who span { font-size: 12px; color: var(--text-secondary); }
+.ll-id-who strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ll-id-switch { min-height: 40px !important; padding: 6px 12px !important; font-size: 13.5px; }
 .ll-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 14px; }
 .ll-step h2 { margin: 0 0 8px; font-size: 20px; }
 .ll-step p { margin: 0 0 12px; line-height: 1.5; }

@@ -21,7 +21,7 @@ export const copy = {
       "Get your Care Passport (code + QR) and walk the hospital journey: reception, medicine delivery, doctor call."
     ],
     privacy: "Camera is optional and runs on this device only. No video is stored or sent. Only your preferences and the interaction log are saved.",
-    consentLabel: "I agree to save my preferences as a Care Passport. If I turn on the camera, the video is processed on this device only and is never stored or sent. If I answer by voice, my browser's speech service may process the audio; this site does not save it.",
+    consentLabel: "I agree to save my preferences as a Care Passport linked to my verified email. If I turn on the camera, the video is processed on this device only and is never stored or sent. If I answer by voice, my browser's speech service may process the audio; this site does not save it.",
     consentHint: "Required before the robot starts.",
     start: "Start",
     loadingRobot: "Loading robot…",
@@ -254,7 +254,7 @@ export const copy = {
       "รับ Care Passport (รหัสและ QR) แล้วเดินเส้นทางในโรงพยาบาล: คัดกรอง → ส่งยา → ต่อสายหาหมอ"
     ],
     privacy: "กล้องเป็นตัวเลือก ประมวลผลในเครื่องนี้เท่านั้น ไม่บันทึกหรือส่งภาพ ระบบเก็บเฉพาะความชอบของคุณและบันทึกการโต้ตอบ",
-    consentLabel: "ฉันยินยอมให้บันทึกความชอบของฉันเป็น Care Passport หากเปิดกล้อง วิดีโอจะถูกประมวลผลในเครื่องนี้เท่านั้น ไม่บันทึกหรือส่งออก หากตอบด้วยเสียง บริการรู้จำเสียงของเบราว์เซอร์อาจประมวลผลเสียงนั้น โดยเว็บไซต์นี้ไม่บันทึกเสียง",
+    consentLabel: "ฉันยินยอมให้บันทึกความชอบของฉันเป็น Care Passport ที่ผูกกับอีเมลที่ยืนยันแล้ว หากเปิดกล้อง วิดีโอจะถูกประมวลผลในเครื่องนี้เท่านั้น ไม่บันทึกหรือส่งออก หากตอบด้วยเสียง บริการรู้จำเสียงของเบราว์เซอร์อาจประมวลผลเสียงนั้น โดยเว็บไซต์นี้ไม่บันทึกเสียง",
     consentHint: "ต้องยินยอมก่อนเริ่มต้น",
     start: "เริ่ม",
     loadingRobot: "กำลังโหลดหุ่นยนต์…",
