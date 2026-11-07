@@ -84,3 +84,11 @@ export function toPublicProfile(p: PassportProfileSource) {
 }
 
 export type PublicProfile = ReturnType<typeof toPublicProfile>;
+
+// What the hospital journey page may send to the browser. Anyone holding the 6-character code can
+// open that page and the code is printed on the public card, so the raw anxiety level is replaced
+// by its effects, the same ones the robot API exposes: a capped speed and a calm demeanour.
+export function toJourneyPassport<T extends { speed: number; anxiety: string }>(passport: T) {
+  const { anxiety, ...rest } = passport;
+  return { ...rest, speed: careSpeed(passport.speed, anxiety), calm: anxiety === "high" };
+}

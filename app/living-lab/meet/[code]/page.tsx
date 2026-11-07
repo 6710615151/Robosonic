@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizePassportCode } from "@/lib/hri/passport";
 import { API_LIMITS } from "@/lib/hri/passport-api";
+import { toJourneyPassport } from "@/lib/hri/public-profile";
 import { consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
 import MeetClient, { type Station } from "./MeetClient";
 
@@ -74,10 +75,9 @@ export default async function MeetPage({ params, searchParams }: { params: Param
 
   // Prisma stores these as strings; narrow them once at the page boundary.
   const care = {
-    anxiety: (passport.anxiety === "medium" || passport.anxiety === "high" ? passport.anxiety : "low") as "low" | "medium" | "high",
     captions: (passport.captions === "large" ? "large" : "normal") as "normal" | "large",
     speechPace: (passport.speechPace === "slow" ? "slow" : "normal") as "normal" | "slow"
   };
 
-  return <MeetClient lang={lang} passport={{ ...passport, ...care }} stations={stations} startIndex={startIndex} />;
+  return <MeetClient lang={lang} passport={toJourneyPassport({ ...passport, ...care })} stations={stations} startIndex={startIndex} />;
 }

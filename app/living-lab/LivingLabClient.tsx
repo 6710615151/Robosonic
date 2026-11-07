@@ -10,6 +10,7 @@ import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from 
 import { describeDistance, type PassportInput } from "@/lib/hri/passport";
 import { AutoCalibrator, type AutoEvent, type AutoEvidence, type AutoResult, type AutoStage, type PauseReason } from "@/lib/hri/auto-calibration";
 import type { PoseFrame } from "@/lib/hri/camera";
+import { CameraSession } from "@/lib/hri/camera-session";
 import { createPassportAction } from "./actions";
 import PassportCardVisual from "./PassportCardVisual";
 import { copy, type Lang } from "./copy";
@@ -84,14 +85,14 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
   const counters = useRef({ tooClose: 0, tooFast: 0, leanBack: 0 });
   const timers = useRef<number[]>([]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const stopCamera = useRef<(() => void) | null>(null);
+  const camera = useRef(new CameraSession());
   const logRef = useRef<HTMLDivElement | null>(null);
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
 
   const later = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
   const clearTimers = () => { timers.current.forEach((id) => window.clearTimeout(id)); timers.current = []; };
-  useEffect(() => () => { clearTimers(); stopCamera.current?.(); window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { clearTimers(); camera.current.stop(); window.speechSynthesis?.cancel(); }, []);
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [log]);
 
   const record = useCallback((e: LogEvent) => setLog((prev) => [...prev.slice(-299), e]), []);
@@ -306,11 +307,17 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     setPhase("saving");
     setStatus(t.statusSaving);
     try {
-      const { code, accessToken, editToken } = await createPassportAction(
+      const result = await createPassportAction(
         passport,
         { protocol: "wai_first_calibration", inputMode: mode, events: log.slice(-250), summary },
         consent
       );
+      if (!result.ok) {
+        setError(result.error === "rate_limited" ? t.saveRateLimited(Math.ceil(result.retryAfterSeconds / 60)) : t.saveFailed);
+        setPhase(mode === "auto" ? "review" : "voice");
+        return;
+      }
+      const { code, accessToken, editToken } = result;
       // The edit token is the owner's key to the card page. Keep it in this browser so the card
       // unlocks here without asking again; the key is also shown once below for other devices.
       try { window.localStorage.setItem(`hri-passport-edit:${accessToken}`, editToken); } catch { /* private mode */ }
@@ -323,8 +330,8 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
       setStatus(t.statusDone);
       say(t.doneSpeech(code));
       human("passport_created", { code });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch {
+      setError(t.saveFailed);
       setPhase(mode === "auto" ? "review" : "voice");
     }
   }
@@ -336,6 +343,17 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     if (!on && (cameraState === "on" || cameraState === "loading")) {
       stopCam(); setInputMode("buttons"); human("camera_off");
     }
+  }
+
+  // "Again" may hand the screen to the next visitor, so nothing of this visitor's carries over:
+  // they must give their own consent and answer the care questions for themselves.
+  function startOver() {
+    setCountdown(null);
+    changeConsent(false);
+    setAnxiety("low"); setAccessible(false); setNoReach(false);
+    setPhase("intro");
+    setStatus(t.statusIdle);
+    setSpeech(t.introSpeech);
   }
 
   async function copyEditKey() {
@@ -351,8 +369,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
 
   // ---------------- camera (optional) ----------------
   function stopCam() {
-    stopCamera.current?.();
-    stopCamera.current = null;
+    camera.current.stop();
     setCameraState("off");
   }
 
@@ -362,7 +379,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
       stopCam(); setInputMode("buttons"); human("camera_off");
       return;
     }
-    if (await startCamera()) {
+    if ((await startCamera()) === "started") {
       setInputMode("camera");
       human("camera_on");
     }
@@ -370,14 +387,15 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
 
   // One camera pipeline for both modes: frames go to the Auto calibrator while it runs, otherwise to
   // the optional wai / lean-back helpers of the button flow.
-  async function startCamera(): Promise<boolean> {
-    if (!videoRef.current) return false;
+  // "cancelled" means stopCam() ran while the camera was loading: whoever stopped it has already reset the UI.
+  async function startCamera(): Promise<"started" | "cancelled" | "failed"> {
+    const video = videoRef.current;
+    if (!video) return "failed";
     setCameraState("loading");
     try {
-      const { startPoseCamera } = await import("@/lib/hri/camera");
       const wai = new WaiDetector();
       const lean = new LeanBackDetector();
-      stopCamera.current = await startPoseCamera(videoRef.current, (frame: PoseFrame) => {
+      const onFrame = (frame: PoseFrame) => {
         const { tMs, landmarks, fps, people } = frame;
         setCameraInfo(`${fps.toFixed(0)} fps · ${landmarks ? t.personSeen : t.noPerson}`);
         const robot = robotRef.current;
@@ -402,13 +420,18 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
           if (s.state === "fired") receiveWai("camera");
         }
         if (phaseRef.current === "approach" && lean.update(tMs, shoulderWidth(landmarks))) tooClose("camera");
+      };
+      const live = await camera.current.start(async (isCancelled) => {
+        const { startPoseCamera } = await import("@/lib/hri/camera");
+        return startPoseCamera(video, onFrame, isCancelled);
       });
+      if (!live) return "cancelled";
       setCameraState("on");
-      return true;
+      return "started";
     } catch (e) {
       setCameraState("error");
       setCameraInfo(e instanceof Error ? e.message : String(e));
-      return false;
+      return "failed";
     }
   }
 
@@ -431,7 +454,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
     autoRef.current = new AutoCalibrator(lang);
     setPhase("auto");
     human("session_start", { inputMode: "auto" });
-    if (cameraState !== "on" && !(await startCamera())) {
+    if (cameraState !== "on" && (await startCamera()) === "failed") {
       autoRef.current = null;
       setPhase("intro");
       setAutoNotice(t.cameraError);
@@ -738,7 +761,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
               <div className="ll-row">
                 <button className="ll-btn primary" onClick={saveAuto} disabled={phase === "saving"}>{t.reviewSaveNow}</button>
                 {countdown !== null && phase === "review" && <button className="ll-btn" onClick={() => setCountdown(null)}>{t.reviewStop}</button>}
-                <button className="ll-btn" disabled={phase === "saving"} onClick={() => { setCountdown(null); setPhase("intro"); setStatus(t.statusIdle); setSpeech(t.introSpeech); }}>
+                <button className="ll-btn" disabled={phase === "saving"} onClick={startOver}>
                   <Pause size={18} aria-hidden="true" /> {t.again}
                 </button>
               </div>
@@ -803,7 +826,7 @@ export default function LivingLabClient({ lang, stats, robots }: { lang: Lang; s
                 <Link className="ll-btn primary" href={`/living-lab/passport/${accessToken}`}>{t.cardLink}</Link>
                 <Link className="ll-btn" href={`/living-lab/meet/${passportCode}`}>🏥 {t.meetNow}</Link>
                 <Link className="ll-btn" href="/living-lab/robot">{t.consoleLink}</Link>
-                <button className="ll-btn" onClick={() => { setPhase("intro"); setStatus(t.statusIdle); setSpeech(t.introSpeech); }}><Pause size={18} aria-hidden="true" /> {t.again}</button>
+                <button className="ll-btn" onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
               </div>
             </div>
           )}

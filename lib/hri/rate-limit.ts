@@ -52,10 +52,8 @@ export async function currentClientId() {
   return clientId(await headers());
 }
 
-// Throws a user-facing error when a server action is called too often from one client.
-export async function enforceActionLimit(scope: string, limit: number, windowSeconds: number) {
-  const decision = await consumeRateLimit(`${scope}:${await currentClientId()}`, limit, windowSeconds);
-  if (!decision.allowed) {
-    throw new Error(`Too many requests. Please wait ${decision.retryAfterSeconds} seconds and try again.`);
-  }
+// Counts one server-action call from this client. The action returns the refusal as data: Next.js
+// hides the message of anything thrown from a server action in production.
+export async function consumeActionLimit(scope: string, limit: number, windowSeconds: number) {
+  return consumeRateLimit(`${scope}:${await currentClientId()}`, limit, windowSeconds);
 }

@@ -22,7 +22,13 @@ function makeLumaSampler() {
   };
 }
 
-export async function startPoseCamera(video: HTMLVideoElement, onFrame: (frame: PoseFrame) => void) {
+// isCancelled lets a caller abandon a start that is still loading: the camera is then never requested,
+// or is released straight away, and the returned stop function does nothing.
+export async function startPoseCamera(
+  video: HTMLVideoElement,
+  onFrame: (frame: PoseFrame) => void,
+  isCancelled: () => boolean = () => false
+) {
   const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
   const fileset = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
   const create = (delegate: "GPU" | "CPU") =>
@@ -40,7 +46,17 @@ export async function startPoseCamera(video: HTMLVideoElement, onFrame: (frame: 
     landmarker = await create("CPU");
   }
 
+  if (isCancelled()) {
+    landmarker.close();
+    return () => undefined;
+  }
+
   const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" }, audio: false });
+  if (isCancelled()) {
+    stream.getTracks().forEach((track) => track.stop());
+    landmarker.close();
+    return () => undefined;
+  }
   video.srcObject = stream;
   await video.play();
 

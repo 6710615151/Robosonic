@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { OWNER_LIMITS, ownerPatchSchema } from "../lib/hri/passport-owner";
+import { OWNER_LIMITS, ownerPatchSchema, shouldForgetEditKey } from "../lib/hri/passport-owner";
 import { issuePassportTokens, tokenMatchesHash } from "../lib/hri/security";
+
+// ---------------- keeping the owner's key ----------------
+
+test("edit key: a temporary rate limit never forgets it, a rejected key does", () => {
+  assert.equal(shouldForgetEditKey("rate_limited"), false);
+  assert.equal(shouldForgetEditKey("not_found"), true);
+});
 
 // ---------------- what the owner may change ----------------
 

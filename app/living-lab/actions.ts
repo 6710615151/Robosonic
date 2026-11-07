@@ -6,15 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { newPassportCode, normalizePassportCode, passportSchema, sessionSchema } from "@/lib/hri/passport";
 import { OWNER_LIMITS, ownerPatchSchema } from "@/lib/hri/passport-owner";
 import { API_LIMITS } from "@/lib/hri/passport-api";
-import { consumeRateLimit, currentClientId, enforceActionLimit, peekRateLimit } from "@/lib/hri/rate-limit";
+import { consumeActionLimit, consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
 import { hashToken, isWellFormedToken, issuePassportTokens, tokenMatchesHash } from "@/lib/hri/security";
-
-// Session summaries are analytics. Care needs belong to the passport only, so a deleted passport
-// leaves no sensitive trace in its sessions.
-const SENSITIVE_SUMMARY_KEYS = ["anxiety", "nickname"];
-function minimiseSummary(summary: Record<string, unknown>) {
-  return Object.fromEntries(Object.entries(summary).filter(([key]) => !SENSITIVE_SUMMARY_KEYS.includes(key)));
-}
+import { minimiseEvents, minimiseSummary } from "@/lib/hri/session-privacy";
 
 // Saves the comfort passport learned in a Living Lab encounter and the encounter log.
 // Public by design (visitors create passports); input is validated, size-limited and rate-limited.
@@ -23,11 +17,19 @@ function minimiseSummary(summary: Record<string, unknown>) {
 //
 // Consent is a required argument: the UI asks for it before calibration starts (camera included),
 // and the timestamp is kept on the passport as the record of that consent.
+//
+// Expected refusals are returned, not thrown: Next.js hides thrown messages in production.
 export async function createPassportAction(passportRaw: unknown, sessionRaw: unknown, consentRaw: unknown) {
-  if (consentRaw !== true) throw new Error("Consent is required before a passport can be saved.");
-  const passport = passportSchema.parse(passportRaw);
-  const session = sessionSchema.parse(sessionRaw);
-  await enforceActionLimit("create", 10, 3600);
+  if (consentRaw !== true) return { ok: false as const, error: "consent_required" as const };
+  const parsedPassport = passportSchema.safeParse(passportRaw);
+  const parsedSession = sessionSchema.safeParse(sessionRaw);
+  if (!parsedPassport.success || !parsedSession.success) return { ok: false as const, error: "invalid" as const };
+  const passport = parsedPassport.data;
+  const session = parsedSession.data;
+  const decision = await consumeActionLimit("create", 10, 3600);
+  if (!decision.allowed) {
+    return { ok: false as const, error: "rate_limited" as const, retryAfterSeconds: decision.retryAfterSeconds };
+  }
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = newPassportCode();
@@ -55,7 +57,7 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
               protocol: session.protocol,
               inputMode: session.inputMode,
               robotModelId: session.robotModelId || null,
-              eventsJson: session.events as Prisma.InputJsonValue,
+              eventsJson: minimiseEvents(session.events) as Prisma.InputJsonValue,
               summaryJson: minimiseSummary(session.summary) as Prisma.InputJsonValue,
               endedAt: new Date()
             }
@@ -63,14 +65,14 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
         }
       });
       revalidatePath("/living-lab");
-      return { code: created.code, accessToken: tokens.accessToken, editToken: tokens.editToken };
+      return { ok: true as const, code: created.code, accessToken: tokens.accessToken, editToken: tokens.editToken };
     } catch (error) {
       // Unique-code collision: try another code.
       if ((error as { code?: string }).code === "P2002") continue;
       throw error;
     }
   }
-  throw new Error("Could not allocate a passport code. Please try again.");
+  return { ok: false as const, error: "code_unavailable" as const };
 }
 
 // ---------------- owner access (passport card) ----------------
@@ -160,17 +162,19 @@ export async function deletePassportAction(accessTokenRaw: string, editTokenRaw:
 // Rate-limited; unknown codes count toward the same guessing budget as the robot API.
 export async function recordMeetingAction(codeRaw: string, sessionRaw: unknown) {
   const code = normalizePassportCode(codeRaw);
-  const session = sessionSchema.parse(sessionRaw);
-  await enforceActionLimit("meeting", 60, 600);
+  const parsedSession = sessionSchema.safeParse(sessionRaw);
+  if (!parsedSession.success) return { ok: false as const, error: "invalid" as const };
+  const session = parsedSession.data;
+  if (!(await consumeActionLimit("meeting", 60, 600)).allowed) return { ok: false as const, error: "rate_limited" as const };
   const caller = await currentClientId();
   const { limit, windowSeconds } = API_LIMITS.misses;
   if (!(await peekRateLimit(`miss:${caller}`, limit, windowSeconds)).allowed) {
-    throw new Error("Too many failed passport lookups. Please wait a few minutes and try again.");
+    return { ok: false as const, error: "rate_limited" as const };
   }
   const passport = await prisma.hriPassport.findUnique({ where: { code }, select: { id: true } });
   if (!passport) {
     await consumeRateLimit(`miss:${caller}`, limit, windowSeconds);
-    throw new Error("Passport not found.");
+    return { ok: false as const, error: "not_found" as const };
   }
 
   const robotModelId = session.robotModelId
@@ -183,11 +187,11 @@ export async function recordMeetingAction(codeRaw: string, sessionRaw: unknown) 
       inputMode: session.inputMode,
       passportId: passport.id,
       robotModelId,
-      eventsJson: session.events as Prisma.InputJsonValue,
+      eventsJson: minimiseEvents(session.events) as Prisma.InputJsonValue,
       summaryJson: minimiseSummary(session.summary) as Prisma.InputJsonValue,
       endedAt: new Date()
     }
   });
   revalidatePath("/living-lab");
-  return { ok: true };
+  return { ok: true as const };
 }

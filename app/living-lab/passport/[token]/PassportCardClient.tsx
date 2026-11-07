@@ -5,6 +5,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { Copy, Lock, Pencil, Share2, ShieldCheck, Trash2, X } from "lucide-react";
 import { describeDistance } from "@/lib/hri/passport";
+import { shouldForgetEditKey } from "@/lib/hri/passport-owner";
 import PassportCardVisual from "../../PassportCardVisual";
 import { deletePassportAction, getOwnerViewAction, updatePassportAction } from "../../actions";
 import { cardCopy, type CardLang } from "../copy";
@@ -153,7 +154,9 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
         } else {
           setAccess("read_only");
           setUnlockError(unlockErrorText(res.error));
-          try { window.localStorage.removeItem(storageKey); } catch { /* private mode */ }
+          if (shouldForgetEditKey(res.error)) {
+            try { window.localStorage.removeItem(storageKey); } catch { /* private mode */ }
+          }
         }
       })
       .catch(() => {

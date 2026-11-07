@@ -18,3 +18,9 @@ export const OWNER_LIMITS = {
   update: { scope: "owner-update", limit: 30, windowSeconds: 600 },
   delete: { scope: "owner-delete", limit: 5, windowSeconds: 3600 }
 } as const;
+
+// A stored edit key is forgotten only when the server says it is wrong. A rate limit is temporary,
+// and the key is shown only once, so dropping it then could lock the owner out for good.
+export function shouldForgetEditKey(error: "rate_limited" | "not_found") {
+  return error === "not_found";
+}
