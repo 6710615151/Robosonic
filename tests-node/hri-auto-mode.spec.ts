@@ -4,9 +4,11 @@
 // It cannot prove detection accuracy on real people: that needs the venue test in
 // HRI_FEASIBILITY_SPIKE.md §3.4. The full decision logic is unit-tested in test/hri-auto.test.ts.
 //
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET (see identity-helper.ts)
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-auto-mode.spec.ts
 import { test, expect } from "@playwright/test";
 import pg from "pg";
+import { signInParticipant } from "./identity-helper";
 
 test.skip(process.env.NEON_BRANCH !== "dev", "Reads the dev database: only runs when NEON_BRANCH=dev.");
 test.describe.configure({ mode: "serial" });
@@ -25,9 +27,15 @@ const passportsSince = async (since: string) =>
     `SELECT count(*) FROM "HriPassport" WHERE "createdAt" >= $1::timestamp AND "nickname" IS DISTINCT FROM 'integration-test'`,
     [since]
   )).rows[0].count);
-test.afterAll(async () => { await db.end(); });
+const participants: { cleanup: () => Promise<unknown> }[] = [];
+test.afterAll(async () => {
+  for (const p of participants) await p.cleanup();
+  await db.end();
+});
 
+// Every mode needs a verified participant before it can start; sign in, then open the page.
 async function openLab(page: import("@playwright/test").Page) {
+  participants.push(await signInParticipant(db, page.context()));
   await page.goto("/living-lab");
   const start = page.getByRole("button", { name: /Loading robot|Start/ }).first();
   await start.waitFor();

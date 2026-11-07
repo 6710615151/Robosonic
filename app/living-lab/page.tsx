@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import LivingLabClient, { type LabStats, type LabRobot } from "./LivingLabClient";
+import { readClientIdentity } from "./identity-actions";
+import { identityRequired } from "@/lib/hri/identity-server";
 
 export const dynamic = "force-dynamic";
 
@@ -59,5 +61,6 @@ export default async function LivingLabPage() {
     console.error("Living Lab: database unavailable", error);
   }
 
-  return <LivingLabClient lang={lang} stats={stats} robots={robots} />;
+  const identity = await readClientIdentity();
+  return <LivingLabClient lang={lang} stats={stats} robots={robots} initialIdentity={identity} identityRequired={identityRequired()} />;
 }

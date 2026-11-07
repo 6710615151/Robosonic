@@ -9,6 +9,8 @@ import { API_LIMITS } from "@/lib/hri/passport-api";
 import { consumeActionLimit, consumeRateLimit, currentClientId, peekRateLimit } from "@/lib/hri/rate-limit";
 import { hashToken, isWellFormedToken, issuePassportTokens, tokenMatchesHash } from "@/lib/hri/security";
 import { minimiseEvents, minimiseSummary } from "@/lib/hri/session-privacy";
+import { currentParticipant, identityRequired } from "@/lib/hri/identity-server";
+import { maskEmail, ownerForNewPassport } from "@/lib/hri/identity";
 
 // Saves the comfort passport learned in a Living Lab encounter and the encounter log.
 // Public by design (visitors create passports); input is validated, size-limited and rate-limited.
@@ -19,6 +21,10 @@ import { minimiseEvents, minimiseSummary } from "@/lib/hri/session-privacy";
 // and the timestamp is kept on the passport as the record of that consent.
 //
 // Expected refusals are returned, not thrown: Next.js hides thrown messages in production.
+//
+// Identity is optional (decision 1, docs/hri-living-lab-identity-design.md): the passport is linked to
+// the participant verified by the Living Lab cookie, and an unverified visitor's passport has no owner.
+// HRI_IDENTITY_REQUIRED=true makes it required: the action then refuses with "identity_required".
 export async function createPassportAction(passportRaw: unknown, sessionRaw: unknown, consentRaw: unknown) {
   if (consentRaw !== true) return { ok: false as const, error: "consent_required" as const };
   const parsedPassport = passportSchema.safeParse(passportRaw);
@@ -26,6 +32,9 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
   if (!parsedPassport.success || !parsedSession.success) return { ok: false as const, error: "invalid" as const };
   const passport = parsedPassport.data;
   const session = parsedSession.data;
+  const participant = await currentParticipant();
+  const owner = ownerForNewPassport(participant, identityRequired());
+  if (!owner.ok) return { ok: false as const, error: owner.error };
   const decision = await consumeActionLimit("create", 10, 3600);
   if (!decision.allowed) {
     return { ok: false as const, error: "rate_limited" as const, retryAfterSeconds: decision.retryAfterSeconds };
@@ -52,6 +61,7 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
           speechPace: passport.speechPace,
           noReach: passport.noReach,
           consentAt: new Date(),
+          ...(owner.participantId ? { participant: { connect: { id: owner.participantId } } } : {}),
           sessions: {
             create: {
               protocol: session.protocol,
@@ -65,7 +75,14 @@ export async function createPassportAction(passportRaw: unknown, sessionRaw: unk
         }
       });
       revalidatePath("/living-lab");
-      return { ok: true as const, code: created.code, accessToken: tokens.accessToken, editToken: tokens.editToken };
+      return {
+        ok: true as const,
+        code: created.code,
+        accessToken: tokens.accessToken,
+        editToken: tokens.editToken,
+        // Who the server really saved it to, masked for shared screens. Not what the browser assumed.
+        owner: participant ? maskEmail(participant.email) : null
+      };
     } catch (error) {
       // Unique-code collision: try another code.
       if ((error as { code?: string }).code === "P2002") continue;

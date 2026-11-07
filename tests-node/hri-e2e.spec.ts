@@ -3,10 +3,12 @@
 // robot console (Robot A / B) → edit on the card → API and console see version 2 → delete → gone everywhere.
 // Writes to the database, so it only runs when NEON_BRANCH=dev, and it removes its passport even on failure.
 //
+//   set -a && source ./.env.local && set +a      # must include HRI_IDENTITY_SECRET (see identity-helper.ts)
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-e2e.spec.ts
 import { test, expect, type Page } from "@playwright/test";
 import pg from "pg";
 import QRCode from "qrcode";
+import { signInParticipant } from "./identity-helper";
 
 test.skip(process.env.NEON_BRANCH !== "dev", "Writes test data: only runs when NEON_BRANCH=dev.");
 test.describe.configure({ mode: "serial" });
@@ -16,9 +18,11 @@ const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
 const ip = `203.0.113.${Math.floor(Math.random() * 200) + 1}-${Date.now()}`;
 let code = "";
 let token = "";
+let participant: Awaited<ReturnType<typeof signInParticipant>> | null = null;
 
 test.afterAll(async () => {
   if (code) await db.query(`DELETE FROM "HriPassport" WHERE "code" = $1`, [code]);
+  await participant?.cleanup();
   await db.end();
 });
 
@@ -57,6 +61,8 @@ async function readInConsole(page: Page, input: string) {
 
 test("one passport, created in the Living Lab, read by every robot, edited and deleted", async ({ browser, request }) => {
   const context = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": ip }, viewport: { width: 1440, height: 1000 } });
+  // Living Lab identity is required before Start (docs/hri-living-lab-identity-design.md).
+  participant = await signInParticipant(db, context);
   const page = await context.newPage();
   const pageErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
@@ -89,6 +95,13 @@ test("one passport, created in the Living Lab, read by every robot, edited and d
   code = (await page.locator(".ll-code").textContent())!.trim();
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
   expect(code).toMatch(/^[2-9A-HJKMNP-Z]{6}$/);
+
+  // 2a. Identity: the passport belongs to the verified participant, and the email never leaves the server.
+  const owner = await db.query(`SELECT "participantId" FROM "HriPassport" WHERE "code" = $1`, [code]);
+  expect(owner.rows[0]?.participantId).toBe(participant!.id);
+  const apiBody = await (await api(token)).text();
+  expect(apiBody).not.toContain(participant!.email);
+  expect(apiBody).not.toContain(participant!.id);
   await expect(page.getByText("Your edit key (shown once)")).toBeVisible();
   const origin = new URL(page.url()).origin;
   const cardUrl = `${origin}/living-lab/passport/${token}`;

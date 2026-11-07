@@ -8,6 +8,7 @@ import { adapt, DEFAULT_PLAN, type BehaviourPlan } from "@/lib/hri/adapt";
 import type { RobotBehavior } from "@/lib/hri/behavior-engine";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES, type RobotCapabilities, type RobotProfile } from "@/lib/hri/robot-profiles";
+import { buildDefaultSpeech, buildSpokenSummary } from "@/lib/hri/spoken-summary";
 import {
   NOT_UNDERSTOOD_REPLY,
   parseVoiceCommand,
@@ -15,7 +16,7 @@ import {
   type RobotState,
   type VoiceIntent
 } from "@/lib/hri/voice-commands";
-import { greetings, robotCopy, type RobotLang } from "./copy";
+import { robotCopy, type RobotLang } from "./copy";
 import VoiceControl, { type VoiceLogEntry } from "./VoiceControl";
 import styles from "./robot.module.css";
 
@@ -33,6 +34,11 @@ function readToken(raw: string): string | null {
     // Not a URL and not a token.
   }
   return null;
+}
+
+// What this robot says, shown as a caption too. The default robot has no passport to talk about.
+function spokenText(key: string, plan: BehaviourPlan) {
+  return key === "default" ? buildDefaultSpeech(plan.language) : buildSpokenSummary(plan);
 }
 
 function speak(text: string, lang: RobotLang, rate: number) {
@@ -303,8 +309,7 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   }
 
   function speakPlan(key: string, plan: BehaviourPlan) {
-    const text = greetings[plan.greeting][plan.language];
-    const utterance = speak(text, plan.language, plan.speechRate);
+    const utterance = speak(spokenText(key, plan), plan.language, plan.speechRate);
     if (!utterance) return;
     setSpeaking(key);
     utterance.onend = () => setSpeaking((current) => (current === key ? null : current));
@@ -341,7 +346,6 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
     const title = robot ? robot.name[lang] : t.defaultTitle;
     const subtitle = robot ? robot.short[lang] : t.defaultHint;
     const active = plan !== null;
-    const greeting = plan ? greetings[plan.greeting][plan.language] : t.noPassport;
 
     return (
       <article
@@ -376,8 +380,12 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
           </span>
         </div>
 
-        <p className={`${styles.speech} ${plan?.captions === "large" ? styles.speechLarge : ""}`}>
-          {greeting}
+        <p
+          data-testid={`robot-speech-${key}`}
+          lang={plan?.language}
+          className={`${styles.speech} ${plan?.captions === "large" ? styles.speechLarge : ""}`}
+        >
+          {plan ? spokenText(key, plan) : t.noPassport}
         </p>
 
         {active && plan ? (

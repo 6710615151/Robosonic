@@ -282,9 +282,39 @@ model HriPassport {
   expiresAt        DateTime?
   consentAt        DateTime?
   version          Int          @default(1)
+  // Living Lab identity: the verified participant who owns this passport. Older passports have none.
+  // Deleting a participant keeps the passport, unlinked (decision 3, docs/hri-living-lab-identity-design.md).
+  participantId    String?
+  participant      HriParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
   sessions         HriSession[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+
+  @@index([participantId])
+}
+
+// A Living Lab visitor who proved they own an email address with a one-time code (lib/hri/identity.ts).
+model HriParticipant {
+  id             String        @id @default(cuid())
+  email          String        @unique // trimmed + lowercase
+  verifiedAt     DateTime
+  sessionVersion Int           @default(1) // bump to sign the participant out everywhere
+  passports      HriPassport[]
+  createdAt      DateTime      @default(now())
+}
+
+// One emailed one-time code. Only an HMAC of the code is stored.
+model HriEmailChallenge {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@index([expiresAt])
 }
 
 // Fixed-window request counters shared by every serverless instance (in-memory limits
