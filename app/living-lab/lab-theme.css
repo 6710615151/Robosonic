@@ -487,3 +487,14 @@ html[lang="th"] .llo-hero h1, html[lang="th"] .llo h2 { letter-spacing: 0; line-
   html:has(.lab .ll-stage-card) { scroll-padding-top: calc(var(--ll-pin-top, 112px) + max(38vh, 240px) + 12px); scroll-padding-bottom: 96px; }
 }
 @media (min-width: 861px) and (max-width: 960px) { html:has(.lab .ll-stage-card) { --ll-pin-top: 52px; scroll-padding-bottom: 16px; } }
+
+/* ---------------- Hospital journey (meet/[code]/MeetClient) ---------------- */
+.lab .mt-head h1 { font-family: var(--ll-font-display); font-weight: 600; letter-spacing: -0.02em; }
+.lab .mt-eyebrow { color: var(--ll-green-ink); font-family: var(--ll-font-mono); font-weight: 600; letter-spacing: .12em; }
+.mt-notice { margin: 0; padding: 12px 14px; border-radius: var(--ll-radius); border: 1px solid #e9c3a5; background: var(--ll-orange-tint); color: var(--ll-orange-ink); font-size: var(--ll-text-sm); line-height: 1.5; }
+.mt-notice.is-ok { border-color: var(--lab-tint-border); background: var(--ll-green-tint); color: var(--ll-green-ink); }
+.mt-intro { max-width: 760px; }
+.mt-intro h2 { margin: 0; font: 600 var(--ll-text-xl)/1.2 var(--ll-font-display); }
+.mt-intro-list { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: var(--ll-text-md); line-height: 1.6; color: var(--text-primary); }
+.lab .mt-scale button { min-width: 48px; min-height: 48px; }
+html[lang="th"] .lab .mt-eyebrow { font-family: var(--font-thai-stack); letter-spacing: 0; text-transform: none; }

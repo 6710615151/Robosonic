@@ -71,7 +71,9 @@ export default async function MeetPage({ params, searchParams }: { params: Param
       org: robot.developerOrg ?? robot.manufacturer ?? null
     });
   }
-  const startIndex = Math.max(0, stations.findIndex((s) => s.robotId === robotId));
+  const requested = robotId ? stations.findIndex((s) => s.robotId === robotId) : -1;
+  const startIndex = Math.max(0, requested);
+  const robotNotInJourney = Boolean(robotId) && requested === -1;
 
   // Prisma stores these as strings; narrow them once at the page boundary.
   const care = {
@@ -79,5 +81,5 @@ export default async function MeetPage({ params, searchParams }: { params: Param
     speechPace: (passport.speechPace === "slow" ? "slow" : "normal") as "normal" | "slow"
   };
 
-  return <MeetClient lang={lang} passport={toJourneyPassport({ ...passport, ...care })} stations={stations} startIndex={startIndex} />;
+  return <MeetClient lang={lang} passport={toJourneyPassport({ ...passport, ...care })} stations={stations} startIndex={startIndex} robotNotInJourney={robotNotInJourney} />;
 }

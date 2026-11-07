@@ -72,10 +72,12 @@ const ui = {
     saveFailed: "The rating could not be saved. Please press Save again.",
     next: "Next station", finish: "Finish journey",
     doneTitle: "Journey complete",
-    doneBody: "Every care robot in this journey read your Care Passport. Compare the same stations with a default robot to see the difference.",
+    doneBody: "Thank you. Each rating was saved when you pressed Save, linked only to this passport's code, never to your name or email. In Research they appear only as group averages, and care details stay hidden until at least 5 people share them.",
+    doneResearch: "See what the lab is learning",
+    again: "Run the journey again",
     avg: "Your average comfort rating",
     back: "Back to the Living Lab",
-    ready: "Press start. The robot will read your Care Passport first.",
+    ready: "Press start when you are ready. The panel shows which version of the robot you will meet.",
     empty: "No care robots from the registry were found. Please seed the atlas and try again.",
     robotLabel: "Robot",
     condition: (n: number) => `Condition ${n} of 2`,
@@ -91,7 +93,21 @@ const ui = {
     adaptedTitle: "Adapted to this robot's hardware",
     avgPassport: "Average with passport",
     avgDefault: "Average without passport",
-    difference: "Difference"
+    difference: "Difference",
+    round: (n: number) => `Round ${n} of 2`,
+    intro: {
+      title: "Before you begin",
+      points: (n: number) => [
+        `You will visit ${n} hospital station${n === 1 ? "" : "s"}. At each one a care robot does a short task for you.`,
+        "You meet the same robot twice: once as a default robot that has not read your passport, once after it has. The order is chosen for you and alternates between stations, so the comparison is fair.",
+        "After each meeting, rate how comfortable you felt from 1 (very uncomfortable) to 5 (very comfortable). There are no right or wrong answers.",
+        "Each rating is saved when you press Save. If you leave or reload, you can carry on where you stopped in this browser tab."
+      ],
+      sim: "The robots are 3D simulations in your browser. Distances are scene units, not metres.",
+      begin: "Begin the journey"
+    },
+    resumed: (done: number, total: number) => `Welcome back. You have rated ${done} of ${total} meetings; carry on where you left off.`,
+    robotNotInJourney: "The robot you picked is not one of this journey's stations, so the journey starts at station 1."
   },
   th: {
     eyebrow: "เส้นทางโรงพยาบาลด้วย Care Passport",
@@ -119,10 +135,12 @@ const ui = {
     saveFailed: "บันทึกคะแนนไม่สำเร็จ กรุณากดบันทึกอีกครั้ง",
     next: "สถานีถัดไป", finish: "จบเส้นทาง",
     doneTitle: "จบเส้นทางแล้ว",
-    doneBody: "หุ่นดูแลทุกตัวในเส้นทางนี้อ่าน Care Passport ของคุณ ลองเปรียบเทียบสถานีเดิมกับหุ่นแบบปกติเพื่อดูความต่าง",
+    doneBody: "ขอบคุณครับ คะแนนแต่ละครั้งถูกบันทึกเมื่อคุณกดบันทึก โดยผูกกับรหัสพาสปอร์ตนี้เท่านั้น ไม่ผูกกับชื่อหรืออีเมล ในหน้างานวิจัยจะแสดงเป็นค่าเฉลี่ยของกลุ่มเท่านั้น และข้อมูลด้านการดูแลจะถูกซ่อนจนกว่าจะมีอย่างน้อย 5 คน",
+    doneResearch: "ดูสิ่งที่แล็บเรียนรู้",
+    again: "เดินเส้นทางอีกครั้ง",
     avg: "คะแนนความสบายใจเฉลี่ยของคุณ",
     back: "กลับไป Living Lab",
-    ready: "กดเริ่ม หุ่นจะอ่าน Care Passport ของคุณก่อน",
+    ready: "กดเริ่มเมื่อพร้อม แผงด้านข้างจะบอกว่าคุณจะพบหุ่นแบบไหน",
     empty: "ไม่พบหุ่นดูแลใน registry กรุณา seed ข้อมูล atlas แล้วลองอีกครั้ง",
     robotLabel: "หุ่นยนต์",
     condition: (n: number) => `เงื่อนไขที่ ${n} จาก 2`,
@@ -138,7 +156,21 @@ const ui = {
     adaptedTitle: "ปรับตามฮาร์ดแวร์ของหุ่นตัวนี้",
     avgPassport: "เฉลี่ยเมื่อมีพาสปอร์ต",
     avgDefault: "เฉลี่ยเมื่อไม่มีพาสปอร์ต",
-    difference: "ผลต่าง"
+    difference: "ผลต่าง",
+    round: (n: number) => `รอบ ${n} จาก 2`,
+    intro: {
+      title: "ก่อนเริ่ม",
+      points: (n: number) => [
+        `คุณจะไปที่ ${n} จุดในโรงพยาบาล ในแต่ละจุด หุ่นดูแลจะทำงานสั้น ๆ ให้คุณ`,
+        "คุณจะพบหุ่นตัวเดิมสองครั้ง: ครั้งหนึ่งเป็นหุ่นแบบปกติที่ยังไม่ได้อ่านพาสปอร์ต อีกครั้งหลังจากที่อ่านแล้ว ระบบเลือกลำดับให้และสลับกันในแต่ละจุด เพื่อให้การเปรียบเทียบยุติธรรม",
+        "หลังพบแต่ละครั้ง ให้คะแนนความสบายใจ 1 (ไม่สบายใจมาก) ถึง 5 (สบายใจมาก) ไม่มีคำตอบที่ถูกหรือผิด",
+        "คะแนนจะถูกบันทึกเมื่อคุณกดบันทึก หากออกไปหรือโหลดหน้าใหม่ คุณทำต่อจากจุดเดิมได้ในแท็บนี้"
+      ],
+      sim: "หุ่นยนต์เป็นการจำลอง 3 มิติในเบราว์เซอร์ ระยะทางเป็นหน่วยในฉาก ไม่ใช่เมตร",
+      begin: "เริ่มเส้นทาง"
+    },
+    resumed: (done: number, total: number) => `ยินดีต้อนรับกลับ คุณให้คะแนนไปแล้ว ${done} จาก ${total} ครั้ง ทำต่อจากจุดเดิมได้เลย`,
+    robotNotInJourney: "หุ่นที่คุณเลือกไม่ได้อยู่ในจุดของเส้นทางนี้ จึงเริ่มที่จุดที่ 1"
   }
 };
 
@@ -189,16 +221,43 @@ const stationCopy: Record<"en" | "th", Record<StationTask, StationCopy>> = {
   }
 };
 
+type StoredJourney = { journeyId: string; ratings: Record<number, StationRatings>; current: number };
+
+// Reads this tab's saved journey, keeping only well-formed values for stations that exist.
+function readJourney(key: string, stationCount: number): StoredJourney | null {
+  try {
+    const raw = JSON.parse(window.sessionStorage.getItem(key) ?? "null") as Record<string, unknown> | null;
+    if (!raw || raw.v !== 1 || raw.started !== true || typeof raw.journeyId !== "string" || !/^[0-9a-f]{12}$/.test(raw.journeyId)) return null;
+    const ratings: Record<number, StationRatings> = {};
+    const isRating = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5;
+    for (const [index, value] of Object.entries((raw.ratings ?? {}) as Record<string, Record<string, unknown>>)) {
+      const i = Number(index);
+      if (!Number.isInteger(i) || i < 0 || i >= stationCount || !value) continue;
+      const kept: StationRatings = {};
+      if (isRating(value.passport)) kept.passport = value.passport;
+      if (isRating(value.default)) kept.default = value.default;
+      if (Object.keys(kept).length) ratings[i] = kept;
+    }
+    const current = Number.isInteger(raw.current) && (raw.current as number) >= 0 && (raw.current as number) < stationCount ? (raw.current as number) : 0;
+    return { journeyId: raw.journeyId, ratings, current };
+  } catch {
+    return null;
+  }
+}
+
 export default function MeetClient({
   lang,
   passport,
   stations,
-  startIndex
+  startIndex,
+  robotNotInJourney = false
 }: {
   lang: "en" | "th";
   passport: Passport;
   stations: Station[];
   startIndex: number;
+  // A ?robot= link named a robot that is not one of the stations: say so instead of starting silently.
+  robotNotInJourney?: boolean;
 }) {
   const t = ui[lang];
   const voiceLang = (passport.language === "th" ? "th" : "en") as "th" | "en";
@@ -241,7 +300,33 @@ export default function MeetClient({
   const [ratings, setRatings] = useState<Record<number, StationRatings>>({});
   // Random per journey run; set after mount so server and client render the same first frame.
   const [journeyId, setJourneyId] = useState("");
-  useEffect(() => { setJourneyId(newJourneyId()); }, []);
+  const [started, setStarted] = useState(false);
+  const [resumed, setResumed] = useState<number | null>(null);
+  const ratingsRef = useRef(ratings);
+  ratingsRef.current = ratings;
+  // Resume: a reload or a visit to another page must not start a new journey id, because the id fixes the
+  // counterbalanced order. Only ratings the server confirmed are kept, in this tab only (sessionStorage).
+  const storeKey = `hri-journey:${passport.code}`;
+  useEffect(() => {
+    const saved = readJourney(storeKey, stations.length);
+    if (saved) {
+      setJourneyId(saved.journeyId);
+      setRatings(saved.ratings);
+      setCurrent(saved.current);
+      setStarted(true);
+      setResumed(Object.values(saved.ratings).reduce((n, r) => n + Object.keys(r).length, 0));
+    } else {
+      setJourneyId(newJourneyId());
+    }
+  }, [storeKey, stations.length]);
+  useEffect(() => {
+    if (!journeyId) return;
+    try {
+      window.sessionStorage.setItem(storeKey, JSON.stringify({ v: 1, journeyId, ratings, current, started }));
+    } catch {
+      // Storage blocked (private mode): the journey still works, it just cannot resume after a reload.
+    }
+  }, [storeKey, journeyId, ratings, current, started]);
   const next = nextCondition(journeyId, current, ratings[current]);
   const stationDone = stationComplete(ratings[current]);
   const [running, setRunning] = useState(false);
@@ -263,7 +348,8 @@ export default function MeetClient({
     setComfort(null);
     setRunning(false);
     setReady(false);
-    setMode(conditionOrder(journeyId, current)[0]);
+    // After a resume the first condition here may already be rated: show the one that is actually next.
+    setMode(nextCondition(journeyId, current, ratingsRef.current[current])?.mode ?? conditionOrder(journeyId, current)[0]);
     adjustments.current = { tooClose: 0, tooFar: 0 };
     setBubble(t.ready);
     window.speechSynthesis?.cancel();
@@ -486,7 +572,7 @@ export default function MeetClient({
         <div>
           <p className="mt-eyebrow">{t.eyebrow} · {passport.code}</p>
           <h1>{done ? t.doneTitle : t.journey}</h1>
-          <p className="muted">{t.stationOf(current + 1, stations.length)} · {copy.title}</p>
+          <p className="muted" aria-live="polite">{t.stationOf(current + 1, stations.length)}{!done && next ? ` · ${t.round(next.position)}` : ""} · {copy.title}</p>
         </div>
         <ol className="mt-steps" aria-label={t.journey}>
           {stations.map((s, i) => {
@@ -503,10 +589,27 @@ export default function MeetClient({
         </ol>
       </header>
 
-      {done ? (
+      {robotNotInJourney && !started && <p className="mt-notice" role="note">{t.robotNotInJourney}</p>}
+      {resumed !== null && resumed > 0 && !done && <p className="mt-notice is-ok" role="status" data-testid="journey-resumed">{t.resumed(resumed, stations.length * 2)}</p>}
+
+      {!started && !done ? (
+        <section className="mt-panel mt-intro" aria-labelledby="journey-intro" data-testid="journey-intro">
+          <h2 id="journey-intro">{t.intro.title}</h2>
+          <ol className="mt-intro-list">
+            {t.intro.points(stations.length).map((point) => <li key={point}>{point}</li>)}
+          </ol>
+          <p className="muted">{t.intro.sim}</p>
+          <div className="mt-row">
+            <button className="mt-btn primary" disabled={!journeyId} onClick={() => setStarted(true)}>
+              <Play size={18} aria-hidden="true" /> {t.intro.begin}
+            </button>
+          </div>
+        </section>
+      ) : done ? (
         <section className="mt-panel mt-done">
           <h2>{t.doneTitle}</h2>
           <p className="muted">{t.doneBody}</p>
+          <p><Link className="mt-link" href="/living-lab/research">{t.doneResearch} →</Link></p>
           <dl className="mt-avgs">
             <div className="is-passport"><dt>{t.avgPassport}</dt><dd>{avgPassport === null ? "–" : avgPassport.toFixed(1)}<small>/5</small></dd></div>
             <div className="is-default"><dt>{t.avgDefault}</dt><dd>{avgDefault === null ? "–" : avgDefault.toFixed(1)}<small>/5</small></dd></div>
@@ -526,7 +629,7 @@ export default function MeetClient({
           </table>
           <div className="mt-row">
             <Link className="mt-btn primary" href="/living-lab">{t.back}</Link>
-            <button className="mt-btn" onClick={() => { setRatings({}); setCurrent(0); setJourneyId(newJourneyId()); }}><RotateCcw size={18} aria-hidden="true" /> {t.replay}</button>
+            <button className="mt-btn" onClick={() => { setRatings({}); setCurrent(0); setResumed(null); setJourneyId(newJourneyId()); }}><RotateCcw size={18} aria-hidden="true" /> {t.again}</button>
           </div>
         </section>
       ) : (
