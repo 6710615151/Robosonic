@@ -48,7 +48,7 @@ export function getIdentity(): Identity | null {
   return cached;
 }
 
-// HRI_IDENTITY_REQUIRED=false makes email verification optional (event-day fallback). Default: required.
+// HRI_IDENTITY_REQUIRED=true makes email verification required. Default: optional.
 export function identityRequired(): boolean {
   return identityRequiredFromEnv(process.env.HRI_IDENTITY_REQUIRED);
 }

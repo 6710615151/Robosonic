@@ -106,10 +106,10 @@ export function maskEmail(email: string): string {
   return `${email.slice(0, Math.min(2, at))}•••${email.slice(at)}`;
 }
 
-// Whether a new passport must have a verified owner. On by default; HRI_IDENTITY_REQUIRED=false is the
-// event-day fallback for when EmailJS cannot send (quota or outage). Only the exact string "false" turns it off.
+// Whether a new passport must have a verified owner. Optional by default, so nobody needs an email to
+// try the Living Lab. Only the exact string "true" makes it required.
 export function identityRequiredFromEnv(value: string | undefined): boolean {
-  return value?.trim().toLowerCase() !== "false";
+  return value?.trim().toLowerCase() === "true";
 }
 
 // Who owns a passport about to be created: the verified participant if there is one; nobody if

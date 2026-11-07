@@ -173,6 +173,7 @@ test("without speech support the same flow works by typing", async ({ page }) =>
 });
 
 test("if saving fails, the answers stay on the review screen and can be saved again", async ({ page }) => {
+  test.skip(process.env.HRI_IDENTITY_REQUIRED?.trim().toLowerCase() !== "true", "Makes saving fail by removing a required owner, so it needs HRI_IDENTITY_REQUIRED=true on both sides.");
   // Saving is made to fail by removing the participant after the flow has started: the server then
   // refuses with "identity_required". (Before identity, this test relied on a server with no database.)
   const participant = await signIn(page);

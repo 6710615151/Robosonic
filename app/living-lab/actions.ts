@@ -22,9 +22,9 @@ import { maskEmail, ownerForNewPassport } from "@/lib/hri/identity";
 //
 // Expected refusals are returned, not thrown: Next.js hides thrown messages in production.
 //
-// Identity is required (decision 1, docs/hri-living-lab-identity-design.md): the passport is linked
-// to the participant verified by the Living Lab cookie, or the action refuses with "identity_required".
-// HRI_IDENTITY_REQUIRED=false makes it optional: an unverified visitor's passport then has no owner.
+// Identity is optional (decision 1, docs/hri-living-lab-identity-design.md): the passport is linked to
+// the participant verified by the Living Lab cookie, and an unverified visitor's passport has no owner.
+// HRI_IDENTITY_REQUIRED=true makes it required: the action then refuses with "identity_required".
 export async function createPassportAction(passportRaw: unknown, sessionRaw: unknown, consentRaw: unknown) {
   if (consentRaw !== true) return { ok: false as const, error: "consent_required" as const };
   const parsedPassport = passportSchema.safeParse(passportRaw);

@@ -32,7 +32,7 @@ export const identityCopy: Record<Lang, {
   en: {
     title: "Who is this passport for?",
     why: "Verify your email so that your passport is recorded as yours.",
-    optional: "Optional today: you can start without it. Verify your email if you want this passport saved as yours.",
+    optional: "Optional: you can start without it. Verify your email if you want this passport recorded as yours.",
     emailLabel: "Email",
     emailPlaceholder: "you@example.com",
     send: "Send code",
@@ -71,7 +71,7 @@ export const identityCopy: Record<Lang, {
   th: {
     title: "Passport นี้เป็นของใคร",
     why: "ยืนยันอีเมลเพื่อบันทึกว่า passport นี้เป็นของคุณ",
-    optional: "วันนี้ไม่บังคับ เริ่มได้เลยโดยไม่ต้องยืนยัน ถ้าต้องการให้ passport นี้เป็นของคุณ ให้ยืนยันอีเมล",
+    optional: "ไม่บังคับ เริ่มได้เลยโดยไม่ต้องยืนยัน ถ้าต้องการบันทึกว่า passport นี้เป็นของคุณ ให้ยืนยันอีเมล",
     emailLabel: "อีเมล",
     emailPlaceholder: "you@example.com",
     send: "ส่งรหัส",

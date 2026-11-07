@@ -2,14 +2,14 @@
 // the server has no HRI_IDENTITY_SECRET, so sending reports "unavailable". The verified state, including
 // deleting an email, needs a database and is covered by unit tests in test/hri-identity.test.ts only.
 //
-//   pnpm build && pnpm start &                   # also try with HRI_IDENTITY_REQUIRED=false
+//   pnpm build && pnpm start &                   # also try with HRI_IDENTITY_REQUIRED=true
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm exec playwright test tests-node/hri-identity-card.spec.ts
 import { test, expect } from "@playwright/test";
 
 test.skip(Boolean(process.env.NEON_BRANCH), "Needs a server with no database and no identity secret.");
 test.use({ viewport: { width: 1440, height: 1100 } });
 
-const required = process.env.HRI_IDENTITY_REQUIRED?.trim().toLowerCase() !== "false";
+const required = process.env.HRI_IDENTITY_REQUIRED?.trim().toLowerCase() === "true";
 const LINKED = /linked to my verified email, which is used only to identify the owner, never for marketing/;
 
 test("no code can be requested before consent", async ({ page }) => {

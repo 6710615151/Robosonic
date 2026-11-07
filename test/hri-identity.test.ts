@@ -274,19 +274,19 @@ test("per-client limits stop code guessing across many emails", async () => {
   assert.equal(!blocked.ok && blocked.error, "rate_limited");
 });
 
-test("HRI_IDENTITY_REQUIRED: on unless set to exactly false (event-day fallback)", () => {
-  assert.equal(identityRequiredFromEnv(undefined), true);
-  assert.equal(identityRequiredFromEnv(""), true);
-  assert.equal(identityRequiredFromEnv("true"), true);
-  assert.equal(identityRequiredFromEnv("0"), true, "only \"false\" turns it off, so a typo keeps the safe default");
+test("HRI_IDENTITY_REQUIRED: optional unless set to exactly true", () => {
+  assert.equal(identityRequiredFromEnv(undefined), false);
+  assert.equal(identityRequiredFromEnv(""), false);
   assert.equal(identityRequiredFromEnv("false"), false);
-  assert.equal(identityRequiredFromEnv(" FALSE "), false);
+  assert.equal(identityRequiredFromEnv("1"), false, "only \"true\" turns it on");
+  assert.equal(identityRequiredFromEnv("true"), true);
+  assert.equal(identityRequiredFromEnv(" TRUE "), true);
 });
 
 test("passport owner: verified participant always linked; without one, refused unless identity is optional", () => {
   const p = { id: "p1", email: "wu@gmail.com" };
   assert.deepEqual(ownerForNewPassport(p, true), { ok: true, participantId: "p1" });
-  assert.deepEqual(ownerForNewPassport(p, false), { ok: true, participantId: "p1" }, "fallback still links verified people");
+  assert.deepEqual(ownerForNewPassport(p, false), { ok: true, participantId: "p1" }, "optional mode still links verified people");
   assert.deepEqual(ownerForNewPassport(null, true), { ok: false, error: "identity_required" });
   assert.deepEqual(ownerForNewPassport(null, false), { ok: true, participantId: null });
 });

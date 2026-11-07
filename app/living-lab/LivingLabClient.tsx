@@ -50,14 +50,14 @@ const REVIEW_SLOWER_SPEED = 0.5;
 // The care questions are asked one at a time when answering by voice or text.
 const CARE_QUESTIONS = ["anxiety", "communication", "reach"] as const;
 
-export default function LivingLabClient({ lang, stats, robots, initialIdentity, identityRequired = true }: {
+export default function LivingLabClient({ lang, stats, robots, initialIdentity, identityRequired = false }: {
   lang: Lang; stats: LabStats | null; robots: LabRobot[]; initialIdentity: ClientIdentity;
-  // False only when HRI_IDENTITY_REQUIRED=false (event-day fallback): verifying is then optional.
+  // True only when HRI_IDENTITY_REQUIRED=true: the robot then waits for a verified email.
   identityRequired?: boolean;
 }) {
   const t = copy[lang];
   const idT = identityCopy[lang];
-  // Verified Living Lab participant (masked email). Required before the robot starts (decision 1).
+  // Verified Living Lab participant (masked email). Optional unless required by configuration (decision 1).
   const [identity, setIdentity] = useState<ClientIdentity>(initialIdentity);
   const identityOk = Boolean(identity) || !identityRequired;
   const robotRef = useRef<RobotBehavior | null>(null);

@@ -11,13 +11,13 @@ import type { Lang } from "./copy";
 
 type ErrorKey = keyof (typeof identityCopy)["en"]["errors"];
 
-export default function IdentityCard({ lang, identity, onChange, locked, required = true, consent }: {
+export default function IdentityCard({ lang, identity, onChange, locked, required = false, consent }: {
   lang: Lang;
   identity: ClientIdentity;
   onChange: (identity: ClientIdentity) => void;
   // True while a calibration is running: switching person mid-session would save to the wrong owner.
   locked: boolean;
-  // False under the HRI_IDENTITY_REQUIRED=false fallback: verifying is offered but not needed to start.
+  // True only with HRI_IDENTITY_REQUIRED=true. Otherwise verifying is offered but not needed to start.
   required?: boolean;
   // The consent box in the panel above. No email is sent or stored until it is ticked.
   consent: boolean;
