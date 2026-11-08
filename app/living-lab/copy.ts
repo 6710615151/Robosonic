@@ -238,6 +238,7 @@ export const copy = {
       scan: "Scan passport",
       scanFailed: "I could not read that passport. It may have been deleted or replaced. Please try another one.",
       agreeStart: "I agree, start talking",
+      leave: "Leave",
       allow: "Allow",
       callDenied: "The camera and microphone are off. Press Allow below, or allow them in your browser’s address bar.",
       showQr: "Hold up a passport QR and I will read it"
@@ -594,6 +595,7 @@ export const copy = {
       scan: "สแกน Passport",
       scanFailed: "ผมอ่านพาสปอร์ตใบนี้ไม่ได้ครับ อาจถูกลบหรือเปลี่ยนไปแล้ว ลองใบอื่นนะครับ",
       agreeStart: "ยินยอมและเริ่มคุย",
+      leave: "ออก",
       allow: "อนุญาต",
       callDenied: "กล้องและไมค์ยังปิดอยู่ กด อนุญาต ด้านล่าง หรืออนุญาตที่แถบที่อยู่ของเบราว์เซอร์",
       showQr: "ยก QR พาสปอร์ตให้ดู แล้วผมจะอ่านเอง"

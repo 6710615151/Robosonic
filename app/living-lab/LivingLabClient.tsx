@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, Play, ScanFace, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, PhoneOff, Play, ScanFace, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
 import { adapt } from "@/lib/hri/adapt";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
 import { buildSpokenSummary } from "@/lib/hri/spoken-summary";
 import { useQrWatch } from "./components/qr-watch";
 import RobotStage from "@/app/components/robot/RobotStage";
+import ThaiConstellation from "@/app/components/brand/ThaiConstellation";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
 import { describeDistance, type PassportInput } from "@/lib/hri/passport";
@@ -1163,6 +1164,15 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     <main className={call ? "ll ll-call" : "ll"} data-testid={call ? "call" : undefined}>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
 
+      {/* The HumanoidTH stage, as on the site's overview: emerald, a gold Thai lattice, Thailand drawn as
+          a network of towns, a halo and a plinth for the robot. Decoration only. */}
+      {call && (
+        <div className="ll-call-deco" aria-hidden="true">
+          <ThaiConstellation className="ll-call-constellation" />
+          <span className="ll-call-halo" />
+          <span className="ll-call-plinth" />
+        </div>
+      )}
       {call && (
         <div className="ll-call-top">
           <span className="ll-call-name">Atlas</span>
@@ -1662,6 +1672,10 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
               <UserPlus size={20} aria-hidden="true" /> {t.talk.create}
             </button>
           )}
+          {/* Leave, like hanging up: back to the site. Leaving stops the camera and microphone. */}
+          <Link className="ll-callbar-btn is-leave" href="/" aria-label={t.talk.leave} title={t.talk.leave} data-testid="call-leave">
+            <PhoneOff size={20} aria-hidden="true" /> <span className="ll-callbar-label">{t.talk.leave}</span>
+          </Link>
         </div>
       )}
     </main>

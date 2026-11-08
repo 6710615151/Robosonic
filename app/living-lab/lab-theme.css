@@ -681,39 +681,52 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
    small tile, and the controls are a bar at the bottom. Everything else stays out of the way. */
 .lab.ll-portal { padding: 0; min-height: 0; margin: 0; }
 .ll-call-pending { min-height: 100vh; background: #0d1626; }
-.lab .ll-call { position: fixed; inset: 0; z-index: 1200; overflow: hidden; background: #0d1626; color: #e6e9ee; }
+.lab .ll-call { position: fixed; inset: 0; z-index: 1200; overflow: hidden; color: #e9f3ee; isolation: isolate;
+  background:
+    radial-gradient(80% 70% at 50% 42%, rgba(22, 168, 120, 0.34) 0%, rgba(22, 168, 120, 0) 60%),
+    radial-gradient(70% 60% at 0% 100%, rgba(198, 164, 91, 0.16) 0%, transparent 60%),
+    var(--lai-dark) 0 0 / 56px 56px,
+    linear-gradient(150deg, var(--th-emerald) 0%, var(--th-forest) 65%); }
+/* Gold frame line, as on the overview hero. */
+.lab .ll-call::before { content: ""; position: absolute; inset: 12px; z-index: 0; border: 1px solid rgba(198, 164, 91, 0.28); border-radius: 18px; pointer-events: none; }
+.ll-call-deco { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.ll-call-constellation { position: absolute; right: 4%; top: 50%; height: 72%; width: auto; transform: translateY(-50%); opacity: 0.7; }
+.ll-call-halo { position: absolute; left: 50%; top: 50%; width: min(620px, 80vw); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(185, 244, 90, 0.16) 0%, rgba(22, 168, 120, 0.1) 36%, transparent 68%); }
+.ll-call-plinth { position: absolute; left: 50%; bottom: 8%; width: min(380px, 70vw); height: 70px; transform: translateX(-50%); border-radius: 50%; border: 1px solid rgba(185, 244, 90, 0.35); box-shadow: 0 0 0 14px rgba(185, 244, 90, 0.04), 0 0 0 30px rgba(185, 244, 90, 0.025); }
 .lab .ll-call .lab-section, .lab .ll-call .ll-grid { display: block; height: 100%; margin: 0; padding: 0; }
-.lab .ll-call .ll-stage-card { position: absolute !important; inset: 0 !important; top: 0 !important; height: auto !important; border: 0; border-radius: 0; box-shadow: none;
-  background: radial-gradient(70% 60% at 50% 38%, #23364f 0%, #15233a 55%, #0d1626 100%); }
+.lab .ll-call .lab-section { position: relative; z-index: 1; }
+.lab .ll-call .ll-stage-card { position: absolute !important; inset: 0 !important; top: 0 !important; height: auto !important; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .lab .ll-call .ll-stage { inset: 0; }
-.lab .ll-call .ll-stage::after { content: ""; position: absolute; left: 30%; right: 30%; bottom: 12%; height: 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(181, 201, 154, .22), transparent); pointer-events: none; }
 /* Captions, as in a call. */
 .lab .ll-call .ll-bubble { top: auto; bottom: 108px; left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: min(780px, calc(100% - 32px)); min-height: 0; padding: 10px 18px; border: 0; border-radius: 12px; background: rgba(8, 12, 20, .72); color: #fff; font-size: clamp(16px, 1.8vw, 20px); line-height: 1.5; text-align: center; box-shadow: none; }
 .lab .ll-call .ll-bubble:empty { display: none; }
 .lab .ll-call .ll-chip { display: none; }
 /* Your own tile (the call's camera). The pose camera's video keeps running, out of sight. */
 .lab .ll-call .ll-cam { display: block !important; position: absolute; width: 2px; height: 2px; right: 0; bottom: 0; opacity: 0; pointer-events: none; overflow: hidden; border: 0; }
-.ll-self { position: absolute; z-index: 4; right: 20px; bottom: 100px; width: clamp(140px, 18vw, 260px); aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; border-radius: 14px; border: 1px solid rgba(237, 233, 223, .2); background: #1b2a40; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.ll-self { position: absolute; z-index: 4; right: 20px; bottom: 100px; width: clamp(140px, 18vw, 260px); aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; border-radius: 14px; border: 1px solid rgba(198, 164, 91, 0.35); background: #0f2e25; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
 .ll-self video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .ll-self:not(.is-on) video { opacity: 0; }
-.ll-self b { position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: #2c3e57; color: #e6e9ee; font-size: 14px; }
+.ll-self b { position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: #164a3a; color: #e6e9ee; font-size: 14px; }
 .ll-self-hint { position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 6px; background: rgba(8, 12, 20, .7); color: #fff; font-size: 11px; line-height: 1.35; text-align: center; }
 .ll-call-alert { position: absolute; z-index: 6; top: 64px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); margin: 0; padding: 10px 16px; border-radius: 12px; background: #7a2419; color: #fff; font-size: 14px; line-height: 1.5; text-align: center; }
 .ll-consent-text { margin: 0 !important; padding: 12px; border-radius: 10px; background: var(--lab-tint); border: 1px solid var(--lab-tint-border); font-size: 13px; line-height: 1.55; }
 /* Top-left: who you are talking to, and that it is a simulation. */
 .ll-call-top { position: absolute; top: 18px; left: 20px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .ll-call-name { font: 600 18px/1.2 var(--ll-font-display); color: #fff; }
-.ll-call-sim { padding: 3px 10px; border-radius: 999px; border: 1px dashed rgba(237, 233, 223, .4); font-size: 12px; color: #c4cbd4; }
+.ll-call-top { top: 26px !important; left: 30px !important; }
+.ll-call-sim { padding: 3px 10px; border-radius: 999px; border: 1px dashed rgba(198, 164, 91, .55); font-size: 12px; color: #e3d3a6; }
 .lab .ll-call-about { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; color: #c4cbd4 !important; text-decoration: none; }
 .lab .ll-call-about:hover { background: rgba(237, 233, 223, .1); }
 /* Controls. */
-.ll-callbar { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 6; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 999px; background: rgba(8, 12, 20, .6); backdrop-filter: blur(10px); }
+.ll-callbar { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 6; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 999px; background: rgba(4, 22, 17, .62); border: 1px solid rgba(198, 164, 91, 0.22); backdrop-filter: blur(10px); }
 .ll-callbar-ind { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #c0392b; color: #fff; }
-.ll-callbar-ind.is-on { background: #2c3e57; }
-.lab .ll-callbar-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: #2c3e57; color: #fff; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap; }
-.lab .ll-callbar-btn:hover { background: #3a4f6c; }
+.ll-callbar-ind.is-on { background: rgba(233, 243, 238, 0.14); }
+.lab .ll-callbar-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: rgba(233, 243, 238, 0.14); color: #fff; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.lab .ll-callbar-btn:hover { background: rgba(233, 243, 238, 0.22); }
 .lab .ll-callbar-btn.is-primary { padding: 0 24px; background: var(--ll-green); color: var(--ll-navy); }
 .lab .ll-callbar-btn.is-primary:hover { background: #c6d8ac; }
+.lab .ll-callbar-btn.is-leave { background: #c0392b; color: #fff !important; text-decoration: none; }
+.lab .ll-callbar-btn.is-leave:hover { background: #d9483a; }
 .ll-call :focus-visible { outline: 3px solid var(--ll-green) !important; outline-offset: 2px; }
 /* The panel: hidden, a sheet (create / passport), or a small "on air" pill while talking. */
 .lab .ll-call .ll-side { position: absolute; z-index: 5; right: 20px; top: 64px; bottom: 100px; width: min(460px, calc(100% - 40px)); overflow: auto; color: var(--text-primary); }
