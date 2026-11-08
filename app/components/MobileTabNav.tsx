@@ -19,7 +19,7 @@ export default function MobileTabNav({ currentLang = "en" }: MobileTabNavProps) 
   const pathname = usePathname() || "/";
   const t = getTranslation(currentLang);
   const tabs = [
-    { href: "/overview", label: t.overview, icon: Home },
+    { href: "/", label: t.overview, icon: Home },
     { href: "/dashboard", label: t.dashboard, icon: LayoutDashboard },
     { href: "/network", label: t.network, icon: Network },
     { href: "/robots", label: t.robots, icon: Bot },

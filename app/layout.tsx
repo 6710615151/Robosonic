@@ -65,11 +65,11 @@ export const metadata: Metadata = {
   creator: siteName,
   publisher: siteName,
   alternates: {
-    canonical: "/living-lab"
+    canonical: "/"
   },
   openGraph: {
     type: "website",
-    url: "/living-lab",
+    url: "/",
     siteName,
     title: siteName,
     description: defaultSeoDescription,

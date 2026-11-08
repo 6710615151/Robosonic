@@ -1920,7 +1920,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             </button>
           )}
           {/* Leave, like hanging up: back to the site. Leaving stops the camera and microphone. */}
-          <Link className="ll-callbar-btn is-leave" href="/overview" aria-label={t.talk.leave} title={t.talk.leave} data-testid="call-leave">
+          <Link className="ll-callbar-btn is-leave" href="/" aria-label={t.talk.leave} title={t.talk.leave} data-testid="call-leave">
             <PhoneOff size={20} aria-hidden="true" /> <span className="ll-callbar-label">{t.talk.leave}</span>
           </Link>
         </div>

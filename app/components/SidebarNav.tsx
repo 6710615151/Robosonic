@@ -30,7 +30,7 @@ export default function SidebarNav({ currentLang = "en" }: SidebarNavProps) {
   const t = getTranslation(currentLang);
 
   const navItems = [
-    { href: "/overview", label: t.overview, icon: Home },
+    { href: "/", label: t.overview, icon: Home },
     { href: "/living-lab", label: t.livingLab, icon: HeartHandshake },
     { href: "/dashboard", label: t.dashboard, icon: LayoutDashboard },
     { href: "/data-pulls", label: t.dataPulls, icon: Inbox },

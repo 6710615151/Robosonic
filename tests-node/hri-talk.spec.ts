@@ -38,7 +38,7 @@ test("arriving opens the camera and microphone, with no button to press", async 
   await expect(page.getByTestId("call-scan")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Living Lab" })).toHaveCount(0);
   // Leave, like hanging up: back to the research overview.
-  await expect(page.getByTestId("call-leave")).toHaveAttribute("href", "/overview");
+  await expect(page.getByTestId("call-leave")).toHaveAttribute("href", "/");
 });
 
 test("one tap agrees and starts talking; nothing measured is shown", async ({ page }) => {

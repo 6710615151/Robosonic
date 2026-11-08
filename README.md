@@ -126,8 +126,8 @@ curl -X POST http://localhost:3000/api/ingest/github \
 ## 🌐 Product Routes Map
 
 Explore the main app modules:
-- `🟢 /` — 🤝 The HRI Living Lab is the front door: a Gemini chat with Atlas that makes your Care Passport, then switches to follow-up questions.
-- `🟢 /overview` — 📊 Interactive overview of the corpus, statistics, and active tasks.
+- `🟢 /` — 📊 Interactive overview of the corpus, statistics, and active tasks.
+- `🟢 /living-lab` — 🤝 The HRI Living Lab: a Gemini chat with Atlas that makes your Care Passport, then switches to follow-up questions.
 - `🟡 /robots` — 🤖 Registry of robot models deployed, researched, or observed in Thailand.
 - `🟢 /perspectives` — 📣 Media coverage database, platform sentiment, and safety metrics.
 - `🟡 /contributions` — 📂 Directory of open-source repositories, makers, and papers.
@@ -354,7 +354,7 @@ Below is a breakdown of the key files and folders in the project to help navigat
 │   │   └── RobotViewer.tsx       # Interactive 3D robot model renderer (Three.js)
 │   ├── loading.tsx           # Page routing transition loader
 │   ├── globals.css           # Global custom stylesheet
-│   └── page.tsx              # "/" redirects to the HRI Living Lab (the front door)
+│   └── page.tsx              # Home / Overview dashboard page (`/overview` redirects here)
 ├── components/               # App-wide UI design system components
 │   └── loading-ui/           # Reusable inline spinner components (Ring, DotsRing)
 ├── data/                     # Data feeds, pipeline configurations, and seed templates
