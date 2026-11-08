@@ -1,6 +1,6 @@
 // The HRI Passport drawn as an identity card. Presentational only: callers pass already-translated text.
 // Used by the calibration "done" screen (LivingLabClient) and the passport card page (PassportCardClient).
-import { Eye, Gauge, Languages, MessageCircle, MoveHorizontal, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Eye, Gauge, Languages, MessageCircle, MoveHorizontal, type LucideIcon } from "lucide-react";
 import styles from "./passport-card.module.css";
 
 export type PassportVisualPref = {
@@ -61,7 +61,11 @@ export default function PassportCardVisual({
     <figure className={`${styles.card} ${issued ? styles.issued : ""}`} aria-label={`${heading} ${code}`} style={{ margin: 0 }}>
       <div className={styles.head}>
         <div className={styles.brand}>
-          <span className={styles.emblem} aria-hidden="true"><ShieldCheck size={18} /></span>
+          {/* The official HumanoidTH logo (public/logo.png), cropped to its drawn area by CSS. */}
+          <span className={styles.logo}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Thailand Humanoid Atlas" width={1448} height={1086} decoding="async" />
+          </span>
           <div>
             <p className={styles.heading}>{heading}</p>
             <p className={styles.motto}>{motto}</p>

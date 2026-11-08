@@ -62,12 +62,24 @@ export async function renderPassportPng(d: PassportImageData): Promise<Blob> {
   for (let y = 0; y < H; y += 48) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
   ctx.restore();
 
+  // The official HumanoidTH logo, top right (its drawn area in public/logo.png: x 79, y 257, 1306 × 537).
+  const LOGO_W = 270;
+  const LOGO_H = Math.round((LOGO_W * 537) / 1306);
+  try {
+    const logo = new Image();
+    logo.src = "/logo.png";
+    await logo.decode();
+    ctx.drawImage(logo, 79, 257, 1306, 537, W - 64 - LOGO_W, 52, LOGO_W, LOGO_H);
+  } catch {
+    // No logo (offline or blocked): the passport still works without it.
+  }
+
   // Header
   ctx.fillStyle = "#b5c99a";
   ctx.font = `700 30px ${family}`;
   ctx.fillText(d.heading, 64, 92);
   ctx.fillStyle = "#c4cbd4";
-  fit(ctx, d.motto, W - 128, "500", 24, family);
+  fit(ctx, d.motto, W - 128 - LOGO_W - 32, "500", 24, family);
   ctx.fillText(d.motto, 64, 132);
 
   // QR on a white tile

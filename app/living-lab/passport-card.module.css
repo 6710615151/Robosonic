@@ -59,6 +59,10 @@
   border: 1px solid var(--pc-gold-line);
   background: rgba(217, 180, 90, 0.08);
 }
+/* The logo's drawn area in public/logo.png is x 79, y 257, 1306 × 537 of a 1448 × 1086 canvas: show only that. */
+.logo { --w: 104px; flex: none; position: relative; display: block; width: var(--w); height: calc(var(--w) * 537 / 1306); overflow: hidden; padding-right: 11px; border-right: 1px solid var(--pc-gold-line); box-sizing: content-box; }
+.logo img { position: absolute; left: calc(var(--w) * -79 / 1306); top: calc(var(--w) * -257 / 1306); width: calc(var(--w) * 1448 / 1306); height: auto; max-width: none; }
+@media (max-width: 480px) { .logo { --w: 80px; } }
 .heading { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: var(--pc-gold); }
 .motto { margin: 2px 0 0; font-size: 12.5px; line-height: 1.35; color: var(--pc-muted); }
 
