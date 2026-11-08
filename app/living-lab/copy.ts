@@ -236,7 +236,11 @@ export const copy = {
       camOffNow: "Camera off",
       create: "Create passport",
       scan: "Scan passport",
-      scanFailed: "I could not read that passport. It may have been deleted or replaced. Please try another one."
+      scanFailed: "I could not read that passport. It may have been deleted or replaced. Please try another one.",
+      agreeStart: "I agree, start talking",
+      allow: "Allow",
+      callDenied: "The camera and microphone are off. Press Allow below, or allow them in your browser’s address bar.",
+      showQr: "Hold up a passport QR and I will read it"
     },
     autoStart: "Auto: just stand in front of the camera",
     autoHint: "One tap and you're done. The robot watches for your wai, how you react as it comes closer, and where you look. The camera runs on this device only. Feelings are never guessed from your face.",
@@ -588,7 +592,11 @@ export const copy = {
       camOffNow: "กล้องปิดอยู่",
       create: "สร้าง Passport",
       scan: "สแกน Passport",
-      scanFailed: "ผมอ่านพาสปอร์ตใบนี้ไม่ได้ครับ อาจถูกลบหรือเปลี่ยนไปแล้ว ลองใบอื่นนะครับ"
+      scanFailed: "ผมอ่านพาสปอร์ตใบนี้ไม่ได้ครับ อาจถูกลบหรือเปลี่ยนไปแล้ว ลองใบอื่นนะครับ",
+      agreeStart: "ยินยอมและเริ่มคุย",
+      allow: "อนุญาต",
+      callDenied: "กล้องและไมค์ยังปิดอยู่ กด อนุญาต ด้านล่าง หรืออนุญาตที่แถบที่อยู่ของเบราว์เซอร์",
+      showQr: "ยก QR พาสปอร์ตให้ดู แล้วผมจะอ่านเอง"
     },
     autoStart: "อัตโนมัติ: แค่ยืนหน้ากล้อง",
     autoHint: "กดครั้งเดียวจบ หุ่นจะสังเกตการไหว้ ปฏิกิริยาของคุณเมื่อหุ่นเข้าใกล้ และทิศที่คุณมอง กล้องประมวลผลในเครื่องนี้เท่านั้น และระบบไม่เดาความรู้สึกจากใบหน้า",

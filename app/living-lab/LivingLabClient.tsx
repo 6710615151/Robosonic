@@ -4,13 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Info, Mic, MicOff, Pause, Play, ScanFace, ScanLine, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, Play, ScanFace, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
 import { adapt } from "@/lib/hri/adapt";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
 import { buildSpokenSummary } from "@/lib/hri/spoken-summary";
-import PassportScanner from "./components/PassportScanner";
+import { useQrWatch } from "./components/qr-watch";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
@@ -70,14 +69,6 @@ function stageOf(phase: Phase): number {
   return 1;
 }
 
-// Old links pointed at sections of the single long page; the call page forwards them.
-const LEGACY_HASHES: Record<string, string> = {
-  "#calibrate": "/living-lab/create",
-  "#research": "/living-lab/research",
-  "#robots": "/living-lab/robot",
-  "#journey": "/living-lab/meet"
-};
-
 export default function LivingLabClient({ lang, initialIdentity, identityRequired = false, layout = "page", openSheet = false, startManual = false }: {
   lang: Lang; initialIdentity: ClientIdentity;
   // True only when HRI_IDENTITY_REQUIRED=true: the robot then waits for a verified email.
@@ -89,7 +80,6 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   startManual?: boolean;
 }) {
   const call = layout === "call";
-  const router = useRouter();
   // The call room is drawn over the whole viewport, outside the site's animated page wrapper (whose
   // transform would otherwise trap position: fixed). It mounts after hydration; the page cannot scroll.
   const [portal, setPortal] = useState<HTMLElement | null>(null);
@@ -100,6 +90,32 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previous; };
   }, [call]);
+
+  // Call room: camera and microphone open as soon as the room does, like joining a call. The camera feeds
+  // your own tile and the passport QR watcher; nothing is analysed or saved until you agree to talk.
+  const selfRef = useRef<HTMLVideoElement>(null);
+  const selfStream = useRef<MediaStream | null>(null);
+  const [media, setMedia] = useState<"asking" | "on" | "denied">("asking");
+  const openMedia = useCallback(async () => {
+    setMedia("asking");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      selfStream.current?.getTracks().forEach((track) => track.stop());
+      selfStream.current = stream;
+      if (selfRef.current) selfRef.current.srcObject = stream;
+      setMedia("on");
+    } catch {
+      setMedia("denied");
+    }
+  }, []);
+  useEffect(() => {
+    if (!call || !portal) return;
+    void openMedia();
+    return () => { selfStream.current?.getTracks().forEach((track) => track.stop()); selfStream.current = null; };
+  }, [call, portal, openMedia]);
+  useEffect(() => {
+    if (media === "on" && selfRef.current && selfStream.current && selfRef.current.srcObject !== selfStream.current) selfRef.current.srcObject = selfStream.current;
+  });
   const t = copy[lang];
   const idT = identityCopy[lang];
   // Verified Living Lab participant (masked email). Optional unless required by configuration (decision 1).
@@ -162,7 +178,6 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   const [manual, setManual] = useState(startManual);
   // Call layout: the create sheet, the passport scanner, and the passport the robot last read.
   const [sheet, setSheet] = useState(openSheet);
-  const [scanning, setScanning] = useState(false);
   const [askingPermission, setAskingPermission] = useState(false);
   const talkState = useRef({ asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false });
   const talkResult = useRef<{ result: AutoResult; evidence: AutoEvidence } | null>(null);
@@ -243,16 +258,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     }
   }, [layout, lang]);
 
-  // Call page: forward old #section links, as the overview used to.
-  useEffect(() => {
-    if (!call) return;
-    const target = LEGACY_HASHES[window.location.hash];
-    if (target) router.replace(target);
-  }, [call, router]);
-
   // Call page: a passport shown to the robot. It reads the public profile, adapts, and says what it will do.
   async function readScanned(token: string) {
-    setScanning(false);
     const robot = robotRef.current;
     try {
       const response = await fetch(`/api/hri/passport/${encodeURIComponent(token)}`, { cache: "no-store", headers: { accept: "application/json" } });
@@ -662,9 +669,9 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   }
 
   // ---------------- Auto mode: one tap, then the camera does the rest ----------------
-  async function startAuto() {
+  async function startAuto(agreed = false) {
     const robot = robotRef.current;
-    if (!robot || !consent || !identityOk) return;
+    if (!robot || !(consent || agreed) || !identityOk) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
     setLog([]); setStep(0); setSpeed(1); setComfort(null);
@@ -707,8 +714,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   }
 
   // ---------------- Conversation mode ----------------
-  async function startTalk() {
-    if (!robotRef.current || !consent || !identityOk) return;
+  async function startTalk(agreed = false) {
+    if (!robotRef.current || !(consent || agreed) || !identityOk) return;
     setAutoNotice(null);
     // One browser prompt for both, while the explanation is on screen. Both are required for this experiment.
     // The stream is closed at once: the pose camera and speech recognition open their own when needed.
@@ -727,7 +734,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     talkAnalyzer.current = new TalkAnalyzer();
     talkAi.current = null; talkHistory.current = []; talkUpdates.current = {};
     talkRef.current = true; setTalk(true);
-    await startAuto();
+    await startAuto(agreed);
     if (!autoRef.current) {
       // The camera could not start (denied or missing): this experiment needs it.
       talkRef.current = false; setTalk(false);
@@ -1147,17 +1154,19 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     source === "camera" ? t.interview.sourceCamera : source === "voice" ? t.interview.sourceVoice : t.interview.sourceDefault;
   const Src = ({ of }: { of: Source }) => <em className={`ll-src ll-src-${of}`}>{sourceLabel(of)}</em>;
 
+  // Show a passport to the camera at any time outside the conversation: the robot reads it by itself.
+  // (Called before the early return below, as every hook must be.)
+  useQrWatch(selfRef, call && media === "on" && !talk && (phase === "intro" || phase === "done"), (token) => void readScanned(token));
+
   if (call && !portal) return <main className="ll ll-call-pending" aria-busy="true" />;
   const room = (
     <main className={call ? "ll ll-call" : "ll"} data-testid={call ? "call" : undefined}>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
-      {scanning && <PassportScanner lang={lang} onClose={() => setScanning(false)} onToken={(token) => void readScanned(token)} />}
 
       {call && (
         <div className="ll-call-top">
           <span className="ll-call-name">Atlas</span>
           <span className="ll-call-sim">{t.talk.simulated}</span>
-          <Link className="ll-call-about" href="/living-lab/about"><Info size={15} aria-hidden="true" /> {t.talk.about}</Link>
         </div>
       )}
 
@@ -1174,7 +1183,6 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           <div className={`ll-cam ${cameraState === "on" ? "is-on" : ""}`}>
             <video ref={videoRef} playsInline muted aria-label={t.cameraPreview} />
             {cameraState !== "off" && !talk && !call && <span>{cameraState === "loading" ? t.cameraLoading : cameraInfo}</span>}
-            {call && cameraState !== "on" && <b className="ll-self-off" aria-hidden="true">{t.talk.you}</b>}
           </div>
         </div>
 
@@ -1185,21 +1193,30 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             <div className="ll-step ll-ready ll-talk-intro" data-testid="talk-intro">
               <h2>{t.talk.introTitle}</h2>
               <ul className="ll-talk-points">{t.talk.points.map((point) => <li key={point}>{point}</li>)}</ul>
-              <label className="ll-consent">
-                <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
-                <span>{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</span>
-              </label>
-              {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
+              {call ? (
+                <p className="ll-consent-text">{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</p>
+              ) : (
+                <label className="ll-consent">
+                  <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
+                  <span>{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</span>
+                </label>
+              )}
+              {!consent && !call && <p className="ll-consent-hint">{t.consentHint}</p>}
               {!identityOk ? <p className="ll-consent-hint">{idT.required}</p> : !identity && <p className="ll-note">{t.ready.emailHint}</p>}
               {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
               {askingPermission && <p className="ll-note" role="status" data-testid="talk-permission">{t.talk.asking}</p>}
-              <button className="ll-btn primary big ll-talk-start" onClick={startTalk} disabled={!ready || !consent || !identityOk || cameraState === "loading" || askingPermission} data-testid="talk-start">
-                <Mic size={18} aria-hidden="true" /> {ready ? t.talk.start : t.loadingRobot}
-              </button>
+              {call ? (
+                <button className="ll-btn primary big ll-talk-start" onClick={() => { changeConsent(true); void startTalk(true); }} disabled={!ready || !identityOk || cameraState === "loading" || askingPermission} data-testid="talk-start">
+                  <Mic size={18} aria-hidden="true" /> {ready ? t.talk.agreeStart : t.loadingRobot}
+                </button>
+              ) : (
+                <button className="ll-btn primary big ll-talk-start" onClick={() => void startTalk()} disabled={!ready || !consent || !identityOk || cameraState === "loading" || askingPermission} data-testid="talk-start">
+                  <Mic size={18} aria-hidden="true" /> {ready ? t.talk.start : t.loadingRobot}
+                </button>
+              )}
               {call
-                ? <a className="ll-linkbtn" href="/living-lab/create?manual=1" data-testid="talk-fallback">{t.talk.fallback}</a>
+                ? <button type="button" className="ll-linkbtn" onClick={() => setSheet(false)}>{t.talk.notNow}</button>
                 : <button type="button" className="ll-linkbtn" onClick={() => { setManual(true); setAutoNotice(null); }} data-testid="talk-fallback">{t.talk.fallback}</button>}
-              {call && <button type="button" className="ll-linkbtn" onClick={() => setSheet(false)}>{t.talk.notNow}</button>}
             </div>
           )}
 
@@ -1254,7 +1271,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                       <h4 id="ll-m-auto">{t.ready.methods.auto.title}</h4>
                       <p>{t.ready.methods.auto.body}</p>
                       <p className="ll-needs"><span>{t.ready.needs}:</span> {t.ready.methods.auto.needs}</p>
-                      <button className="ll-btn auto" onClick={startAuto} disabled={!ready || !consent || !identityOk || cameraState === "loading"}>
+                      <button className="ll-btn auto" onClick={() => void startAuto()} disabled={!ready || !consent || !identityOk || cameraState === "loading"}>
                         <ScanFace size={18} aria-hidden="true" /> {t.autoStart}
                       </button>
                       <p className="ll-note">{t.ready.aiNote}</p>
@@ -1556,16 +1573,16 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                   prefs: cardPrefs(), scanNote: lang === "th" ? "ยกรูปนี้ให้หุ่นยนต์สแกน" : "Show this to a robot to scan", mrz: passportMrz(passportCode, lang, 1)
                 }}
               />
-              <p className="ll-q">{t.moreTitle}</p>
+              {!call && <><p className="ll-q">{t.moreTitle}</p>
               <ul className="ll-facts ll-more">
                 <li><span>{t.factGreeting}</span><strong>{t.greetingLabels[greeting]}</strong></li>
                 <li><span>{t.factVoice}</span><strong>{voice ? t.on : t.off}</strong></li>
                 <li><span>{t.factAnxiety}</span><strong>{inputMode === "auto" ? t.factNotAsked : t.anxietyLabels[anxiety]}</strong></li>
                 <li><span>{t.factComm}</span><strong>{accessible ? t.commAccessible : t.commNormal}</strong></li>
                 <li><span>{t.factReach}</span><strong>{noReach ? t.reachAvoid : t.reachOk}</strong></li>
-              </ul>
+              </ul></>}
               {savedOwner && <p className="ll-owner"><BadgeCheck size={16} aria-hidden="true" /> {idT.savedUnder(savedOwner)}</p>}
-              <p className="ll-note">{t.scanHint}</p>
+              {!call && <p className="ll-note">{t.scanHint}</p>}
               <div className="ll-editkey">
                 <p><strong>{t.editKeyTitle}</strong></p>
                 <div className="ll-editkey-row">
@@ -1574,6 +1591,12 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                 </div>
                 <p className="ll-note">{t.editKeyHint}</p>
               </div>
+              {call ? (
+                <div className="ll-row">
+                  <Link className="ll-btn" href={`/living-lab/passport/${accessToken}`}><IdCard size={18} aria-hidden="true" /> {t.cardLink}</Link>
+                  <button className="ll-btn" onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
+                </div>
+              ) : (
               <div className="ll-next" data-testid="passport-next">
                 <h3>{t.nextSteps.title}</h3>
                 <ul>
@@ -1593,6 +1616,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                 </ul>
                 <button className="ll-btn ll-again" onClick={startOver}><Pause size={18} aria-hidden="true" /> {t.again}</button>
               </div>
+              )}
             </div>
           )}
 
@@ -1612,23 +1636,30 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
       </div>
 
       {call && (
+        <div className={`ll-self${media === "on" ? " is-on" : ""}`} data-testid="call-self">
+          <video ref={selfRef} autoPlay playsInline muted aria-label={t.cameraPreview} />
+          {media !== "on" && <b aria-hidden="true">{t.talk.you}</b>}
+          {media === "on" && !talk && (phase === "intro" || phase === "done") && <span className="ll-self-hint">{t.talk.showQr}</span>}
+        </div>
+      )}
+      {call && media === "denied" && <p className="ll-call-alert" role="alert" data-testid="call-denied">{t.talk.callDenied}</p>}
+
+      {call && (
         <div className="ll-callbar" role="toolbar" aria-label={t.talk.controls}>
-          <span className={`ll-callbar-ind${talk ? " is-on" : ""}`} title={talk ? t.talk.micOn : t.talk.micOffNow}>
-            {talk ? <Mic size={20} aria-hidden="true" /> : <MicOff size={20} aria-hidden="true" />}
-            <span className="visually-hidden">{talk ? t.talk.micOn : t.talk.micOffNow}</span>
+          <span className={`ll-callbar-ind${media === "on" ? " is-on" : ""}`} title={media === "on" ? t.talk.micOn : t.talk.micOffNow} data-testid="call-mic">
+            {media === "on" ? <Mic size={20} aria-hidden="true" /> : <MicOff size={20} aria-hidden="true" />}
+            <span className="visually-hidden">{media === "on" ? t.talk.micOn : t.talk.micOffNow}</span>
           </span>
-          <span className={`ll-callbar-ind${cameraState === "on" ? " is-on" : ""}`} title={cameraState === "on" ? t.talk.camOn : t.talk.camOffNow}>
-            {cameraState === "on" ? <Camera size={20} aria-hidden="true" /> : <CameraOff size={20} aria-hidden="true" />}
-            <span className="visually-hidden">{cameraState === "on" ? t.talk.camOn : t.talk.camOffNow}</span>
+          <span className={`ll-callbar-ind${media === "on" ? " is-on" : ""}`} title={media === "on" ? t.talk.camOn : t.talk.camOffNow} data-testid="call-cam">
+            {media === "on" ? <Camera size={20} aria-hidden="true" /> : <CameraOff size={20} aria-hidden="true" />}
+            <span className="visually-hidden">{media === "on" ? t.talk.camOn : t.talk.camOffNow}</span>
           </span>
+          {media === "denied" && (
+            <button type="button" className="ll-callbar-btn" onClick={() => void openMedia()} data-testid="call-allow">{t.talk.allow}</button>
+          )}
           {phase === "intro" && (
             <button type="button" className="ll-callbar-btn is-primary" onClick={() => setSheet(true)} data-testid="call-create">
               <UserPlus size={20} aria-hidden="true" /> {t.talk.create}
-            </button>
-          )}
-          {(phase === "intro" || phase === "done") && (
-            <button type="button" className="ll-callbar-btn" onClick={() => setScanning(true)} data-testid="call-scan">
-              <ScanLine size={20} aria-hidden="true" /> <span className="ll-callbar-label">{t.talk.scan}</span>
             </button>
           )}
         </div>

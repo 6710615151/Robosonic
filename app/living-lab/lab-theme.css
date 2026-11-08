@@ -691,11 +691,15 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
 .lab .ll-call .ll-bubble { top: auto; bottom: 108px; left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: min(780px, calc(100% - 32px)); min-height: 0; padding: 10px 18px; border: 0; border-radius: 12px; background: rgba(8, 12, 20, .72); color: #fff; font-size: clamp(16px, 1.8vw, 20px); line-height: 1.5; text-align: center; box-shadow: none; }
 .lab .ll-call .ll-bubble:empty { display: none; }
 .lab .ll-call .ll-chip { display: none; }
-/* Your own tile. */
-.lab .ll-call .ll-cam { display: grid !important; place-items: center; right: 20px; bottom: 100px; width: clamp(128px, 17vw, 240px); aspect-ratio: 4 / 3; border: 1px solid rgba(237, 233, 223, .2); border-radius: 14px; background: #1b2a40; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
-.lab .ll-call .ll-cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.lab .ll-call .ll-cam:not(.is-on) video { opacity: 0; }
-.ll-self-off { position: relative; z-index: 1; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: #2c3e57; color: #e6e9ee; font-size: 14px; }
+/* Your own tile (the call's camera). The pose camera's video keeps running, out of sight. */
+.lab .ll-call .ll-cam { display: block !important; position: absolute; width: 2px; height: 2px; right: 0; bottom: 0; opacity: 0; pointer-events: none; overflow: hidden; border: 0; }
+.ll-self { position: absolute; z-index: 4; right: 20px; bottom: 100px; width: clamp(140px, 18vw, 260px); aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; border-radius: 14px; border: 1px solid rgba(237, 233, 223, .2); background: #1b2a40; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.ll-self video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.ll-self:not(.is-on) video { opacity: 0; }
+.ll-self b { position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: #2c3e57; color: #e6e9ee; font-size: 14px; }
+.ll-self-hint { position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 6px; background: rgba(8, 12, 20, .7); color: #fff; font-size: 11px; line-height: 1.35; text-align: center; }
+.ll-call-alert { position: absolute; z-index: 6; top: 64px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); margin: 0; padding: 10px 16px; border-radius: 12px; background: #7a2419; color: #fff; font-size: 14px; line-height: 1.5; text-align: center; }
+.ll-consent-text { margin: 0 !important; padding: 12px; border-radius: 10px; background: var(--lab-tint); border: 1px solid var(--lab-tint-border); font-size: 13px; line-height: 1.55; }
 /* Top-left: who you are talking to, and that it is a simulation. */
 .ll-call-top { position: absolute; top: 18px; left: 20px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .ll-call-name { font: 600 18px/1.2 var(--ll-font-display); color: #fff; }
@@ -703,7 +707,7 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
 .lab .ll-call-about { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; color: #c4cbd4 !important; text-decoration: none; }
 .lab .ll-call-about:hover { background: rgba(237, 233, 223, .1); }
 /* Controls. */
-.ll-callbar { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 999px; background: rgba(8, 12, 20, .6); backdrop-filter: blur(10px); }
+.ll-callbar { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 6; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 999px; background: rgba(8, 12, 20, .6); backdrop-filter: blur(10px); }
 .ll-callbar-ind { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #c0392b; color: #fff; }
 .ll-callbar-ind.is-on { background: #2c3e57; }
 .lab .ll-callbar-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: #2c3e57; color: #fff; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap; }
@@ -723,7 +727,8 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
 .lab .ll-call .ll-side.is-pill .ll-btn { min-height: 38px; border-radius: 999px; background: #c0392b; border-color: #c0392b; color: #fff; }
 @media (max-width: 760px) {
   .lab .ll-call .ll-side { left: 10px; right: 10px; top: auto; bottom: 92px; width: auto; max-height: 66vh; }
-  .lab .ll-call .ll-cam { right: 12px; top: 64px; bottom: auto; width: 104px; }
+  .ll-self { right: 12px; top: 64px; bottom: auto; width: 112px; }
+  .ll-self-hint { display: none; }
   .lab .ll-call .ll-bubble { bottom: 96px; }
   .ll-callbar { bottom: 14px; gap: 8px; padding: 8px; }
   .ll-callbar-ind { width: 42px; height: 42px; }

@@ -1,9 +1,9 @@
 // The passport as a picture, and a robot reading it back. Seeds one passport on Neon dev (code starts
 // with "1", which real codes never use) and removes it afterwards.
 //   - the card offers a PNG download and a "scan to save" QR; ?save=1 (the phone) shows the picture first
-//   - the call room is the Living Lab front door, with Create passport and Scan passport
-//   - a robot reads a passport from the camera: the camera is fed a canvas showing the passport QR, so the
-//     real decoder runs on a real image
+//   - the Living Lab is the call room, with Create passport below
+//   - the robot reads a passport held up to the camera, with no button: the camera is fed a canvas showing
+//     the passport QR, so the real decoder runs on a real image
 //
 //   set -a && source ./.env.local && set +a
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test tests-node/hri-passport-image.spec.ts --workers=1
@@ -40,10 +40,14 @@ test.afterAll(async () => {
 
 const skipSplash = (page: Page) => page.addInitScript(() => sessionStorage.setItem("th_atlas_loaded_before", "true"));
 
+// A white image: a camera with no QR in view.
+const BLANK = "data:image/svg+xml;base64," + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="white"/></svg>').toString("base64");
+
 // The browser's camera shows `qrDataUrl` (drawn on a canvas), whatever device the test machine has.
+// Requests that include audio get a silent track added (headless audio capture may never settle).
 async function cameraShows(page: Page, qrDataUrl: string) {
   await page.addInitScript((src) => {
-    navigator.mediaDevices.getUserMedia = async () => {
+    navigator.mediaDevices.getUserMedia = async (constraints?: MediaStreamConstraints) => {
       const canvas = document.createElement("canvas");
       canvas.width = 640; canvas.height = 480;
       const ctx = canvas.getContext("2d")!;
@@ -52,7 +56,9 @@ async function cameraShows(page: Page, qrDataUrl: string) {
       const draw = () => { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 640, 480); ctx.drawImage(img, 170, 90, 300, 300); };
       draw();
       window.setInterval(draw, 100);
-      return canvas.captureStream(10);
+      const stream = canvas.captureStream(10);
+      if (constraints?.audio) new AudioContext().createMediaStreamDestination().stream.getAudioTracks().forEach((track) => stream.addTrack(track));
+      return stream;
     };
   }, qrDataUrl);
 }
@@ -77,36 +83,26 @@ test("opened from the phone QR (?save=1), the picture comes first", async ({ pag
   await expect(page.getByTestId("passport-save-qr")).toHaveCount(0);
 });
 
-test("the Living Lab front door is a call: robot full screen, Create and Scan passport below", async ({ page }) => {
+test("the Living Lab is a call: robot full screen, Create passport below", async ({ page }) => {
   await skipSplash(page);
+  await cameraShows(page, BLANK);
   await page.goto("/living-lab");
   const room = page.getByTestId("call");
   await expect(room).toBeVisible();
   await expect(room.getByTestId("call-create")).toBeVisible();
-  await expect(room.getByTestId("call-scan")).toBeVisible();
-  // The room covers the viewport: the site chrome and lab tabs are behind it.
+  // The room covers the viewport: the site chrome is behind it.
   const box = await room.boundingBox();
   expect(box).toMatchObject({ x: 0, y: 0, width: 1440, height: 1000 });
   await room.getByTestId("call-create").click();
   await expect(page.getByTestId("talk-intro")).toBeVisible();
 });
 
-test("a robot reads a passport shown to its camera", async ({ page }) => {
+test("holding a passport up to the camera is enough: the robot reads it by itself", async ({ page }) => {
   test.setTimeout(120_000);
   await skipSplash(page);
-  const origin = new URL(page.url() === "about:blank" ? "http://localhost:3000" : page.url()).origin;
-  await cameraShows(page, await QRCode.toDataURL(`${origin}/living-lab/passport/${row.accessToken}`, { width: 300, margin: 2 }));
-
-  // In the Robot Lab: both robots adapt to the scanned passport.
-  await page.goto("/living-lab/robot");
-  await page.getByTestId("console-scan").click();
-  await expect(page.getByTestId("passport-scanner")).toBeVisible();
-  await expect(page.getByTestId("robot-card-a")).toContainText("Passport v1", { timeout: 60_000 });
-  await expect(page.getByTestId("passport-scanner")).toHaveCount(0);
-
-  // In the call room: the robot reads it and says what it will do.
+  await cameraShows(page, await QRCode.toDataURL(`http://localhost:3000/living-lab/passport/${row.accessToken}`, { width: 300, margin: 2 }));
   await page.goto("/living-lab");
-  const caption = page.locator(".ll-call .ll-bubble");
-  await page.getByTestId("call-scan").click();
-  await expect(caption).toContainText(/I'll|I will/, { timeout: 60_000 });
+  await expect(page.getByTestId("call-self")).toHaveClass(/is-on/, { timeout: 30_000 });
+  // No button pressed: the caption changes from the welcome to what the robot will do for this passport.
+  await expect(page.locator(".ll-call .ll-bubble")).toContainText(/I'll|I will/, { timeout: 60_000 });
 });

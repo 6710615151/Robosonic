@@ -1,103 +1,80 @@
-// Conversation mode, the default way to create a passport: one consent, then camera and microphone on and
-// the robot makes small talk while the Auto calibrator measures behind it. Uses Chromium's fake camera and
-// microphone (a test pattern with nobody in it), so it proves the wiring and that nothing measured is shown,
-// not detection accuracy (that needs the venue test in HRI_FEASIBILITY_SPIKE.md §3.4).
+// The Living Lab call room (/living-lab): camera and microphone open on arrival, one tap to agree and talk,
+// and nothing measured is shown while talking. Chromium gets a fake camera plus a silent audio track
+// (headless audio capture never settles on some machines), so this proves the page, not detection
+// accuracy (that needs the venue test in HRI_FEASIBILITY_SPIKE.md §3.4).
 //
 //   set -a && source ./.env.local && set +a
 //   PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test tests-node/hri-talk.spec.ts --workers=1
-import { test, expect } from "@playwright/test";
-import pg from "pg";
-import { signInParticipant } from "./identity-helper";
+import { test, expect, type Page } from "@playwright/test";
 
-test.skip(process.env.NEON_BRANCH !== "dev", "Reads the dev database: only runs when NEON_BRANCH=dev.");
 test.describe.configure({ mode: "serial" });
 test.use({
   launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
   viewport: { width: 1440, height: 1000 }
 });
 
-const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-const participants: { cleanup: () => Promise<unknown> }[] = [];
-test.afterAll(async () => {
-  for (const p of participants) await p.cleanup();
-  await db.end();
-});
-
-async function openCreate(page: import("@playwright/test").Page) {
-  participants.push(await signInParticipant(db, page.context()));
-  await page.goto("/living-lab/create");
-  await expect(page.getByTestId("talk-intro")).toBeVisible();
-  return page.getByTestId("talk-start");
+async function media(page: Page, allowed: boolean) {
+  await page.addInitScript((ok) => {
+    sessionStorage.setItem("th_atlas_loaded_before", "true");
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      if (!ok) throw new DOMException("denied", "NotAllowedError");
+      if (!constraints?.audio) return original(constraints);
+      const stream = new AudioContext().createMediaStreamDestination().stream;
+      if (constraints.video) (await original({ video: true })).getVideoTracks().forEach((track) => stream.addTrack(track));
+      return stream;
+    };
+  }, allowed);
 }
 
-test.describe("with a camera and microphone", () => {
-  test.use({ permissions: ["camera", "microphone"] });
-
-  test("talking is the default way in, needs consent, and buttons stay one link away", async ({ page }) => {
-    const start = await openCreate(page);
-    await expect(page.getByTestId("talk-intro")).toContainText("camera and microphone turn on");
-    await expect(start).toBeDisabled();
-    // The answer methods are not on the first screen.
-    await expect(page.getByRole("button", { name: "Talk or type your answers" })).toHaveCount(0);
-
-    await page.getByTestId("talk-fallback").click();
-    await expect(page.getByRole("button", { name: "Talk or type your answers" })).toBeVisible();
-    await page.getByRole("button", { name: /Back to talking with the robot/ }).click();
-    await expect(page.getByTestId("talk-intro")).toBeVisible();
-
-    await page.getByLabel(/I agree to save my preferences/).check();
-    await expect(start).toBeEnabled({ timeout: 60_000 });
-  });
-
-  test("starting turns the camera and microphone on, the robot talks, and no measurement is shown", async ({ page }) => {
-    test.setTimeout(120_000);
-    const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-    // Headless Chromium on some machines never settles a request that includes audio. Hand it a silent
-    // stream (plus the fake camera) so this test checks the page, not the test machine's audio stack.
-    await page.addInitScript(() => {
-      const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-      navigator.mediaDevices.getUserMedia = async (constraints) => {
-        if (!constraints?.audio) return original(constraints);
-        const silent = new AudioContext().createMediaStreamDestination().stream;
-        if (constraints.video) (await original({ video: true })).getVideoTracks().forEach((track) => silent.addTrack(track));
-        return silent;
-      };
-    });
-    const start = await openCreate(page);
-    await page.getByLabel(/I agree to save my preferences/).check();
-    await expect(start).toBeEnabled({ timeout: 60_000 });
-    await start.click();
-
-    const talking = page.getByTestId("talking");
-    await expect(talking).toBeVisible({ timeout: 60_000 });
-    await expect(talking).toContainText("Camera and microphone are on");
-    // Nothing the camera measures appears while talking: no stages, signals, counts or meters.
-    await expect(page.locator(".ll-auto-signals, .ll-auto-stage, .ll-meter")).toHaveCount(0);
-    await expect(page.getByText(/Lean-backs|fps ·|Person in view/)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /I made a wai|Too close|Comfortable here/ })).toHaveCount(0);
-
-    await talking.getByRole("button", { name: "Stop" }).click();
-    await expect(page.getByTestId("talk-intro")).toBeVisible();
-    expect(errors).toEqual([]);
-  });
+test("arriving opens the camera and microphone, with no button to press", async ({ page }) => {
+  await media(page, true);
+  await page.goto("/living-lab");
+  await expect(page.getByTestId("call")).toBeVisible();
+  await expect(page.getByTestId("call-self")).toHaveClass(/is-on/, { timeout: 30_000 });
+  await expect(page.getByTestId("call-mic")).toHaveClass(/is-on/);
+  await expect(page.getByTestId("call-cam")).toHaveClass(/is-on/);
+  // No scan button: a passport QR is read automatically. No lab navigation either.
+  await expect(page.getByTestId("call-scan")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Living Lab" })).toHaveCount(0);
 });
 
-test.describe("without microphone permission", () => {
-  test.use({ permissions: [] });
+test("one tap agrees and starts talking; nothing measured is shown", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await media(page, true);
+  await page.goto("/living-lab");
+  await page.getByTestId("call-create").click();
+  const intro = page.getByTestId("talk-intro");
+  await expect(intro).toContainText("camera and microphone turn on");
+  // The consent text is shown in full above the single button.
+  await expect(intro).toContainText("I agree to save my preferences");
+  const start = page.getByTestId("talk-start");
+  await expect(start).toBeEnabled({ timeout: 60_000 });
+  await start.click();
 
-  test("the experiment explains that it needs the camera and microphone and offers buttons", async ({ page }) => {
-    const start = await openCreate(page);
-    // A browser that refuses the microphone, whatever the test machine has.
-    await page.addInitScript(() => {
-      navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("denied", "NotAllowedError"));
-    });
-    await page.reload();
-    await page.getByLabel(/I agree to save my preferences/).check();
-    await expect(start).toBeEnabled({ timeout: 60_000 });
-    await start.click();
-    await expect(page.getByRole("alert").filter({ hasText: "needs the camera and the microphone" })).toBeVisible();
-    await expect(page.getByTestId("talking")).toHaveCount(0);
-    await expect(page.getByTestId("talk-fallback")).toBeVisible();
-  });
+  const talking = page.getByTestId("talking");
+  await expect(talking).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".ll-auto-signals, .ll-auto-stage, .ll-meter, .ll-log-wrap")).toHaveCount(0);
+  await expect(page.getByText(/Lean-backs|fps ·|Person in view/)).toHaveCount(0);
+  await talking.getByRole("button", { name: "Stop" }).click();
+  await expect(page.getByTestId("talk-intro")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("if the camera and microphone are refused, the room says so and offers to ask again", async ({ page }) => {
+  await media(page, false);
+  await page.goto("/living-lab");
+  await expect(page.getByTestId("call-denied")).toContainText("camera and microphone are off");
+  await expect(page.getByTestId("call-allow")).toBeVisible();
+  await expect(page.getByTestId("call-self")).not.toHaveClass(/is-on/);
+});
+
+test("the former Living Lab pages lead to the call room", async ({ page }) => {
+  await media(page, true);
+  for (const path of ["/living-lab/about", "/living-lab/create", "/living-lab/robot", "/living-lab/meet", "/living-lab/meet/ABC234", "/living-lab/research"]) {
+    await page.goto(path);
+    await expect(page, path).toHaveURL(/\/living-lab$/);
+  }
 });
