@@ -727,6 +727,20 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
 .lab .ll-callbar-btn.is-primary:hover { background: #c6d8ac; }
 .lab .ll-callbar-btn.is-leave { background: #c0392b; color: #fff !important; text-decoration: none; }
 .lab .ll-callbar-btn.is-leave:hover { background: #d9483a; }
+.lab .ll-callbar-btn.is-talk.is-listening { background: var(--ll-green); color: var(--ll-navy); animation: ll-free-pulse 1.2s ease-in-out infinite; }
+.lab .ll-callbar-btn:disabled { opacity: .6; cursor: default; }
+@keyframes ll-free-pulse { 50% { box-shadow: 0 0 0 8px rgba(198, 216, 172, .25); } }
+@media (prefers-reduced-motion: reduce) { .lab .ll-callbar-btn.is-talk.is-listening { animation: none; } }
+/* Free chat before any passport: a type box above the call bar; the caption moves up to make room. */
+.ll-free { position: absolute; z-index: 4; left: 50%; bottom: 106px; transform: translateX(-50%); width: min(560px, calc(100% - 32px)); margin: 0; display: grid; gap: 6px; }
+.ll-free-row { display: flex; gap: 8px; padding: 6px; border-radius: 999px; background: rgba(4, 22, 17, .62); border: 1px solid rgba(198, 164, 91, 0.22); backdrop-filter: blur(10px); }
+.lab .ll-free input { flex: 1; min-width: 0; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: #fff; font: inherit; font-size: 15px; }
+.lab .ll-free input::placeholder { color: rgba(233, 243, 238, .65); }
+.lab .ll-free input:focus-visible { outline: 2px solid var(--ll-green) !important; outline-offset: 0; }
+.lab .ll-free-send { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--ll-green); color: var(--ll-navy); cursor: pointer; flex: none; }
+.lab .ll-free-send:disabled { opacity: .45; cursor: default; }
+.ll-free-note { justify-self: center; margin: 0; padding: 4px 12px; border-radius: 10px; background: rgba(8, 12, 20, .6); font-size: 12px; line-height: 1.45; color: rgba(233, 243, 238, .9); text-align: center; }
+.lab .ll-call.is-free .ll-bubble { bottom: 208px; }
 .ll-call :focus-visible { outline: 3px solid var(--ll-green) !important; outline-offset: 2px; }
 /* The panel: hidden, a sheet (create / passport), or a small "on air" pill while talking. */
 .lab .ll-call .ll-side { position: absolute; z-index: 5; right: 20px; top: 64px; bottom: 100px; width: min(460px, calc(100% - 40px)); overflow: auto; color: var(--text-primary); }
@@ -747,4 +761,10 @@ html[lang="th"] .lab :is(.lab-q-kicker, .lab-glance h3) { font-family: var(--fon
   .ll-callbar-ind { width: 42px; height: 42px; }
   .lab .ll-callbar-btn { min-height: 44px; padding: 0 14px; }
   .ll-callbar-label { display: none; }
+  .ll-free { bottom: 84px; }
+  .ll-free-note { font-size: 11px; }
+  .lab .ll-call.is-free .ll-bubble { bottom: 178px; }
+  /* On a phone the open sheet fills the bottom of the screen: chat comes back once it is closed. */
+  .ll-call.has-sheet .ll-free { display: none; }
+  .lab .ll-call.is-free.has-sheet .ll-bubble { bottom: 96px; }
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, PhoneOff, Play, ScanFace, Send, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, MessageCircle, Mic, MicOff, Pause, PhoneOff, Play, ScanFace, Send, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
 import { adapt } from "@/lib/hri/adapt";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
@@ -20,6 +20,7 @@ import { applyInterviewUpdates, initialReview, pendingTopics, toState, type Fiel
 import { TalkAnalyzer } from "@/lib/hri/talk-analysis";
 import { findSpeechRecognition, listenOnce } from "@/lib/hri/speech-input";
 import { matchFirstVoiceAnswer } from "@/lib/hri/voice-answers";
+import { NOT_UNDERSTOOD_REPLY, parseDirectCommand, parseVoiceCommand, runVoiceIntent, type RobotState, type VoiceIntent } from "@/lib/hri/voice-commands";
 import type { PoseFrame } from "@/lib/hri/camera";
 import { CameraSession } from "@/lib/hri/camera-session";
 import { createPassportAction, updatePassportAction } from "./actions";
@@ -201,7 +202,9 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   // Call layout: the create sheet, the passport scanner, and the passport the robot last read.
   const [sheet, setSheet] = useState(openSheet);
   const [askingPermission, setAskingPermission] = useState(false);
-  const talkState = useRef({ asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false });
+  // finishAsked: the person pressed "finish" before the camera had measured anything; the passport follows the measurement.
+  const talkState = useRef({ asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false, finishAsked: false });
+  const [finishWaiting, setFinishWaiting] = useState(false);
   const talkResult = useRef<{ result: AutoResult; evidence: AutoEvidence } | null>(null);
   const talkAnalyzer = useRef(new TalkAnalyzer());
   // Gemini small talk while it answers; null = not tried yet, false = unavailable, use the script.
@@ -296,6 +299,95 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
       window.speechSynthesis.speak(u);
     }
   };
+
+  // Free chat in the call room before any passport exists: Gemini answers and may make one gesture; when the
+  // AI is unavailable the keyword parser still handles "wai", "wave" and the like. Nothing is measured or
+  // saved, and it steps aside as soon as the passport conversation (which uses the microphone) starts.
+  const [freeState, setFreeState] = useState<"idle" | "listening" | "thinking">("idle");
+  const [freeText, setFreeText] = useState("");
+  const freeHistory = useRef<Array<{ role: "user" | "robot"; text: string }>>([]);
+  const freeMotion = useRef<RobotState>({ distance: 0, speed: 1 });
+  const freeCancel = useRef<(() => void) | null>(null);
+  const freeOpen = call && phase === "intro" && !talk && !ownQuestions;
+
+  useEffect(() => {
+    if (freeOpen) return;
+    freeCancel.current?.();
+    freeCancel.current = null;
+    setFreeState("idle");
+  }, [freeOpen]);
+  useEffect(() => () => freeCancel.current?.(), []);
+
+  async function freeChat(raw: string) {
+    const text = raw.trim().slice(0, 300);
+    if (!text || freeState === "thinking") return;
+    const robot = robotRef.current;
+    // A bare command ("ไหว้หน่อยครับ", "โบกมือ") needs no AI: the robot just does it, at once and for free.
+    const direct = parseDirectCommand(text);
+    if (direct && robot) {
+      const done = runVoiceIntent(robot, ROBOT_PROFILES[0].capabilities, direct, freeMotion.current);
+      freeHistory.current = [...freeHistory.current, { role: "user" as const, text }, { role: "robot" as const, text: done.reply.slice(0, 300) }].slice(-12);
+      const before = voiceRef.current;
+      voiceRef.current = true;
+      say(done.reply);
+      voiceRef.current = before;
+      return;
+    }
+    // The AI takes a few seconds: react straight away so the wait feels like listening, not like nothing.
+    setFreeState("thinking");
+    setSpeech(`${t.talk.you}: ${text} · ${t.talk.freeThinking}`);
+    robot?.nod(1);
+    robot?.expression("calm");
+    let reply: string | null = null;
+    let intent: VoiceIntent | null = null;
+    try {
+      const response = await fetch("/api/hri/voice-chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, history: freeHistory.current.slice(-6), preferences: { language: lang } })
+      });
+      if (response.ok) {
+        const body = (await response.json()) as { say?: string; intent?: VoiceIntent | null };
+        if (body.say) { reply = body.say; intent = body.intent ?? null; }
+      }
+    } catch { /* offline: the keyword parser answers below */ }
+    setFreeState("idle");
+    // The passport conversation started meanwhile: it owns the robot and the caption now.
+    if (talkRef.current) return;
+    if (reply) {
+      freeHistory.current = [...freeHistory.current, { role: "user" as const, text }, { role: "robot" as const, text: reply.slice(0, 300) }].slice(-12);
+    } else {
+      intent = parseVoiceCommand(text);
+    }
+    const result = robot && intent ? runVoiceIntent(robot, ROBOT_PROFILES[0].capabilities, intent, freeMotion.current) : null;
+    robot?.expression(result?.done === false ? "sorry" : "happy");
+    const line = reply ?? result?.reply ?? NOT_UNDERSTOOD_REPLY;
+    const before = voiceRef.current;
+    voiceRef.current = true; // the robot always answers aloud here
+    say(line);
+    voiceRef.current = before;
+  }
+
+  function freeListen() {
+    if (freeState === "listening") {
+      freeCancel.current?.();
+      freeCancel.current = null;
+      setFreeState("idle");
+      return;
+    }
+    if (freeState !== "idle") return;
+    const Recognition = findSpeechRecognition(window);
+    if (!Recognition) { setSpeech(t.talk.freeNoMic); return; }
+    window.speechSynthesis?.cancel(); // never listen to its own voice
+    setFreeState("listening");
+    freeCancel.current = listenOnce(Recognition, lang, ({ alternatives, problem }) => {
+      freeCancel.current = null;
+      const heard = alternatives.find((a) => a.trim());
+      if (heard) { void freeChat(heard); return; }
+      setFreeState("idle");
+      setSpeech(problem === "denied" || problem === "unavailable" ? t.talk.freeDenied : t.talk.freeNoSpeech);
+    });
+  }
 
   const onReady = useCallback((robot: RobotBehavior) => {
     robotRef.current = robot;
@@ -806,7 +898,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
       return;
     }
     setAskingPermission(false);
-    talkState.current = { asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false };
+    talkState.current = { asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false, finishAsked: false };
+    setFinishWaiting(false);
     talkResult.current = null;
     talkAnalyzer.current = new TalkAnalyzer();
     talkAi.current = null; talkHistory.current = []; talkUpdates.current = {};
@@ -943,6 +1036,20 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     robot.setDistance(farther.values.comfortDistance); robot.expression("sorry"); robot.lean("back");
     later(1500, () => robot.lean("upright"));
     human("too_close", { source: "talk", distance: farther.values.comfortDistance });
+  }
+
+  // The "finish" button. Saving needs the camera's measurement, so before it is ready the request waits for it
+  // (closing now would stop the camera and the passport would never be made).
+  function requestFinish() {
+    const c = talkState.current;
+    if (c.closing || c.finishAsked) return;
+    if (!talkResult.current) {
+      c.finishAsked = true;
+      setFinishWaiting(true);
+      say(t.talk.finishWait);
+      return;
+    }
+    closeTalk();
   }
 
   function closeTalk() {
@@ -1096,7 +1203,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           const c = talkState.current;
           c.sensingDone = true;
           human("auto_complete", { ...e.evidence });
-          if (!c.awaiting && (c.asked >= MIN_TALK_QUESTIONS || c.asked >= t.talk.questions.length)) closeTalk();
+          if (c.finishAsked || (!c.awaiting && (c.asked >= MIN_TALK_QUESTIONS || c.asked >= t.talk.questions.length))) closeTalk();
           break;
         }
         setPhase("review");
@@ -1316,7 +1423,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
 
   if (call && !portal) return <main className="ll ll-call-pending" aria-busy="true" />;
   const room = (
-    <main className={call ? "ll ll-call" : "ll"} data-testid={call ? "call" : undefined}>
+    <main className={call ? `ll ll-call${freeOpen ? " is-free" : ""}${freeOpen && sheet ? " has-sheet" : ""}` : "ll"} data-testid={call ? "call" : undefined}>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
 
       {/* The HumanoidTH stage, as on the site's overview: emerald, a gold Thai lattice, Thailand drawn as
@@ -1583,8 +1690,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                 </button>
               </form>
               <div className="ll-row">
-                <button className="ll-btn primary" onClick={closeTalk} data-testid="talk-finish">
-                  <BadgeCheck size={16} aria-hidden="true" /> {t.talk.finishNow}
+                <button className="ll-btn primary" onClick={requestFinish} disabled={finishWaiting} data-testid="talk-finish">
+                  <BadgeCheck size={16} aria-hidden="true" /> {finishWaiting ? t.talk.finishWaiting : t.talk.finishNow}
                 </button>
                 <button className="ll-btn" onClick={stopAuto}><Pause size={18} aria-hidden="true" /> {t.talk.stop}</button>
               </div>
@@ -1901,8 +2008,35 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
       )}
       {call && media === "denied" && <p className="ll-call-alert" role="alert" data-testid="call-denied">{t.talk.callDenied}</p>}
 
+      {freeOpen && (
+        <form
+          className="ll-free" data-testid="free-chat"
+          onSubmit={(e) => { e.preventDefault(); const text = freeText; setFreeText(""); void freeChat(text); }}
+        >
+          <div className="ll-free-row">
+            <input
+              value={freeText} onChange={(e) => setFreeText(e.target.value)} maxLength={300}
+              placeholder={t.talk.freePlaceholder} aria-label={t.talk.freePlaceholder} disabled={freeState === "thinking"}
+            />
+            <button type="submit" className="ll-free-send" aria-label={t.talk.freeSend} title={t.talk.freeSend} disabled={!freeText.trim() || freeState === "thinking"}>
+              <Send size={18} aria-hidden="true" />
+            </button>
+          </div>
+          <p className="ll-free-note">{t.talk.freeNote}</p>
+        </form>
+      )}
+
       {call && (
         <div className="ll-callbar" role="toolbar" aria-label={t.talk.controls}>
+          {freeOpen && (
+            <button
+              type="button" className={`ll-callbar-btn is-talk${freeState === "listening" ? " is-listening" : ""}`}
+              onClick={freeListen} disabled={freeState === "thinking"} aria-pressed={freeState === "listening"} data-testid="free-talk"
+            >
+              <MessageCircle size={20} aria-hidden="true" />
+              <span className="ll-callbar-label">{freeState === "listening" ? t.talk.freeListening : freeState === "thinking" ? t.talk.freeThinking : t.talk.freeTalk}</span>
+            </button>
+          )}
           <span className={`ll-callbar-ind${media === "on" ? " is-on" : ""}`} title={media === "on" ? t.talk.micOn : t.talk.micOffNow} data-testid="call-mic">
             {media === "on" ? <Mic size={20} aria-hidden="true" /> : <MicOff size={20} aria-hidden="true" />}
             <span className="visually-hidden">{media === "on" ? t.talk.micOn : t.talk.micOffNow}</span>

@@ -64,6 +64,27 @@ export function normalizeTranscript(raw: string): string {
 // Keywords go through the same normalisation as the transcript, so "ช้าๆ" and "ช้า ๆ" compare equal.
 const RULE_KEYS = RULES.map(([intent, words]) => [intent, words.map(strip)] as const);
 
+// Polite endings and fillers that may sit around a bare command ("ไหว้หน่อยครับ"). Longest first.
+const FILLERS = ["ครับผม", "นะครับ", "นะคะ", "ครับ", "ค่ะ", "คะ", "นะ", "หน่อย", "เลย", "จ้ะ", "จ้า", "สิ", "ซิ"];
+
+// Stricter than parseVoiceCommand: a command only when the whole utterance IS the command, plus polite
+// endings. "ไหว้หน่อยครับ" is one; "ผมชอบให้หุ่นยืนห่างๆ" is a sentence that merely contains "ห่างๆ", so it is
+// left for the AI to answer. Used to answer simple commands at once, without waiting for Gemini.
+export function parseDirectCommand(raw: string): VoiceIntent | null {
+  const text = normalizeTranscript(raw);
+  if (!text) return null;
+  for (const [intent, words] of RULE_KEYS) {
+    for (const word of words) {
+      const at = word ? text.indexOf(word) : -1;
+      if (at < 0) continue;
+      let rest = text.slice(0, at) + text.slice(at + word.length);
+      for (const filler of FILLERS) rest = rest.split(filler).join("");
+      return rest === "" ? intent : null;
+    }
+  }
+  return null;
+}
+
 export function parseVoiceCommand(raw: string): VoiceIntent | null {
   const text = normalizeTranscript(raw);
   if (!text) return null;

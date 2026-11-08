@@ -68,6 +68,27 @@ test("one tap agrees and starts talking; nothing measured is shown", async ({ pa
   expect(errors).toEqual([]);
 });
 
+// The fake camera shows nobody, so the measurement never finishes: this is exactly the case where "finish"
+// used to say goodbye, stop the camera and then never make the passport.
+test("pressing finish before the camera has measured waits for it instead of stalling", async ({ page }) => {
+  test.setTimeout(120_000);
+  await media(page, true);
+  await page.goto("/living-lab");
+  await page.getByTestId("call-create").click();
+  const start = page.getByTestId("talk-start");
+  await expect(start).toBeEnabled({ timeout: 60_000 });
+  await start.click();
+  const finish = page.getByTestId("talk-finish");
+  await expect(finish).toBeVisible({ timeout: 60_000 });
+  await finish.click();
+  await expect(finish).toBeDisabled();
+  await expect(finish).toContainText("Waiting for the camera");
+  await expect(page.getByTestId("talk-chat")).toContainText("camera is still measuring");
+  // No goodbye was said, and the chat is still open.
+  await expect(page.getByTestId("talk-chat")).not.toContainText("I really enjoyed talking with you");
+  await expect(page.getByTestId("talk-typed")).toBeVisible();
+});
+
 test("a passport made in this browser opens the follow-up questions instead of the create chat", async ({ page }) => {
   await media(page, true);
   await page.addInitScript(() => {
