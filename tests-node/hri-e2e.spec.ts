@@ -70,6 +70,8 @@ test("one passport, created in the Living Lab, read by every robot, edited and d
 
   // 1. Calibration (button mode). Nothing starts without consent.
   await page.goto("/living-lab/create");
+  // The default way in is a conversation with the robot; this spec covers the answer-by-buttons way.
+  await page.getByTestId("talk-fallback").click();
   const start = page.getByRole("button", { name: /Loading robot|Start/ }).first();
   await start.waitFor();
   await expect(start).toBeDisabled();

@@ -30,6 +30,10 @@ type Phase = "intro" | "greet" | "approach" | "care" | "gaze" | "voice" | "confi
 type InputMode = "buttons" | "camera" | "voice" | "auto";
 type SessionSummary = Record<string, string | number | boolean | null>;
 const REVIEW_SECONDS = 10;
+// Conversation mode: at least this many small-talk questions, however quickly the camera finishes.
+const MIN_TALK_QUESTIONS = 3;
+const TALK_ANSWER_MS = 11000; // from asking (the question is spoken first) to "no answer, next question"
+const TALK_CLOSING_MS = 7000; // the goodbye, then the passport is saved
 // After the camera finishes, offer a spoken interview about what it cannot measure. While it is on offer the
 // automatic save waits for the person to choose (talk, or skip and save with the measured values).
 const INTERVIEW_OFFERED = true;
@@ -111,6 +115,14 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     setInterviewTurnsState(interviewTurnsRef.current);
   };
   const autoValuesRef = useRef<ReviewValues | null>(null);
+  // Conversation mode, the default way in: camera and microphone on, the robot makes small talk, and the
+  // Auto calibrator measures behind it. Nothing it measures is shown until the passport exists.
+  const [talk, setTalk] = useState(false);
+  const talkRef = useRef(false);
+  const [manual, setManual] = useState(false);
+  const [askingPermission, setAskingPermission] = useState(false);
+  const talkState = useRef({ asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false });
+  const talkResult = useRef<{ result: AutoResult; evidence: AutoEvidence } | null>(null);
   const autoSourcesRef = useRef<Sources | null>(null);
   const spokeAt = useRef(0); // when the robot last started to speak: the mic must not hear it
 
@@ -464,6 +476,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     setAnxiety("low"); setAccessible(false); setNoReach(false); setGreeting("wai");
     setVoiceSafety(false); setHeardCue(null); setAutoValues(null); setAutoSources(null); setInterviewTurns(0);
     autoValuesRef.current = null; autoSourcesRef.current = null;
+    talkRef.current = false; setTalk(false);
     setPhase("intro");
     setStatus(t.statusIdle);
     setSpeech(t.introSpeech);
@@ -586,10 +599,113 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     const robot = robotRef.current;
     if (robot) { robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); }
     human("auto_stopped");
+    talkRef.current = false; setTalk(false);
     setInputMode("buttons");
     setPhase("intro");
     setStatus(t.statusIdle);
     setSpeech(t.introSpeech);
+  }
+
+  // ---------------- Conversation mode ----------------
+  async function startTalk() {
+    if (!robotRef.current || !consent || !identityOk) return;
+    setAutoNotice(null);
+    // One browser prompt for both, while the explanation is on screen. Both are required for this experiment.
+    // The stream is closed at once: the pose camera and speech recognition open their own when needed.
+    setAskingPermission(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      stream.getTracks().forEach((track) => track.stop());
+    } catch {
+      setAskingPermission(false);
+      setAutoNotice(t.talk.permDenied);
+      return;
+    }
+    setAskingPermission(false);
+    talkState.current = { asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false };
+    talkResult.current = null;
+    talkRef.current = true; setTalk(true);
+    await startAuto();
+    if (!autoRef.current) {
+      // The camera could not start (denied or missing): this experiment needs it.
+      talkRef.current = false; setTalk(false);
+      setAutoNotice(t.talk.camDenied);
+      return;
+    }
+    if (findSpeechRecognition(window)) setVoiceSafety(true);
+  }
+
+  // Ask the next everyday question; if nobody answers, move on kindly.
+  function askNext() {
+    const c = talkState.current;
+    if (!talkRef.current || c.closing) return;
+    if (c.sensingDone && c.asked >= MIN_TALK_QUESTIONS) { closeTalk(); return; }
+    if (c.asked >= t.talk.questions.length) { if (c.sensingDone) closeTalk(); return; }
+    const asked = c.asked + 1;
+    c.asked = asked; c.awaiting = true;
+    robotRef.current?.expression("happy");
+    say(t.talk.questions[asked - 1]);
+    human("talk_question", { index: asked });
+    later(TALK_ANSWER_MS, () => {
+      const now = talkState.current;
+      if (!talkRef.current || now.closing || !now.awaiting || now.asked !== asked) return;
+      now.awaiting = false;
+      say(t.talk.noAnswer);
+      later(2600, askNext);
+    });
+  }
+
+  // Something was said in reply. Only the fact that it was said is used; the words are not kept.
+  function heardInTalk() {
+    const c = talkState.current;
+    if (!talkRef.current || !c.awaiting || c.closing) return;
+    c.awaiting = false; c.answered += 1;
+    robotRef.current?.nod(1);
+    say(t.talk.acks[(c.answered - 1) % t.talk.acks.length]);
+    human("talk_answer", { index: c.asked });
+    later(2400, askNext);
+  }
+
+  function closeTalk() {
+    const c = talkState.current;
+    if (c.closing) return;
+    c.closing = true; c.awaiting = false;
+    setVoiceSafety(false);
+    const robot = robotRef.current;
+    if (robot) {
+      robot.expression("happy"); robot.bothArms("wai");
+      later(500, () => robot.bow(0.3, 1.5));
+      later(2400, () => robot.bothArms("relaxed"));
+    }
+    say(t.talk.closing);
+    later(TALK_CLOSING_MS, () => { void finishTalk(); });
+  }
+
+  // Save straight away (the person agreed before starting) and show the issued passport.
+  async function finishTalk() {
+    const measured = talkResult.current;
+    if (!measured || !talkRef.current) return;
+    talkRef.current = false;
+    const v = autoValuesRef.current ?? initialReview(measured.result, measured.evidence).values;
+    await savePassport(
+      {
+        greeting: v.greeting, comfortDistance: v.comfortDistance, speed: v.speed, gaze: v.gaze, voice: v.voice,
+        language: v.language, anxiety: "low", captions: v.captions, speechPace: v.speechPace, noReach: v.noReach
+      },
+      {
+        ...measured.evidence,
+        tooClose: counters.current.tooClose,
+        tooFast: counters.current.tooFast,
+        leanBack: counters.current.leanBack,
+        finalDistance: v.comfortDistance,
+        finalSpeed: v.speed,
+        // Counts only. No words from the conversation are saved.
+        conversation: true,
+        talkQuestions: talkState.current.asked,
+        talkAnswers: talkState.current.answered
+      },
+      "auto"
+    );
   }
 
   function applyAutoEvent(e: AutoEvent) {
@@ -598,9 +714,9 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     switch (e.type) {
       case "stage":
         setAutoStage(e.stage);
-        if (e.stage !== "complete" && e.stage !== "aborted") setStatus(t.autoStages[e.stage]);
-        if (e.stage === "baseline") say(t.autoBaselineSpeech);
-        if (e.stage === "greet") { robot.lookAt(0, 0.35); say(t.waitSpeech); }
+        if (e.stage !== "complete" && e.stage !== "aborted") setStatus(talkRef.current ? t.talk.status : t.autoStages[e.stage]);
+        if (e.stage === "baseline") say(talkRef.current ? t.talk.hello : t.autoBaselineSpeech);
+        if (e.stage === "greet") { robot.lookAt(0, 0.35); if (!talkRef.current) say(t.waitSpeech); }
         break;
       case "paused":
         setAutoPaused(e.reason);
@@ -614,7 +730,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         human("auto_resumed");
         break;
       case "wai_progress":
-        setStatus(`${t.waiDetecting} ${Math.round(e.progress * 100)}%`);
+        if (!talkRef.current) setStatus(`${t.waiDetecting} ${Math.round(e.progress * 100)}%`);
         break;
       case "wai_received":
       case "wai_timeout": {
@@ -622,8 +738,10 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         setAutoWai(seen);
         human(seen ? "wai" : "wai_timeout", { source: "auto" });
         robot.lookAt(0, 0.2); robot.bothArms("wai"); robot.expression("calm");
-        say(seen ? t.waiSpeech : t.autoNoWai);
+        say(talkRef.current ? t.talk.niceToMeet : seen ? t.waiSpeech : t.autoNoWai);
         later(500, () => robot.bow(0.36, 1.7));
+        // The first everyday question follows the greeting; the measuring carries on underneath.
+        if (talkRef.current) later(3200, askNext);
         later(2600, () => { robot.bothArms("relaxed"); robot.expression("happy"); robot.setGlow(0.7, "teal"); });
         break;
       }
@@ -632,7 +750,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         robot.setDistance(e.distance);
         setSpeed(e.speed);
         setStep(Math.min(e.index, STEPS.length - 1));
-        if (e.index === 1) say(t.autoStep);
+        if (e.index === 1 && !talkRef.current) say(t.autoStep);
         human("auto_step", { index: e.index, distance: e.distance });
         break;
       case "too_fast":
@@ -641,20 +759,20 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         if (e.source !== "voice") { counters.current.leanBack++; setAutoLeans((n) => n + 1); }
         robot.setSpeed(e.speed); robot.setDistance(e.retreatTo); robot.expression("sorry"); robot.nod(1);
         setSpeed(e.speed);
-        say(t.autoTooFast);
+        say(talkRef.current ? t.talk.sorry : t.autoTooFast);
         human("too_fast", { source: e.source ?? "auto", speed: e.speed });
         break;
       case "too_close":
         counters.current.tooClose++;
         if (e.source !== "voice") { counters.current.leanBack++; setAutoLeans((n) => n + 1); }
         robot.setDistance(e.backTo); robot.moveArm("R", "handOnChest"); robot.expression("sorry"); robot.lean("back");
-        say(t.sorryLean);
+        say(talkRef.current ? t.talk.sorry : t.sorryLean);
         later(1700, () => { robot.lean("upright"); robot.moveArm("R", "relaxed"); });
         human("too_close", { source: e.source ?? "auto", distance: e.backTo });
         break;
       case "lean_in":
         robot.expression("happy");
-        say(t.autoLeanIn);
+        if (!talkRef.current) say(t.autoLeanIn);
         human("lean_in", { source: "auto" });
         break;
       case "distance_set":
@@ -664,7 +782,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         break;
       case "gaze_check":
         robot.lookAt(0, 0);
-        say(t.autoGazeCheck);
+        if (!talkRef.current) say(t.autoGazeCheck);
         break;
       case "complete":
         autoRef.current = null;
@@ -675,6 +793,15 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           const review = initialReview(e.result, e.evidence);
           autoValuesRef.current = review.values; autoSourcesRef.current = review.sources;
           setAutoValues(review.values); setAutoSources(review.sources); setInterviewTurns(0);
+        }
+        if (talkRef.current) {
+          // Measuring is done; the conversation finishes naturally, then the passport is saved.
+          talkResult.current = { result: e.result, evidence: e.evidence };
+          const c = talkState.current;
+          c.sensingDone = true;
+          human("auto_complete", { ...e.evidence });
+          if (!c.awaiting && (c.asked >= MIN_TALK_QUESTIONS || c.asked >= t.talk.questions.length)) closeTalk();
+          break;
         }
         setPhase("review");
         setStatus(t.reviewTitle);
@@ -690,6 +817,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         stopCam();
         robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.expression("neutral"); robot.lookAt(0, 0.35);
         setAutoNotice(t.autoAborted[e.reason]);
+        talkRef.current = false; setTalk(false); setVoiceSafety(false);
         setInputMode("buttons");
         setPhase("intro");
         setStatus(t.statusIdle);
@@ -801,6 +929,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             human("voice_cue", { cue });
             calibrator.applyVoice(cue).forEach(applyAutoEvent);
           }
+          if (talkRef.current && alternatives.some((a) => a.trim())) heardInTalk();
         }
         timer = window.setTimeout(loop, 150);
       });
@@ -840,15 +969,35 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           <div className="ll-chip" role="status">{status}</div>
           <div className={`ll-cam ${cameraState === "on" ? "is-on" : ""}`}>
             <video ref={videoRef} playsInline muted aria-label={t.cameraPreview} />
-            {cameraState !== "off" && <span>{cameraState === "loading" ? t.cameraLoading : cameraInfo}</span>}
+            {cameraState !== "off" && !talk && <span>{cameraState === "loading" ? t.cameraLoading : cameraInfo}</span>}
           </div>
         </div>
 
         <div className="ll-side">
         <div className="ll-panel" ref={panelRef}>
-          <CalibrationProgress lang={lang} phase={phase} auto={inputMode === "auto"} />
-          {phase === "intro" && (
+          {!talk && <CalibrationProgress lang={lang} phase={phase} auto={inputMode === "auto"} />}
+          {phase === "intro" && !manual && (
+            <div className="ll-step ll-ready ll-talk-intro" data-testid="talk-intro">
+              <h2>{t.talk.introTitle}</h2>
+              <ul className="ll-talk-points">{t.talk.points.map((point) => <li key={point}>{point}</li>)}</ul>
+              <label className="ll-consent">
+                <input type="checkbox" checked={consent} onChange={(e) => changeConsent(e.target.checked)} />
+                <span>{identityRequired || identity ? t.consentLabel : t.consentLabelUnlinked}</span>
+              </label>
+              {!consent && <p className="ll-consent-hint">{t.consentHint}</p>}
+              {!identityOk ? <p className="ll-consent-hint">{idT.required}</p> : !identity && <p className="ll-note">{t.ready.emailHint}</p>}
+              {autoNotice && <p className="ll-error" role="alert">{autoNotice}</p>}
+              {askingPermission && <p className="ll-note" role="status" data-testid="talk-permission">{t.talk.asking}</p>}
+              <button className="ll-btn primary big ll-talk-start" onClick={startTalk} disabled={!ready || !consent || !identityOk || cameraState === "loading" || askingPermission} data-testid="talk-start">
+                <Mic size={18} aria-hidden="true" /> {ready ? t.talk.start : t.loadingRobot}
+              </button>
+              <button type="button" className="ll-linkbtn" onClick={() => { setManual(true); setAutoNotice(null); }} data-testid="talk-fallback">{t.talk.fallback}</button>
+            </div>
+          )}
+
+          {phase === "intro" && manual && (
             <div className="ll-step ll-ready">
+              <button type="button" className="ll-linkbtn" onClick={() => { setManual(false); setAutoNotice(null); }}>← {t.talk.backToTalk}</button>
               <h2>{t.introTitle}</h2>
               <ol className="ll-stages">
                 <li>
@@ -977,7 +1126,20 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             </div>
           )}
 
-          {phase === "auto" && (
+          {phase === "auto" && talk && (
+            <div className="ll-step ll-talking" data-testid="talking">
+              <h2>{t.talk.title}</h2>
+              <p>{t.talk.note}</p>
+              <p className="ll-live"><span className="ll-live-dot" aria-hidden="true" /> {t.talk.listening}</p>
+              <button className="ll-btn" onClick={stopAuto}><Pause size={18} aria-hidden="true" /> {t.talk.stop}</button>
+            </div>
+          )}
+
+          {phase === "saving" && talk && (
+            <div className="ll-step"><p className="ll-countdown" role="status">{t.talk.saving}</p></div>
+          )}
+
+          {phase === "auto" && !talk && (
             <div className="ll-step">
               <h2>{t.autoTitle}</h2>
               <p>{t.autoSimNote}</p>
@@ -1009,7 +1171,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             </div>
           )}
 
-          {(phase === "review" || (phase === "saving" && inputMode === "auto")) && autoResult && autoValues && autoSources && (
+          {(phase === "review" || (phase === "saving" && inputMode === "auto" && !talk)) && autoResult && autoValues && autoSources && (
             <div className="ll-step">
               <h2>{t.reviewTitle}</h2>
               <ul className="ll-facts">
@@ -1217,12 +1379,14 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             </div>
           )}
 
-          <details className="ll-log-wrap">
+          {/* The event log is for the answer-it-yourself flows. In the conversation it would show what the
+              robot is measuring, so it stays out of sight there. */}
+          {manual && !talk && <details className="ll-log-wrap">
             <summary>{t.logTitle} ({log.length})</summary>
             <div className="ll-log" ref={logRef} role="log">
               {log.map((e, i) => <div key={i}><b className={e.src}>{e.src}</b> {e.t.toFixed(1)}s · {e.type}</div>)}
             </div>
-          </details>
+          </details>}
         </div>
         <IdentityCard lang={lang} identity={identity} onChange={setIdentity} locked={phase !== "intro" && phase !== "done"} required={identityRequired} consent={consent} />
         </div>
@@ -1337,6 +1501,15 @@ const styles = `
   .ll-head-actions { width: 100%; }
   .ll-head-actions .button { flex: 1 1 auto; }
 }
+.ll-talk-intro h2 { margin-bottom: 4px !important; }
+.ll-talk-points { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14.5px; line-height: 1.6; color: var(--text-primary); }
+.ll-talk-start { width: 100%; justify-content: center; }
+.ll-linkbtn { justify-self: start; min-height: 40px; padding: 0 2px; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.ll-talking p { margin: 0; }
+.ll-live { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--lab-tint-ink); }
+.ll-live-dot { width: 9px; height: 9px; border-radius: 50%; background: #c0392b; box-shadow: 0 0 0 3px rgba(192, 57, 43, .18); }
+@media (prefers-reduced-motion: no-preference) { .ll-live-dot { animation: ll-live 1.6s ease-in-out infinite; } }
+@keyframes ll-live { 50% { opacity: .35; } }
 .ll-auto-offer { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .ll-btn.auto { background: var(--lab-dark); border-color: var(--lab-dark); color: #fff; width: 100%; }
 .ll-btn.auto:disabled { background: var(--lab-muted-line); border-color: var(--lab-muted-line); }

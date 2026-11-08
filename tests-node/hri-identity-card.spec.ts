@@ -30,6 +30,8 @@ test("no code can be requested before consent", async ({ page }) => {
 
 test("the consent text and the start buttons match whether verifying is required", async ({ page }) => {
   await page.goto("/living-lab/create");
+  // The default way in is a conversation with the robot; this spec covers the answer-by-buttons way.
+  await page.getByTestId("talk-fallback").click();
   const consent = page.getByLabel(/I agree to save my preferences/);
   const start = page.getByRole("button", { name: "Start", exact: true });
   await consent.check();

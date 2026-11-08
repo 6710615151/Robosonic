@@ -37,6 +37,8 @@ test.afterAll(async () => {
 async function openLab(page: import("@playwright/test").Page) {
   participants.push(await signInParticipant(db, page.context()));
   await page.goto("/living-lab/create");
+  // The default way in is a conversation with the robot; this spec covers the answer-by-buttons way.
+  await page.getByTestId("talk-fallback").click();
   const start = page.getByRole("button", { name: /Loading robot|Start/ }).first();
   await start.waitFor();
   return page.getByRole("button", { name: /Auto: just stand in front of the camera/ });

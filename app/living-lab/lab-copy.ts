@@ -102,7 +102,7 @@ const en = {
   calibrate: {
     eyebrow: "Care Passport",
     title: "Teach the robot once",
-    lead: "Agree, choose how you want to answer, then greet the robot with a wai. Every answer changes how it behaves right away, so you can feel the difference before anything is saved.",
+    lead: "Agree once, then simply talk with the robot. It learns how you like to be cared for from how you are with it, and makes your Care Passport at the end.",
     progressLabel: "Calibration progress",
     stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
     steps: { greet: "Greet", approach: "Distance & pace", care: "Care needs", gaze: "Eye contact", voice: "Voice", confirm: "Review", done: "Passport", auto: "Camera reads you", review: "Review" },
@@ -342,7 +342,7 @@ const th: typeof en = {
   calibrate: {
     eyebrow: "Care Passport",
     title: "สอนหุ่นยนต์เพียงครั้งเดียว",
-    lead: "ให้ความยินยอม เลือกวิธีตอบ แล้วไหว้ทักทายหุ่นยนต์ ทุกคำตอบเปลี่ยนพฤติกรรมของหุ่นทันที คุณจึงรู้สึกถึงความต่างได้ก่อนจะบันทึกอะไร",
+    lead: "ให้ความยินยอมครั้งเดียว แล้วคุยกับหุ่นยนต์ตามสบาย หุ่นจะเรียนรู้ว่าคุณชอบให้ดูแลแบบไหนจากการอยู่ด้วยกัน แล้วทำ Care Passport ให้ตอนจบ",
     progressLabel: "ความคืบหน้าการปรับเทียบ",
     stepOf: (n: number, total: number) => `ขั้นที่ ${n} จาก ${total}`,
     steps: { greet: "ทักทาย", approach: "ระยะและความเร็ว", care: "การดูแล", gaze: "การสบตา", voice: "เสียง", confirm: "ตรวจทาน", done: "พาสปอร์ต", auto: "กล้องอ่านท่าทาง", review: "ตรวจทาน" },

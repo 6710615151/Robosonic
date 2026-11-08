@@ -188,6 +188,42 @@ export const copy = {
     meetNow: "Start the hospital journey",
     again: "Start again",
     // Auto mode (camera does the rest after one tap)
+    // Conversation mode (the default way in): camera and microphone on, the robot makes small talk, and the
+    // passport is measured from how the person moves while they talk. Nothing measured is shown live.
+    talk: {
+      introTitle: "Talk with the robot (about 2 minutes)",
+      points: [
+        "Your camera and microphone turn on, and the robot chats with you about everyday things. Answer however you like; there are no wrong answers.",
+        "While you talk, the robot notices how close is comfortable for you, how fast it may move and where you look, and uses that for your Care Passport. It does not show these readings during the chat.",
+        "Nothing is recorded. Video is processed on this device only. Your browser’s speech service may process what you say; this site keeps no words and no audio."
+      ],
+      start: "Start talking with the robot",
+      fallback: "Can’t use a camera or microphone? Answer with buttons instead",
+      backToTalk: "Back to talking with the robot",
+      title: "Talking with the robot",
+      note: "Just chat. The robot will make your passport when you are done.",
+      listening: "Camera and microphone are on",
+      stop: "Stop",
+      status: "Chatting",
+      saving: "Making your passport…",
+      permDenied: "This experiment needs the camera and the microphone. Allow both in your browser’s address bar and try again, or answer with buttons instead.",
+      asking: "Your browser is asking to use the camera and microphone. Please choose Allow.",
+      camDenied: "This experiment needs the camera. Allow it in your browser’s address bar and try again, or answer with buttons instead.",
+      hello: "Hello! I’m Atlas. Nice to meet you.",
+      niceToMeet: "Thank you for the greeting.",
+      sorry: "Oh, sorry.",
+      questions: [
+        "How is your day going so far?",
+        "How did you get here today?",
+        "What do you like to do in your free time?",
+        "What is your favourite food?",
+        "If you could travel anywhere, where would you go?",
+        "What kind of music do you like?"
+      ],
+      acks: ["That sounds nice.", "Oh, interesting.", "Thanks for telling me.", "I see."],
+      noAnswer: "That’s alright. Let me ask something else.",
+      closing: "I really enjoyed talking with you. Thank you! I have learned how you like me to be, so I will make your passport now."
+    },
     autoStart: "Auto: just stand in front of the camera",
     autoHint: "One tap and you're done. The robot watches for your wai, how you react as it comes closer, and where you look. The camera runs on this device only. Feelings are never guessed from your face.",
     autoTitle: "Auto calibration",
@@ -493,6 +529,40 @@ export const copy = {
     meetNow: "เริ่มเส้นทางโรงพยาบาล",
     again: "เริ่มใหม่",
     // โหมดอัตโนมัติ (กดครั้งเดียว กล้องทำที่เหลือ)
+    talk: {
+      introTitle: "คุยกับหุ่นยนต์ (ประมาณ 2 นาที)",
+      points: [
+        "กล้องและไมค์จะเปิด แล้วหุ่นจะชวนคุยเรื่องทั่วไป ตอบได้ตามสบาย ไม่มีคำตอบผิด",
+        "ระหว่างคุย หุ่นจะสังเกตว่าระยะไหนที่คุณสบายใจ หุ่นควรเคลื่อนเร็วแค่ไหน และคุณมองไปทางไหน แล้วนำไปทำ Care Passport ของคุณ โดยจะไม่แสดงผลการสังเกตระหว่างคุย",
+        "ไม่มีการบันทึกภาพหรือเสียง วิดีโอประมวลผลในเครื่องนี้เท่านั้น บริการรู้จำเสียงของเบราว์เซอร์อาจประมวลผลสิ่งที่คุณพูด แต่เว็บไซต์นี้ไม่เก็บคำพูดหรือเสียงใด ๆ"
+      ],
+      start: "เริ่มคุยกับหุ่นยนต์",
+      fallback: "ใช้กล้องหรือไมค์ไม่ได้? ตอบด้วยปุ่มแทน",
+      backToTalk: "กลับไปคุยกับหุ่นยนต์",
+      title: "กำลังคุยกับหุ่นยนต์",
+      note: "คุยได้ตามสบาย คุยเสร็จแล้วหุ่นจะทำพาสปอร์ตให้",
+      listening: "กล้องและไมค์เปิดอยู่",
+      stop: "หยุด",
+      status: "กำลังคุยกัน",
+      saving: "กำลังทำพาสปอร์ตของคุณ…",
+      permDenied: "การทดลองนี้ต้องใช้ทั้งกล้องและไมค์ อนุญาตทั้งสองอย่างที่แถบที่อยู่ของเบราว์เซอร์แล้วลองใหม่ หรือตอบด้วยปุ่มแทน",
+      asking: "เบราว์เซอร์กำลังขออนุญาตใช้กล้องและไมค์ กรุณากด อนุญาต",
+      camDenied: "การทดลองนี้ต้องใช้กล้อง อนุญาตกล้องที่แถบที่อยู่ของเบราว์เซอร์แล้วลองใหม่ หรือตอบด้วยปุ่มแทน",
+      hello: "สวัสดีครับ ผมชื่อ Atlas ยินดีที่ได้รู้จักนะครับ",
+      niceToMeet: "ขอบคุณที่ทักทายครับ",
+      sorry: "ขอโทษครับ",
+      questions: [
+        "วันนี้เป็นยังไงบ้างครับ",
+        "วันนี้เดินทางมายังไงครับ",
+        "เวลาว่างชอบทำอะไรครับ",
+        "อาหารจานโปรดของคุณคืออะไรครับ",
+        "ถ้าได้ไปเที่ยวที่ไหนก็ได้ อยากไปที่ไหนครับ",
+        "ชอบฟังเพลงแนวไหนครับ"
+      ],
+      acks: ["ฟังดูดีจังเลยครับ", "อ๋อ น่าสนใจครับ", "ขอบคุณที่เล่าให้ฟังนะครับ", "เข้าใจแล้วครับ"],
+      noAnswer: "ไม่เป็นไรครับ งั้นผมถามเรื่องอื่นนะครับ",
+      closing: "คุยสนุกมากเลยครับ ขอบคุณนะครับ ผมจำได้แล้วว่าคุณชอบให้ผมดูแลแบบไหน เดี๋ยวผมทำพาสปอร์ตให้นะครับ"
+    },
     autoStart: "อัตโนมัติ: แค่ยืนหน้ากล้อง",
     autoHint: "กดครั้งเดียวจบ หุ่นจะสังเกตการไหว้ ปฏิกิริยาของคุณเมื่อหุ่นเข้าใกล้ และทิศที่คุณมอง กล้องประมวลผลในเครื่องนี้เท่านั้น และระบบไม่เดาความรู้สึกจากใบหน้า",
     autoTitle: "ปรับเทียบอัตโนมัติ",
