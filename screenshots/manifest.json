@@ -1,0 +1,236 @@
+[
+  {
+    "name": "01-home",
+    "route": "/",
+    "status": 200,
+    "finalUrl": "/",
+    "title": "Thailand Humanoid Atlas | Embodied AI & Robotics Database",
+    "file": "01-home.png",
+    "bytes": 607649
+  },
+  {
+    "name": "02-analytics",
+    "route": "/analytics",
+    "status": 200,
+    "finalUrl": "/analytics",
+    "title": "Analytics & Stance Insights | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "02-analytics.png",
+    "bytes": 267234
+  },
+  {
+    "name": "03-contributions",
+    "route": "/contributions",
+    "status": 200,
+    "finalUrl": "/contributions",
+    "title": "Academic & Software Contributions | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "03-contributions.png",
+    "bytes": 219771
+  },
+  {
+    "name": "04-dashboard",
+    "route": "/dashboard",
+    "status": 200,
+    "finalUrl": "/dashboard",
+    "title": "Robotics Ecosystem Dashboard | Thailand Humanoid Atlas",
+    "file": "04-dashboard.png",
+    "bytes": 255292
+  },
+  {
+    "name": "05-database",
+    "route": "/database",
+    "status": 200,
+    "finalUrl": "/database",
+    "title": "Raw Database Browser | Thailand Humanoid Atlas",
+    "file": "05-database.png",
+    "bytes": 2520627
+  },
+  {
+    "name": "06-inventory",
+    "route": "/inventory",
+    "status": 200,
+    "finalUrl": "/inventory",
+    "title": "Robot Inventory & Asset Custody | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "06-inventory.png",
+    "bytes": 91319
+  },
+  {
+    "name": "07-map",
+    "route": "/map",
+    "status": 200,
+    "finalUrl": "/map",
+    "title": "Ecosystem Contribution Map | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "07-map.png",
+    "bytes": 132938
+  },
+  {
+    "name": "08-network",
+    "route": "/network",
+    "status": 200,
+    "finalUrl": "/network",
+    "title": "Ecosystem Relationship Graph | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "08-network.png",
+    "bytes": 246064
+  },
+  {
+    "name": "09-perspectives",
+    "route": "/perspectives",
+    "status": 200,
+    "finalUrl": "/perspectives",
+    "title": "Public & Media Perspectives | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "09-perspectives.png",
+    "bytes": 154615
+  },
+  {
+    "name": "10-profile",
+    "route": "/profile",
+    "status": 200,
+    "finalUrl": "/profile",
+    "title": "User Profile | Thailand Humanoid Atlas",
+    "file": "10-profile.png",
+    "bytes": 94899
+  },
+  {
+    "name": "11-robots",
+    "route": "/robots",
+    "status": 200,
+    "finalUrl": "/robots",
+    "title": "Robot Model Registry | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "11-robots.png",
+    "bytes": 934877
+  },
+  {
+    "name": "12-submit-data",
+    "route": "/submit-data",
+    "status": 200,
+    "finalUrl": "/submit-data",
+    "title": "Contribute Data & Sightings | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "12-submit-data.png",
+    "bytes": 178698
+  },
+  {
+    "name": "13-living-lab",
+    "route": "/living-lab",
+    "status": 200,
+    "finalUrl": "/living-lab",
+    "title": "HRI Wellness Living Lab | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "13-living-lab.png",
+    "bytes": 986004
+  },
+  {
+    "name": "14-living-lab-meet",
+    "route": "/living-lab/meet",
+    "status": 200,
+    "finalUrl": "/living-lab/meet",
+    "title": "Meet a Robot with Your HRI Passport | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "file": "14-living-lab-meet.png",
+    "bytes": 82493
+  },
+  {
+    "name": "15-living-lab-meet-code",
+    "route": "/living-lab/meet/QATEST",
+    "status": 200,
+    "finalUrl": "/living-lab/meet/QATEST",
+    "title": "Hospital Journey with a Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "file": "15-living-lab-meet-code.png",
+    "bytes": 282775
+  },
+  {
+    "name": "16-living-lab-passport",
+    "route": "/living-lab/passport/9o62xU7-Shozb85uBxsKvc1GHIJBbg_HeOXwyDvMg34",
+    "status": 200,
+    "finalUrl": "/living-lab/passport/9o62xU7-Shozb85uBxsKvc1GHIJBbg_HeOXwyDvMg34",
+    "title": "My HRI Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "file": "16-living-lab-passport.png",
+    "bytes": 408730
+  },
+  {
+    "name": "17-living-lab-robot",
+    "route": "/living-lab/robot",
+    "status": 200,
+    "finalUrl": "/living-lab/robot",
+    "title": "Robot console | HRI Living Lab | Thailand Humanoid Atlas",
+    "file": "17-living-lab-robot.png",
+    "bytes": 451153
+  },
+  {
+    "name": "18-admin-login",
+    "route": "/admin-login",
+    "status": 200,
+    "finalUrl": "/admin-login",
+    "title": "Admin Login | Thailand Humanoid Atlas",
+    "file": "18-admin-login.png",
+    "bytes": 155067
+  },
+  {
+    "name": "19-admin",
+    "route": "/admin",
+    "status": 200,
+    "finalUrl": "/admin",
+    "title": "Admin Review Console | Thailand Humanoid Atlas",
+    "file": "19-admin.png",
+    "bytes": 129724
+  },
+  {
+    "name": "20-admin-source-records",
+    "route": "/admin?collection=source-records",
+    "status": 200,
+    "finalUrl": "/admin?collection=source-records",
+    "title": "Admin Review Console | Thailand Humanoid Atlas",
+    "file": "20-admin-source-records.png",
+    "bytes": 1280262
+  },
+  {
+    "name": "21-admin-robot-models",
+    "route": "/admin?collection=robot-models",
+    "status": 200,
+    "finalUrl": "/admin?collection=robot-models",
+    "title": "Admin Review Console | Thailand Humanoid Atlas",
+    "file": "21-admin-robot-models.png",
+    "bytes": 337411
+  },
+  {
+    "name": "22-admin-contributions",
+    "route": "/admin?collection=contributions",
+    "status": 200,
+    "finalUrl": "/admin?collection=contributions",
+    "title": "Admin Review Console | Thailand Humanoid Atlas",
+    "file": "22-admin-contributions.png",
+    "bytes": 179792
+  },
+  {
+    "name": "23-admin-cms-redirect",
+    "route": "/admin/cms",
+    "status": 200,
+    "finalUrl": "/admin",
+    "title": "Admin Review Console | Thailand Humanoid Atlas",
+    "file": "23-admin-cms-redirect.png",
+    "bytes": 129724
+  },
+  {
+    "name": "24-admin-submitted-redirect",
+    "route": "/admin/submitted-data",
+    "status": 200,
+    "finalUrl": "/admin?collection=submitted-data",
+    "title": "Admin Review Console | Thailand Humanoid Atlas",
+    "file": "24-admin-submitted-redirect.png",
+    "bytes": 129724
+  },
+  {
+    "name": "25-data-pulls",
+    "route": "/data-pulls",
+    "status": 200,
+    "finalUrl": "/data-pulls",
+    "title": "API Data Ingestion | Thailand Humanoid Atlas",
+    "file": "25-data-pulls.png",
+    "bytes": 76547
+  },
+  {
+    "name": "26-not-found",
+    "route": "/this-page-does-not-exist",
+    "status": 404,
+    "finalUrl": "/this-page-does-not-exist",
+    "title": "Thailand Humanoid Atlas",
+    "file": "26-not-found.png",
+    "bytes": 190779
+  }
+]

@@ -37,8 +37,8 @@ test("arriving opens the camera and microphone, with no button to press", async 
   // No scan button: a passport QR is read automatically. No lab navigation either.
   await expect(page.getByTestId("call-scan")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Living Lab" })).toHaveCount(0);
-  // Leave, like hanging up: back to the site.
-  await expect(page.getByTestId("call-leave")).toHaveAttribute("href", "/");
+  // Leave, like hanging up: back to the research overview.
+  await expect(page.getByTestId("call-leave")).toHaveAttribute("href", "/overview");
 });
 
 test("one tap agrees and starts talking; nothing measured is shown", async ({ page }) => {
@@ -58,11 +58,42 @@ test("one tap agrees and starts talking; nothing measured is shown", async ({ pa
 
   const talking = page.getByTestId("talking");
   await expect(talking).toBeVisible({ timeout: 60_000 });
+  // The conversation is a chat: a transcript and a typed input, alongside the voice.
+  await expect(page.getByTestId("talk-chat")).toBeVisible();
+  await expect(page.getByTestId("talk-typed")).toBeVisible();
   await expect(page.locator(".ll-auto-signals, .ll-auto-stage, .ll-meter, .ll-log-wrap")).toHaveCount(0);
   await expect(page.getByText(/Lean-backs|fps ·|Person in view/)).toHaveCount(0);
   await talking.getByRole("button", { name: "Stop" }).click();
   await expect(page.getByTestId("talk-intro")).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("a passport made in this browser opens the follow-up questions instead of the create chat", async ({ page }) => {
+  await media(page, true);
+  await page.addInitScript(() => {
+    localStorage.setItem("hri-own-passport", JSON.stringify({
+      code: "TEST234",
+      accessToken: "test-access",
+      editToken: "test-edit",
+      values: {
+        greeting: "wai", comfortDistance: 0.5, speed: 0.7, gaze: "soft", voice: true,
+        language: "en", anxiety: "low", captions: "large", speechPace: "slow", noReach: true
+      },
+      sources: {
+        distance: "camera", speed: "camera", gaze: "camera", greeting: "camera",
+        voice: "default", captions: "default", speechPace: "default", handover: "default"
+      }
+    }));
+  });
+  await page.goto("/living-lab");
+  const back = page.getByTestId("own-passport");
+  await expect(back).toBeVisible({ timeout: 30_000 });
+  await expect(back).toContainText("Welcome back");
+  await expect(back).toContainText("TEST234");
+  // No camera-measured create chat: the passport exists, so the guided questions come next.
+  await expect(page.getByTestId("talk-intro")).toHaveCount(0);
+  await page.getByTestId("own-questions").click();
+  await expect(page.getByTestId("auto-interview")).toBeVisible();
 });
 
 test("if the camera and microphone are refused, the room says so and offers to ask again", async ({ page }) => {

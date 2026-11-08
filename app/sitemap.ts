@@ -4,7 +4,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://humanoid.or.th";
 
   const routes = [
-    "",
+    "/living-lab",
+    "/overview",
     "/robots",
     "/perspectives",
     "/contributions",
@@ -19,6 +20,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
     changeFrequency: "daily",
-    priority: route === "" ? 1.0 : 0.8
+    priority: route === "/living-lab" ? 1.0 : 0.8
   }));
 }

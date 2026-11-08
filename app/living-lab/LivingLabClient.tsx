@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, PhoneOff, Play, ScanFace, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, PhoneOff, Play, ScanFace, Send, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
 import { adapt } from "@/lib/hri/adapt";
 import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
 import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
@@ -22,7 +22,7 @@ import { findSpeechRecognition, listenOnce } from "@/lib/hri/speech-input";
 import { matchFirstVoiceAnswer } from "@/lib/hri/voice-answers";
 import type { PoseFrame } from "@/lib/hri/camera";
 import { CameraSession } from "@/lib/hri/camera-session";
-import { createPassportAction } from "./actions";
+import { createPassportAction, updatePassportAction } from "./actions";
 import IdentityCard from "./IdentityCard";
 import { identityCopy } from "./identity-copy";
 import type { ClientIdentity } from "./identity-actions";
@@ -53,6 +53,16 @@ const TALK_START_VALUES: ReviewValues = {
 // automatic save waits for the person to choose (talk, or skip and save with the measured values).
 const INTERVIEW_OFFERED = true;
 type LogEvent = { t: number; src: "robot" | "human"; type: string; [key: string]: unknown };
+type ChatTurn = { role: "user" | "robot"; text: string };
+// Where the browser remembers the passport this person made, so a returning visit opens the follow-up
+// questions instead of the chatbot that creates another one. Preferences only: never the conversation.
+const OWN_PASSPORT_KEY = "hri-own-passport";
+const DEFAULT_SOURCES: Sources = {
+  distance: "default", speed: "default", gaze: "default", greeting: "default",
+  voice: "default", captions: "default", speechPace: "default", handover: "default"
+};
+type OwnPassport = { code: string; accessToken: string; editToken: string; values: ReviewValues; sources: Sources };
+
 
 // Distances the robot steps through while approaching (higher = closer to the person).
 const STEPS = [-2.2, -1.3, -0.4, 0.5, 1.3];
@@ -176,6 +186,17 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   // Auto calibrator measures behind it. Nothing it measures is shown until the passport exists.
   const [talk, setTalk] = useState(false);
   const talkRef = useRef(false);
+  // The chat transcript shown while talking, and on the call page the follow-up questions after a passport exists.
+  const [chatLog, setChatLog] = useState<ChatTurn[]>([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const chatRef = useRef<HTMLOListElement | null>(null);
+  // A passport this browser already made: the conversation then asks the follow-up questions instead of
+  // starting the create-a-passport chat again.
+  const [ownPassport, setOwnPassport] = useState<OwnPassport | null>(null);
+  const [ownQuestions, setOwnQuestions] = useState(false);
+  const [postSaved, setPostSaved] = useState(false);
+  const [postSkipped, setPostSkipped] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
   const [manual, setManual] = useState(startManual);
   // Call layout: the create sheet, the passport scanner, and the passport the robot last read.
   const [sheet, setSheet] = useState(openSheet);
@@ -227,9 +248,46 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
 
   useEffect(() => { setMicSupported(findSpeechRecognition(window) !== null); }, []);
 
+  // A returning visitor: their passport lives in this browser, so the conversation opens on the
+  // follow-up questions. Only the preference values are stored, never anything said.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(OWN_PASSPORT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<OwnPassport> | null;
+      if (!saved || typeof saved.code !== "string" || !saved.values) return;
+      const own: OwnPassport = {
+        code: saved.code,
+        accessToken: typeof saved.accessToken === "string" ? saved.accessToken : "",
+        editToken: typeof saved.editToken === "string" ? saved.editToken : "",
+        values: saved.values,
+        sources: { ...DEFAULT_SOURCES, ...(saved.sources ?? {}) }
+      };
+      setOwnPassport(own);
+      autoValuesRef.current = own.values;
+      autoSourcesRef.current = own.sources;
+      setAutoValues(own.values);
+      setAutoSources(own.sources);
+    } catch { /* private mode or data from an older version */ }
+  }, []);
+
+  useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight }); }, [chatLog]);
+
+  const addChat = useCallback((role: "user" | "robot", text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    setChatLog((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === role && last.text === clean) return prev; // never show the same line twice
+      return [...prev.slice(-79), { role, text: clean }];
+    });
+  }, []);
+
   const say = (text: string) => {
     spokeAt.current = Date.now();
     setSpeech(text);
+    // While the conversation is running the caption is also a chat turn.
+    if (talkRef.current && text.trim() !== "…") addChat("robot", text);
     if (voiceRef.current && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
@@ -254,10 +312,10 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         robot.bothArms("wai"); robot.expression("calm"); robot.lookAt(0, 0.2);
         window.setTimeout(() => robot.bow(0.3, 1.5), 450);
         window.setTimeout(() => { robot.bothArms("relaxed"); robot.expression("happy"); }, 2500);
-        setSpeech(copy[lang].talk.welcome);
+        setSpeech(ownPassport ? copy[lang].talk.followUpIntro : copy[lang].talk.welcome);
       }, 900);
     }
-  }, [layout, lang]);
+  }, [layout, lang, ownPassport]);
 
   // Call page: a passport shown to the robot. It reads the public profile, adapts, and says what it will do.
   async function readScanned(token: string) {
@@ -290,6 +348,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     if (!robot || !consent || !identityOk) return;
     clearTimers();
     counters.current = { tooClose: 0, tooFast: 0, leanBack: 0 };
+    // The button flow has no measured values: do not let a passport from an earlier session seed this one.
+    autoValuesRef.current = null; autoSourcesRef.current = null; setAutoValues(null); setAutoSources(null);
     setLog([]); setStep(0); setSpeed(1); setComfort(null); setGreeting("wai"); setCareQuestion(0);
     setPassportCode(null); setAccessToken(null); setEditToken(null); setKeyCopied(false); setQr(null); setError(null);
     robot.setSpeed(1); robot.setDistance(STEPS[0]); robot.bothArms("relaxed"); robot.expression("neutral"); robot.lookAt(0, 0.35); robot.setGlow(0.45, "teal");
@@ -542,6 +602,21 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
       // The edit token is the owner's key to the card page. Keep it in this browser so the card
       // unlocks here without asking again; the key is also shown once below for other devices.
       try { window.localStorage.setItem(`hri-passport-edit:${accessToken}`, editToken); } catch { /* private mode */ }
+      // Remember the passport this person made. The conversation now switches from the chatbot to the
+      // follow-up questions, and a return visit to this browser opens on those questions.
+      const fallbackValues: ReviewValues = {
+        greeting: passport.greeting, comfortDistance: passport.comfortDistance, speed: passport.speed,
+        gaze: passport.gaze, voice: passport.voice, language: passport.language, anxiety: "low",
+        captions: passport.captions, speechPace: passport.speechPace, noReach: passport.noReach
+      };
+      const storedValues = autoValuesRef.current ?? fallbackValues;
+      const storedSources = autoSourcesRef.current ?? DEFAULT_SOURCES;
+      if (!autoValuesRef.current) { autoValuesRef.current = storedValues; setAutoValues(storedValues); }
+      if (!autoSourcesRef.current) { autoSourcesRef.current = storedSources; setAutoSources(storedSources); }
+      const own: OwnPassport = { code, accessToken, editToken, values: storedValues, sources: storedSources };
+      setOwnPassport(own);
+      setPostSaved(false); setPostSkipped(false); setOwnQuestions(false); setPostError(null);
+      try { window.localStorage.setItem(OWN_PASSPORT_KEY, JSON.stringify(own)); } catch { /* private mode */ }
       const url = `${window.location.origin}/living-lab/passport/${accessToken}`;
       setPassportCode(code);
       setAccessToken(accessToken);
@@ -576,6 +651,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     setVoiceSafety(false); setHeardCue(null); setAutoValues(null); setAutoSources(null); setInterviewTurns(0);
     autoValuesRef.current = null; autoSourcesRef.current = null;
     talkRef.current = false; setTalk(false);
+    setChatLog([]); setChatDraft(""); setPostSaved(false); setPostSkipped(false); setOwnQuestions(false); setPostError(null);
     setPhase("intro");
     setStatus(t.statusIdle);
     setSpeech(t.introSpeech);
@@ -734,6 +810,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     talkResult.current = null;
     talkAnalyzer.current = new TalkAnalyzer();
     talkAi.current = null; talkHistory.current = []; talkUpdates.current = {};
+    setChatLog([]); setChatDraft("");
     talkRef.current = true; setTalk(true);
     await startAuto(agreed);
     if (!autoRef.current) {
@@ -827,6 +904,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     const c = talkState.current;
     if (!talkRef.current || !c.awaiting || c.closing) return;
     c.awaiting = false; c.answered += 1;
+    addChat("user", transcript);
     talkAnalyzer.current.answer(transcript, waitedMs);
     robotRef.current?.nod(1);
     human("talk_answer", { index: c.asked });
@@ -837,6 +915,20 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     }
     say(t.talk.acks[(c.answered - 1) % t.talk.acks.length]);
     later(2400, () => { void askNext(); });
+  }
+
+  // Typed chat: the same turn as a spoken answer. When no question is in flight, a free message still
+  // reaches the AI so the conversation carries on.
+  function submitChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = chatDraft.trim();
+    const c = talkState.current;
+    if (!text || !talkRef.current || c.closing) return;
+    setChatDraft("");
+    if (c.awaiting) { heardInTalk(text, 0); return; }
+    addChat("user", text);
+    robotRef.current?.nod(1);
+    void aiTurn(text).then((ok) => { if (!ok) say(t.talk.noAnswer); });
   }
 
   // A lean-back during the chat (after the calibrator): one step farther, kept for the passport.
@@ -879,7 +971,10 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     const talkGaze = talkAnalyzer.current.gaze();
     if (talkGaze) v = { ...v, gaze: talkGaze };
     // What the person asked for in their own words wins over what the camera inferred.
-    v = applyInterviewUpdates(v, autoSourcesRef.current ?? initialReview(measured.result, measured.evidence).sources, talkUpdates.current, { allowClosest: measured.evidence.leanIn }).values;
+    const merged = applyInterviewUpdates(v, autoSourcesRef.current ?? initialReview(measured.result, measured.evidence).sources, talkUpdates.current, { allowClosest: measured.evidence.leanIn });
+    v = merged.values;
+    autoValuesRef.current = v;
+    autoSourcesRef.current = merged.sources;
     const analysis = talkAnalyzer.current.summary();
     await savePassport(
       {
@@ -1083,6 +1178,49 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     else if (failed) setCountdown(REVIEW_SECONDS);
   }
 
+  // After the passport exists the conversation changes to the few questions a camera cannot measure.
+  // Answers that Gemini could verify against the person's own words are written back to the passport.
+  async function persistPassport(access: string, edit: string, values: ReviewValues) {
+    if (!access || !edit) return false;
+    try {
+      const result = await updatePassportAction(access, edit, {
+        greeting: values.greeting, comfortDistance: values.comfortDistance, speed: values.speed,
+        gaze: values.gaze, voice: values.voice,
+        captions: values.captions, speechPace: values.speechPace, noReach: values.noReach
+      });
+      return result.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function saveFollowUp(access: string, edit: string, fallback: OwnPassport | null) {
+    const values = autoValuesRef.current ?? fallback?.values;
+    if (!values) return;
+    const ok = await persistPassport(access, edit, values);
+    if (ok) {
+      setPostError(null);
+      setPostSaved(true);
+      const nextOwn = ownPassport ? { ...ownPassport, values, sources: autoSourcesRef.current ?? ownPassport.sources } : null;
+      if (nextOwn) {
+        setOwnPassport(nextOwn);
+        try { window.localStorage.setItem(OWN_PASSPORT_KEY, JSON.stringify(nextOwn)); } catch { /* private mode */ }
+      }
+    } else {
+      setPostError(t.talk.saveFailed);
+    }
+    human("follow_up_saved", { ok, fields: Object.keys(autoSourcesRef.current ?? {}).length });
+  }
+
+  function savePostInterview() {
+    void saveFollowUp(accessToken ?? "", editToken ?? "", ownPassport);
+  }
+
+  function saveOwnQuestions() {
+    if (!ownPassport) return;
+    void saveFollowUp(ownPassport.accessToken, ownPassport.editToken, ownPassport);
+  }
+
   // The review screen saves by itself after a visible countdown, so Auto mode needs no second tap.
   useEffect(() => {
     if (phase !== "review" || countdown === null) return;
@@ -1151,6 +1289,23 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     { key: "speech" as const, label: t.factSpeech, value: accessible ? t.slow : t.normal }
   ];
 
+  // Values and neutral camera facts for the follow-up questions, whichever flow made the passport.
+  const followUpValues: ReviewValues = autoValues ?? ownPassport?.values ?? {
+    greeting, comfortDistance: comfort ?? robotRef.current?.state.distanceTarget ?? -0.4,
+    speed, gaze, voice, language: lang, anxiety: "low",
+    captions: accessible ? "large" : "normal", speechPace: accessible ? "slow" : "normal", noReach
+  };
+  const followUpSources: Sources = autoSources ?? ownPassport?.sources ?? DEFAULT_SOURCES;
+  const followUpCamera = {
+    waiDetected: autoResult?.evidence.waiDetected ?? followUpValues.greeting === "wai",
+    leanBacks: autoResult?.evidence.leanBacks ?? counters.current.leanBack,
+    tooFast: autoResult?.evidence.tooFast ?? counters.current.tooFast,
+    voiceCorrections: autoResult?.evidence.voiceCorrections ?? 0,
+    leanIn: autoResult?.evidence.leanIn ?? false,
+    gazeMeasured: autoResult?.evidence.gazeMeasured ?? false,
+    avertShare: autoResult?.evidence.avertShare ?? null
+  };
+
   const sourceLabel = (source: Source) =>
     source === "camera" ? t.interview.sourceCamera : source === "voice" ? t.interview.sourceVoice : t.interview.sourceDefault;
   const Src = ({ of }: { of: Source }) => <em className={`ll-src ll-src-${of}`}>{sourceLabel(of)}</em>;
@@ -1196,10 +1351,52 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           </div>
         </div>
 
-        <div className={`ll-side${call ? ` is-${phase === "intro" ? (sheet ? "sheet" : "hidden") : phase === "auto" && talk ? "pill" : "sheet"}` : ""}`}>
+        <div className={`ll-side${call ? ` is-${phase === "intro" ? (sheet ? "sheet" : "hidden") : "sheet"}` : ""}`}>
         <div className="ll-panel" ref={panelRef}>
           {!talk && <CalibrationProgress lang={lang} phase={phase} auto={inputMode === "auto"} />}
-          {phase === "intro" && !manual && (
+          {phase === "intro" && !manual && ownPassport && (
+            <div className="ll-step ll-ready" data-testid="own-passport">
+              <h2>{t.talk.welcomeBack}</h2>
+              <p className="ll-note">{t.talk.welcomeBackBody(ownPassport.code)}</p>
+              {ownQuestions ? (
+                postSaved ? (
+                  <p className="ll-note" role="status" data-testid="own-questions-saved">{t.talk.followUpSaved}</p>
+                ) : (
+                  <>
+                    <AutoInterview
+                      lang={lang}
+                      values={followUpValues}
+                      sources={followUpSources}
+                      camera={followUpCamera}
+                      say={say}
+                      onUpdates={applyInterview}
+                      onSave={saveOwnQuestions}
+                      onActive={interviewActive}
+                      onSkip={() => setOwnQuestions(false)}
+                    />
+                    {postError && <p className="ll-error" role="alert">{postError}</p>}
+                  </>
+                )
+              ) : (
+                <div className="ll-row">
+                  <button
+                    className="ll-btn primary big" data-testid="own-questions"
+                    onClick={() => { setOwnQuestions(true); setPostSaved(false); setPostError(null); voiceRef.current = true; setVoice(true); say(t.talk.followUpIntro); }}
+                  >
+                    <BadgeCheck size={18} aria-hidden="true" /> {t.talk.continueQuestions}
+                  </button>
+                  <button className="ll-btn" onClick={() => {
+                    setOwnPassport(null); setOwnQuestions(false);
+                    try { window.localStorage.removeItem(OWN_PASSPORT_KEY); } catch { /* private mode */ }
+                    setSpeech(t.talk.welcome);
+                  }}>{t.talk.newPassport}</button>
+                </div>
+              )}
+              {ownQuestions && !postSaved && <button type="button" className="ll-linkbtn" onClick={() => { setOwnQuestions(false); setPostSaved(false); setPostError(null); }}>{t.talk.backToTalk}</button>}
+            </div>
+          )}
+
+          {phase === "intro" && !manual && !ownPassport && (
             <div className="ll-step ll-ready ll-talk-intro" data-testid="talk-intro">
               <h2>{t.talk.introTitle}</h2>
               <ul className="ll-talk-points">{t.talk.points.map((point) => <li key={point}>{point}</li>)}</ul>
@@ -1362,11 +1559,35 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           )}
 
           {phase === "auto" && talk && (
-            <div className="ll-step ll-talking" data-testid="talking">
-              <h2>{t.talk.title}</h2>
-              <p>{t.talk.note}</p>
+            <div className="ll-step ll-talking ll-talk-chat" data-testid="talking">
+              <h2>{t.talk.chatTitle}</h2>
               <p className="ll-live"><span className="ll-live-dot" aria-hidden="true" /> {t.talk.listening}</p>
-              <button className="ll-btn" onClick={stopAuto}><Pause size={18} aria-hidden="true" /> {t.talk.stop}</button>
+              <p className="ll-note">{t.talk.chatNote}</p>
+              <ol className="ll-chat" ref={chatRef} aria-live="polite" data-testid="talk-chat">
+                {chatLog.length === 0 && <li className="robot"><b>{t.interview.robotName}</b> <span>{t.talk.hello}</span></li>}
+                {chatLog.map((turn, index) => (
+                  <li key={index} className={turn.role}>
+                    <b>{turn.role === "robot" ? t.interview.robotName : t.interview.you}</b>
+                    <span lang={lang}>{turn.text}</span>
+                  </li>
+                ))}
+              </ol>
+              <form className="ll-row ll-type" onSubmit={submitChat}>
+                <label htmlFor="talk-typed" className="ll-note" style={{ flexBasis: "100%" }}>{t.talk.typeLabel}</label>
+                <input
+                  id="talk-typed" value={chatDraft} onChange={(event) => setChatDraft(event.target.value)}
+                  placeholder={t.talk.typePlaceholder} autoComplete="off" lang={lang} maxLength={300} data-testid="talk-typed"
+                />
+                <button className="ll-btn" type="submit" disabled={!chatDraft.trim()}>
+                  <Send size={16} aria-hidden="true" /> {t.talk.send}
+                </button>
+              </form>
+              <div className="ll-row">
+                <button className="ll-btn primary" onClick={closeTalk} data-testid="talk-finish">
+                  <BadgeCheck size={16} aria-hidden="true" /> {t.talk.finishNow}
+                </button>
+                <button className="ll-btn" onClick={stopAuto}><Pause size={18} aria-hidden="true" /> {t.talk.stop}</button>
+              </div>
             </div>
           )}
 
@@ -1583,6 +1804,32 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                   prefs: cardPrefs(), scanNote: lang === "th" ? "ยกรูปนี้ให้หุ่นยนต์สแกน" : "Show this to a robot to scan", mrz: passportMrz(passportCode, lang, 1)
                 }}
               />
+              {/* The conversation changes here: the chatbot that made the passport gives way to the few
+                  questions a camera cannot measure. Answers update this passport when they are clear. */}
+              <section className="ll-followup" data-testid="follow-up" aria-labelledby="ll-followup-title">
+                <h3 id="ll-followup-title">{t.talk.followUpTitle}</h3>
+                <p className="ll-note">{t.talk.followUpNote}</p>
+                {postSaved ? (
+                  <p className="ll-note" role="status" data-testid="follow-up-saved">{t.talk.followUpSaved}</p>
+                ) : postSkipped ? (
+                  <p className="ll-note">{t.talk.followUpSkipped}</p>
+                ) : (
+                  <>
+                    <AutoInterview
+                      lang={lang}
+                      values={followUpValues}
+                      sources={followUpSources}
+                      camera={followUpCamera}
+                      say={say}
+                      onUpdates={applyInterview}
+                      onSave={savePostInterview}
+                      onActive={interviewActive}
+                      onSkip={() => setPostSkipped(true)}
+                    />
+                    {postError && <p className="ll-error" role="alert">{postError}</p>}
+                  </>
+                )}
+              </section>
               {!call && <><p className="ll-q">{t.moreTitle}</p>
               <ul className="ll-facts ll-more">
                 <li><span>{t.factGreeting}</span><strong>{t.greetingLabels[greeting]}</strong></li>
@@ -1673,7 +1920,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             </button>
           )}
           {/* Leave, like hanging up: back to the site. Leaving stops the camera and microphone. */}
-          <Link className="ll-callbar-btn is-leave" href="/" aria-label={t.talk.leave} title={t.talk.leave} data-testid="call-leave">
+          <Link className="ll-callbar-btn is-leave" href="/overview" aria-label={t.talk.leave} title={t.talk.leave} data-testid="call-leave">
             <PhoneOff size={20} aria-hidden="true" /> <span className="ll-callbar-label">{t.talk.leave}</span>
           </Link>
         </div>
@@ -1820,6 +2067,10 @@ const styles = `
 .ll-chat li { padding: 8px 11px; border-radius: 10px; font-size: 14px; line-height: 1.5; border: 1px solid var(--border); background: #fff; }
 .ll-chat li.robot { background: var(--lab-tint); border-color: var(--lab-tint-border); }
 .ll-chat li b { margin-right: 6px; font-size: 12px; }
+.ll-talk-chat .ll-chat { max-height: 300px; }
+.ll-followup { display: grid; gap: 8px; margin: 14px 0 4px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--lab-tint); }
+.ll-followup h3 { margin: 0; font-size: 16px; }
+.ll-followup p { margin: 0; }
 .ll-type input { flex: 1 1 200px; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); font: inherit; background: #fff; }
 @media (prefers-reduced-motion: reduce) {
   .ll-btn, .ll-consent input { transition: none; }

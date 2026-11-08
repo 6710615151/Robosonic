@@ -1,0 +1,945 @@
+[
+  {
+    "name": "overview",
+    "route": "/living-lab",
+    "width": 1440,
+    "status": 200,
+    "file": "overview-1440.png",
+    "url": "/living-lab",
+    "title": "HRI Living Lab | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "clientWidth": 1440,
+    "scrollWidth": 1440,
+    "scrollHeight": 2512,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 597347,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "create",
+    "route": "/living-lab/create",
+    "width": 1440,
+    "status": 200,
+    "file": "create-1440.png",
+    "url": "/living-lab/create",
+    "title": "Create your Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 1440,
+    "scrollWidth": 1440,
+    "scrollHeight": 1869,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 464338,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "passport",
+    "route": "/living-lab/passport/D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "width": 1440,
+    "status": 200,
+    "file": "passport-1440.png",
+    "url": "/living-lab/passport/D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "title": "My HRI Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 1440,
+    "scrollWidth": 1440,
+    "scrollHeight": 1604,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 518705,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "robot",
+    "route": "/living-lab/robot#token=D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "width": 1440,
+    "status": 200,
+    "file": "robot-1440.png",
+    "url": "/living-lab/robot",
+    "title": "Robot console | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 1440,
+    "scrollWidth": 1440,
+    "scrollHeight": 3696,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "div",
+        "cls": "robot_protocol__dmHwB",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      },
+      {
+        "tag": "label",
+        "cls": "robot_protocolLabel__CX3gd",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      },
+      {
+        "tag": "p",
+        "cls": "robot_hint__JfmRB",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      },
+      {
+        "tag": "div",
+        "cls": "",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      },
+      {
+        "tag": "h3",
+        "cls": "robot_subhead__pOQl4",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      },
+      {
+        "tag": "p",
+        "cls": "robot_hint__JfmRB",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      },
+      {
+        "tag": "pre",
+        "cls": "robot_pre__wPdGm",
+        "left": 289,
+        "right": 2412,
+        "width": 2123
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 829957,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "meet",
+    "route": "/living-lab/meet/THVIEW",
+    "width": 1440,
+    "status": 200,
+    "file": "meet-1440.png",
+    "url": "/living-lab/meet/THVIEW",
+    "title": "Hospital Journey with a Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 1440,
+    "scrollWidth": 1440,
+    "scrollHeight": 900,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 211961,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "research",
+    "route": "/living-lab/research",
+    "width": 1440,
+    "status": 200,
+    "file": "research-1440.png",
+    "url": "/living-lab/research",
+    "title": "Research Observatory | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 1440,
+    "scrollWidth": 1440,
+    "scrollHeight": 2159,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 381774,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "overview",
+    "route": "/living-lab",
+    "width": 768,
+    "status": 200,
+    "file": "overview-768.png",
+    "url": "/living-lab",
+    "title": "HRI Living Lab | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "scrollHeight": 3900,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 490066,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "create",
+    "route": "/living-lab/create",
+    "width": 768,
+    "status": 200,
+    "file": "create-768.png",
+    "url": "/living-lab/create",
+    "title": "Create your Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "scrollHeight": 2323,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 289155,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "passport",
+    "route": "/living-lab/passport/D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "width": 768,
+    "status": 200,
+    "file": "passport-768.png",
+    "url": "/living-lab/passport/D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "title": "My HRI Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "scrollHeight": 2368,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 408654,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "robot",
+    "route": "/living-lab/robot#token=D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "width": 768,
+    "status": 200,
+    "file": "robot-768.png",
+    "url": "/living-lab/robot",
+    "title": "Robot console | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "scrollHeight": 5929,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "div",
+        "cls": "robot_protocol__dmHwB",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      },
+      {
+        "tag": "label",
+        "cls": "robot_protocolLabel__CX3gd",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      },
+      {
+        "tag": "p",
+        "cls": "robot_hint__JfmRB",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      },
+      {
+        "tag": "div",
+        "cls": "",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      },
+      {
+        "tag": "h3",
+        "cls": "robot_subhead__pOQl4",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      },
+      {
+        "tag": "p",
+        "cls": "robot_hint__JfmRB",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      },
+      {
+        "tag": "pre",
+        "cls": "robot_pre__wPdGm",
+        "left": 35,
+        "right": 2158,
+        "width": 2123
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 717959,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "meet",
+    "route": "/living-lab/meet/THVIEW",
+    "width": 768,
+    "status": 200,
+    "file": "meet-768.png",
+    "url": "/living-lab/meet/THVIEW",
+    "title": "Hospital Journey with a Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "scrollHeight": 1156,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 118085,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "research",
+    "route": "/living-lab/research",
+    "width": 768,
+    "status": 200,
+    "file": "research-768.png",
+    "url": "/living-lab/research",
+    "title": "Research Observatory | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "scrollHeight": 3073,
+    "overflow": false,
+    "offenders": [],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 293432,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "overview",
+    "route": "/living-lab",
+    "width": 390,
+    "status": 200,
+    "file": "overview-390.png",
+    "url": "/living-lab",
+    "title": "HRI Living Lab | Thailand Humanoid Atlas | Thailand Humanoid Atlas",
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "scrollHeight": 4844,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 394,
+        "right": 549,
+        "width": 155
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 394,
+        "right": 549,
+        "width": 155
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": 404,
+        "right": 420,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 405,
+        "right": 419,
+        "width": 13
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 408,
+        "right": 416,
+        "width": 8
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 553,
+        "right": 642,
+        "width": 89
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 553,
+        "right": 642,
+        "width": 89
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": 563,
+        "right": 579,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 565,
+        "right": 577,
+        "width": 12
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 441187,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "create",
+    "route": "/living-lab/create",
+    "width": 390,
+    "status": 200,
+    "file": "create-390.png",
+    "url": "/living-lab/create",
+    "title": "Create your Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "scrollHeight": 2551,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 394,
+        "right": 549,
+        "width": 155
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 394,
+        "right": 549,
+        "width": 155
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": 404,
+        "right": 420,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 405,
+        "right": 419,
+        "width": 13
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 408,
+        "right": 416,
+        "width": 8
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 553,
+        "right": 642,
+        "width": 89
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 553,
+        "right": 642,
+        "width": 89
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": 563,
+        "right": 579,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 565,
+        "right": 577,
+        "width": 12
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 243001,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "passport",
+    "route": "/living-lab/passport/D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "width": 390,
+    "status": 200,
+    "file": "passport-390.png",
+    "url": "/living-lab/passport/D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "title": "My HRI Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "scrollHeight": 3338,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 394,
+        "right": 549,
+        "width": 155
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 394,
+        "right": 549,
+        "width": 155
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": 404,
+        "right": 420,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 405,
+        "right": 419,
+        "width": 13
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 408,
+        "right": 416,
+        "width": 8
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 553,
+        "right": 642,
+        "width": 89
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 553,
+        "right": 642,
+        "width": 89
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": 563,
+        "right": 579,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": 565,
+        "right": 577,
+        "width": 12
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 358699,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "robot",
+    "route": "/living-lab/robot#token=D9zGcm2ivv9fPrUL-jtzx-yWadQGrSq6CYNXp49evz0",
+    "width": 390,
+    "status": 200,
+    "file": "robot-390.png",
+    "url": "/living-lab/robot",
+    "title": "Robot console | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "scrollHeight": 8234,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -120,
+        "right": -28,
+        "width": 92
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -120,
+        "right": -28,
+        "width": 92
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": -110,
+        "right": -94,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": -105,
+        "right": -99,
+        "width": 6
+      },
+      {
+        "tag": "circle",
+        "cls": "[object SVGAnimatedString]",
+        "left": -109,
+        "right": -95,
+        "width": 13
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -24,
+        "right": 108,
+        "width": 132
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -24,
+        "right": 108,
+        "width": 132
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": -14,
+        "right": 2,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": -13,
+        "right": -4,
+        "width": 9
+      },
+      {
+        "tag": "circle",
+        "cls": "[object SVGAnimatedString]",
+        "left": -11,
+        "right": -6,
+        "width": 5
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": 266,
+        "right": 421,
+        "width": 155
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": 266,
+        "right": 421,
+        "width": 155
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 718851,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "meet",
+    "route": "/living-lab/meet/THVIEW",
+    "width": 390,
+    "status": 200,
+    "file": "meet-390.png",
+    "url": "/living-lab/meet/THVIEW",
+    "title": "Hospital Journey with a Care Passport | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "scrollHeight": 1129,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -252,
+        "right": -160,
+        "width": 92
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -252,
+        "right": -160,
+        "width": 92
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": -242,
+        "right": -226,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": -237,
+        "right": -231,
+        "width": 6
+      },
+      {
+        "tag": "circle",
+        "cls": "[object SVGAnimatedString]",
+        "left": -241,
+        "right": -227,
+        "width": 13
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -156,
+        "right": -24,
+        "width": 132
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -156,
+        "right": -24,
+        "width": 132
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": -146,
+        "right": -130,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": -145,
+        "right": -136,
+        "width": 9
+      },
+      {
+        "tag": "circle",
+        "cls": "[object SVGAnimatedString]",
+        "left": -143,
+        "right": -138,
+        "width": 5
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -20,
+        "right": 130,
+        "width": 150
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -20,
+        "right": 130,
+        "width": 150
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 98014,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  },
+  {
+    "name": "research",
+    "route": "/living-lab/research",
+    "width": 390,
+    "status": 200,
+    "file": "research-390.png",
+    "url": "/living-lab/research",
+    "title": "Research Observatory | HRI Living Lab | Thailand Humanoid Atlas",
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "scrollHeight": 3748,
+    "overflow": false,
+    "offenders": [
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -252,
+        "right": -160,
+        "width": 92
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -252,
+        "right": -160,
+        "width": 92
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": -242,
+        "right": -226,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": -237,
+        "right": -231,
+        "width": 6
+      },
+      {
+        "tag": "circle",
+        "cls": "[object SVGAnimatedString]",
+        "left": -241,
+        "right": -227,
+        "width": 13
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -156,
+        "right": -24,
+        "width": 132
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -156,
+        "right": -24,
+        "width": 132
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "left": -146,
+        "right": -130,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "left": -145,
+        "right": -136,
+        "width": 9
+      },
+      {
+        "tag": "circle",
+        "cls": "[object SVGAnimatedString]",
+        "left": -143,
+        "right": -138,
+        "width": 5
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "left": -20,
+        "right": 130,
+        "width": 150
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "left": -20,
+        "right": 130,
+        "width": 150
+      }
+    ],
+    "brokenImages": [],
+    "thai": true,
+    "hasThaiLanguage": "th",
+    "bytes": 289404,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "ok": true
+  }
+]

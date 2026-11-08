@@ -65,11 +65,11 @@ export const metadata: Metadata = {
   creator: siteName,
   publisher: siteName,
   alternates: {
-    canonical: "/"
+    canonical: "/living-lab"
   },
   openGraph: {
     type: "website",
-    url: "/",
+    url: "/living-lab",
     siteName,
     title: siteName,
     description: defaultSeoDescription,
@@ -161,7 +161,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <MobileHeader />
           <aside className="sidebar">
             <div className="brand-logo-container">
-              <Link href="/" className="brand-lockup" aria-label="Thailand Humanoid Atlas — Overview">
+              <Link href="/" className="brand-lockup" aria-label="Thailand Humanoid Atlas — HRI Living Lab">
                 <AtlasLogo width={196} decorative />
               </Link>
               <span className="brand-sub">{lang === "th" ? "แอตลาสวิจัยแบบเปิด" : "Open research atlas"}</span>

@@ -17,5 +17,5 @@ export const metadata: Metadata = {
 export default async function LivingLabPage() {
   const lang = ((await cookies()).get("lang")?.value === "th" ? "th" : "en") as "en" | "th";
   const identity = await readClientIdentity();
-  return <LivingLabClient lang={lang} initialIdentity={identity} identityRequired={identityRequired()} layout="call" />;
+  return <LivingLabClient lang={lang} initialIdentity={identity} identityRequired={identityRequired()} layout="call" openSheet />;
 }
