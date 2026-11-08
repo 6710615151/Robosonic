@@ -200,3 +200,15 @@ export function finalizeInterviewReply(request: InterviewRequest, raw: RawInterv
   }
   return { say: raw.say, updates: accepted, save };
 }
+
+// Conversation mode: the robot's small talk is kept as said, but a preference is recorded only when the
+// person's own words name it (the same lexicons as the interview; no yes/no inference, never "save").
+export function finalizeTalkReply(request: InterviewRequest, raw: RawInterviewReply): InterviewReply {
+  if (request.opening) return { say: raw.say, updates: {}, save: false };
+  const evidence = evidenceFrom(request.text, undefined);
+  const accepted: InterviewUpdates = {};
+  for (const [field, value] of Object.entries(evidence) as [Field, string][]) {
+    (accepted as Record<string, string>)[field] = value;
+  }
+  return { say: raw.say, updates: accepted, save: false };
+}

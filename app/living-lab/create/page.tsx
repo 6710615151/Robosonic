@@ -14,8 +14,13 @@ export const metadata: Metadata = {
 
 // The guided Care Passport calibration. It used to live on /living-lab; links to /living-lab#calibrate
 // are forwarded here by the overview page.
-export default async function CreatePassportPage() {
+// Default: the video-call room with the "create passport" sheet already open. ?manual=1: the page with
+// the answer-by-buttons, voice and Auto flows, for anyone who cannot use a camera or microphone.
+export default async function CreatePassportPage({ searchParams }: { searchParams: Promise<{ manual?: string }> }) {
+  const manual = (await searchParams).manual === "1";
   const lang = ((await cookies()).get("lang")?.value === "th" ? "th" : "en") as "en" | "th";
   const identity = await readClientIdentity();
-  return <LivingLabClient lang={lang} initialIdentity={identity} identityRequired={identityRequired()} />;
+  return manual
+    ? <LivingLabClient lang={lang} initialIdentity={identity} identityRequired={identityRequired()} startManual />
+    : <LivingLabClient lang={lang} initialIdentity={identity} identityRequired={identityRequired()} layout="call" openSheet />;
 }

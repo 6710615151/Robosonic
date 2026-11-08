@@ -6,7 +6,8 @@ import QRCode from "qrcode";
 import { Bot, Copy, Hospital, KeyRound, Lock, Pencil, RefreshCw, Share2, ShieldCheck, Trash2, X } from "lucide-react";
 import { describeDistance } from "@/lib/hri/passport";
 import { shouldForgetEditKey } from "@/lib/hri/passport-owner";
-import PassportCardVisual from "../../PassportCardVisual";
+import PassportCardVisual, { passportMrz } from "../../PassportCardVisual";
+import PassportSave from "../../components/PassportSave";
 import { deletePassportAction, getOwnerViewAction, rotateAccessTokenAction, updatePassportAction } from "../../actions";
 import { cardCopy, type CardLang } from "../copy";
 import styles from "../passport.module.css";
@@ -113,6 +114,10 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
   const [unlocking, setUnlocking] = useState(false);
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  // Opened from the "scan to save" QR (?save=1): this is the phone, so show the picture to keep first.
+  const [saveMode, setSaveMode] = useState(false);
+  const [mounted, setMounted] = useState(false); // the picture needs the page's own address (browser only)
+  useEffect(() => { setSaveMode(new URLSearchParams(window.location.search).get("save") === "1"); setMounted(true); }, []);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<FormValues>(() => formFrom(passport, null));
@@ -352,8 +357,24 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
     { label: t.greeting, value: live.greeting === "wave" ? t.wave : live.greeting === "none" ? t.noGreeting : t.wai }
   ];
 
+  // The picture to keep (and to show robots): only for a passport robots can still read.
+  const saveBlock = live.status === "active" && mounted ? (
+    <PassportSave
+      lang={lang}
+      onPhone={saveMode}
+      saveUrl={saveMode ? undefined : `${cardUrl()}?save=1`}
+      data={{
+        heading: "HRI PASSPORT", motto: t.cardMotto, codeLabel: t.codeLabel, code: live.code, cardUrl: cardUrl(),
+        prefs: corePrefs.map((p) => ({ label: p.label, value: p.value })),
+        scanNote: lang === "th" ? "ยกรูปนี้ให้หุ่นยนต์สแกน" : "Show this to a robot to scan",
+        mrz: passportMrz(live.code, live.language, live.version)
+      }}
+    />
+  ) : null;
+
   return (
     <main className={styles.page}>
+      {saveMode && saveBlock}
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>{t.eyebrow}</p>
@@ -412,6 +433,8 @@ export default function PassportCardClient({ lang, token, passport }: { lang: Ca
           </div>
         </aside>
       </section>
+
+      {!saveMode && saveBlock}
 
       {live.status === "active" && (
         <section className={styles.use} aria-labelledby="use-passport" data-testid="passport-use">

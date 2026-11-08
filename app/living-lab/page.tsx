@@ -1,34 +1,27 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import Overview from "./components/Overview";
-import { loadCareRobots } from "./data";
+import { identityRequired } from "@/lib/hri/identity-server";
+import LivingLabClient from "./LivingLabClient";
+import { readClientIdentity } from "./identity-actions";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "HRI Living Lab | Thailand Humanoid Atlas",
-  description: "Can robots understand you? Create a Care Passport once, meet simulated care robots that respect it, compare them on a hospital journey and see what the research learns.",
+  description: "Meet Atlas, a simulated care robot, as if on a video call. Talk for two minutes and it makes your Care Passport.",
   alternates: { canonical: "/living-lab" }
 };
 
 type SearchParams = Promise<{ window?: string }>;
 
-// The Living Lab overview. Passport creation lives at /living-lab/create and the Research Observatory
-// at /living-lab/research; old /living-lab?window=… links (the observatory filter) are forwarded there.
+// The Living Lab front door: a video call with the robot. Press Create passport to talk; the robot
+// learns how you like to be cared for while you chat. Old /living-lab?window=… links (the research
+// filter) are forwarded to the Research page; old #section links are forwarded in the browser.
 export default async function LivingLabPage({ searchParams }: { searchParams: SearchParams }) {
   const { window: range } = await searchParams;
   if (range) redirect(`/living-lab/research?window=${encodeURIComponent(range)}`);
-
   const lang = ((await cookies()).get("lang")?.value === "th" ? "th" : "en") as "en" | "th";
-  const robots = await loadCareRobots();
-  return (
-    <Overview
-      lang={lang}
-      registryCount={robots ? robots.length : null}
-      dbOnline={robots !== null}
-      aiConfigured={Boolean(process.env.GEMINI_API_KEY)}
-      journeyRobots={(robots ?? []).filter((r) => r.journeyTask).map((r) => ({ name: r.name, task: r.journeyTask! }))}
-    />
-  );
+  const identity = await readClientIdentity();
+  return <LivingLabClient lang={lang} initialIdentity={identity} identityRequired={identityRequired()} layout="call" />;
 }

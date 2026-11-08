@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { callGemini, failureResponse } from "@/lib/hri/gemini";
-import { finalizeInterviewReply } from "@/lib/hri/interview-guard";
+import { finalizeInterviewReply, finalizeTalkReply } from "@/lib/hri/interview-guard";
 import { buildInterviewBody, interviewRequestSchema, parseInterviewReply } from "@/lib/hri/interview-ai";
 import { consumeRateLimit } from "@/lib/hri/rate-limit";
 import { clientId } from "@/lib/hri/security";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
-const LIMIT = 30;
+const LIMIT = 60; // a conversation is about 6-10 turns, an interview 5-8
 const WINDOW_SECONDS = 600; // one interview is about 5-8 turns
 
 const fail = (status: number, error: string, extra: Record<string, unknown> = {}) =>
@@ -43,7 +43,8 @@ export async function POST(req: Request) {
     return fail(httpStatus, error);
   }
   // Gemini proposes, the guard decides what may be recorded.
-  return NextResponse.json(finalizeInterviewReply(parsed.data, outcome.value), { headers: HEADERS });
+  const finalize = parsed.data.mode === "talk" ? finalizeTalkReply : finalizeInterviewReply;
+  return NextResponse.json(finalize(parsed.data, outcome.value), { headers: HEADERS });
 }
 
 export function OPTIONS() {

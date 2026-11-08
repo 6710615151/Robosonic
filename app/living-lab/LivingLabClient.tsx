@@ -1,15 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Mic, MicOff, Pause, Play, ScanFace, Snail, Volume2, VolumeX } from "lucide-react";
+import { BadgeCheck, Bot, Camera, CameraOff, Hand, HeartHandshake, Hospital, IdCard, Info, Mic, MicOff, Pause, Play, ScanFace, ScanLine, Snail, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { adapt } from "@/lib/hri/adapt";
+import { PROFILE_SCHEMA, type PublicProfile } from "@/lib/hri/public-profile";
+import { ROBOT_PROFILES } from "@/lib/hri/robot-profiles";
+import { buildSpokenSummary } from "@/lib/hri/spoken-summary";
+import PassportScanner from "./components/PassportScanner";
 import RobotStage from "@/app/components/robot/RobotStage";
 import type { RobotBehavior, RobotEvent } from "@/lib/hri/behavior-engine";
 import { classifyWai, LeanBackDetector, POSE, shoulderWidth, WaiDetector } from "@/lib/hri/signals";
 import { describeDistance, type PassportInput } from "@/lib/hri/passport";
 import { AutoCalibrator, type AutoEvent, type AutoEvidence, type AutoResult, type AutoStage, type PauseReason, type VoiceCue } from "@/lib/hri/auto-calibration";
-import { applyInterviewUpdates, initialReview, pendingTopics, type FieldKey, type InterviewUpdates, type ReviewValues, type Source, type Sources } from "@/lib/hri/interview-ai";
+import { applyInterviewUpdates, initialReview, pendingTopics, toState, type FieldKey, type InterviewReply, type InterviewUpdates, type ReviewValues, type Source, type Sources } from "@/lib/hri/interview-ai";
+import { TalkAnalyzer } from "@/lib/hri/talk-analysis";
 import { findSpeechRecognition, listenOnce } from "@/lib/hri/speech-input";
 import { matchFirstVoiceAnswer } from "@/lib/hri/voice-answers";
 import type { PoseFrame } from "@/lib/hri/camera";
@@ -18,7 +26,8 @@ import { createPassportAction } from "./actions";
 import IdentityCard from "./IdentityCard";
 import { identityCopy } from "./identity-copy";
 import type { ClientIdentity } from "./identity-actions";
-import PassportCardVisual from "./PassportCardVisual";
+import PassportCardVisual, { passportMrz } from "./PassportCardVisual";
+import PassportSave from "./components/PassportSave";
 import AutoInterview from "./AutoInterview";
 import VoiceAnswerBox from "./VoiceAnswer";
 import { copy, type Lang } from "./copy";
@@ -34,6 +43,12 @@ const REVIEW_SECONDS = 10;
 const MIN_TALK_QUESTIONS = 3;
 const TALK_ANSWER_MS = 11000; // from asking (the question is spoken first) to "no answer, next question"
 const TALK_CLOSING_MS = 7000; // the goodbye, then the passport is saved
+const MAX_TALK_TURNS = 8; // the conversation always ends, even if the camera never finishes
+// Values to talk about before the camera has produced any (Gemini only sees closed-list values).
+const TALK_START_VALUES: ReviewValues = {
+  greeting: "wai", comfortDistance: -2.2, speed: 1, gaze: "direct", voice: true, language: "th", anxiety: "low",
+  captions: "normal", speechPace: "normal", noReach: true
+};
 // After the camera finishes, offer a spoken interview about what it cannot measure. While it is on offer the
 // automatic save waits for the person to choose (talk, or skip and save with the measured values).
 const INTERVIEW_OFFERED = true;
@@ -55,11 +70,36 @@ function stageOf(phase: Phase): number {
   return 1;
 }
 
-export default function LivingLabClient({ lang, initialIdentity, identityRequired = false }: {
+// Old links pointed at sections of the single long page; the call page forwards them.
+const LEGACY_HASHES: Record<string, string> = {
+  "#calibrate": "/living-lab/create",
+  "#research": "/living-lab/research",
+  "#robots": "/living-lab/robot",
+  "#journey": "/living-lab/meet"
+};
+
+export default function LivingLabClient({ lang, initialIdentity, identityRequired = false, layout = "page", openSheet = false, startManual = false }: {
   lang: Lang; initialIdentity: ClientIdentity;
   // True only when HRI_IDENTITY_REQUIRED=true: the robot then waits for a verified email.
   identityRequired?: boolean;
+  // "call": the robot fills the screen like a video call, with a control bar (the Living Lab front door).
+  // "page": the original page with the answer-by-buttons flows (/living-lab/create?manual=1).
+  layout?: "page" | "call";
+  openSheet?: boolean; // call: open the "create passport" sheet straight away (/living-lab/create)
+  startManual?: boolean;
 }) {
+  const call = layout === "call";
+  const router = useRouter();
+  // The call room is drawn over the whole viewport, outside the site's animated page wrapper (whose
+  // transform would otherwise trap position: fixed). It mounts after hydration; the page cannot scroll.
+  const [portal, setPortal] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!call) return;
+    setPortal(document.body);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [call]);
   const t = copy[lang];
   const idT = identityCopy[lang];
   // Verified Living Lab participant (masked email). Optional unless required by configuration (decision 1).
@@ -119,10 +159,19 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
   // Auto calibrator measures behind it. Nothing it measures is shown until the passport exists.
   const [talk, setTalk] = useState(false);
   const talkRef = useRef(false);
-  const [manual, setManual] = useState(false);
+  const [manual, setManual] = useState(startManual);
+  // Call layout: the create sheet, the passport scanner, and the passport the robot last read.
+  const [sheet, setSheet] = useState(openSheet);
+  const [scanning, setScanning] = useState(false);
   const [askingPermission, setAskingPermission] = useState(false);
   const talkState = useRef({ asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false });
   const talkResult = useRef<{ result: AutoResult; evidence: AutoEvidence } | null>(null);
+  const talkAnalyzer = useRef(new TalkAnalyzer());
+  // Gemini small talk while it answers; null = not tried yet, false = unavailable, use the script.
+  const talkAi = useRef<boolean | null>(null);
+  const talkHistory = useRef<{ role: "user" | "robot"; text: string }[]>([]);
+  // Preferences the person named in passing, applied when the passport is made.
+  const talkUpdates = useRef<InterviewUpdates>({});
   const autoSourcesRef = useRef<Sources | null>(null);
   const spokeAt = useRef(0); // when the robot last started to speak: the mic must not hear it
 
@@ -183,7 +232,49 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     robot.setGlow(0.45, "teal");
     robot.snap();
     setReady(true);
-  }, []);
+    if (layout === "call") {
+      // The robot answers the call: a wai, and a line saying what to press.
+      window.setTimeout(() => {
+        robot.bothArms("wai"); robot.expression("calm"); robot.lookAt(0, 0.2);
+        window.setTimeout(() => robot.bow(0.3, 1.5), 450);
+        window.setTimeout(() => { robot.bothArms("relaxed"); robot.expression("happy"); }, 2500);
+        setSpeech(copy[lang].talk.welcome);
+      }, 900);
+    }
+  }, [layout, lang]);
+
+  // Call page: forward old #section links, as the overview used to.
+  useEffect(() => {
+    if (!call) return;
+    const target = LEGACY_HASHES[window.location.hash];
+    if (target) router.replace(target);
+  }, [call, router]);
+
+  // Call page: a passport shown to the robot. It reads the public profile, adapts, and says what it will do.
+  async function readScanned(token: string) {
+    setScanning(false);
+    const robot = robotRef.current;
+    try {
+      const response = await fetch(`/api/hri/passport/${encodeURIComponent(token)}`, { cache: "no-store", headers: { accept: "application/json" } });
+      const profile = (await response.json().catch(() => null)) as PublicProfile | null;
+      if (!response.ok || !profile || profile.schema !== PROFILE_SCHEMA) { say(t.talk.scanFailed); return; }
+      const plan = adapt(profile, ROBOT_PROFILES[0]);
+      human("passport_scanned", { version: profile.version });
+      if (robot) {
+        robot.setSpeed(Math.max(plan.movement.multiplier, 0.25));
+        robot.setDistance(plan.distance.sceneUnits);
+        robot.lookAt(0, plan.eyeContact === "soft" ? 0.35 : 0.1);
+        robot.expression(plan.demeanor === "calm" ? "calm" : "happy");
+        if (plan.greeting === "wai") { robot.bothArms("wai"); later(450, () => robot.bow(0.3, 1.5)); later(2500, () => robot.bothArms("relaxed")); }
+        else if (plan.greeting === "wave") robot.wave("R", 2.4);
+      }
+      // Speak only if the passport asks for a voice; the caption always shows.
+      voiceRef.current = plan.voice;
+      say(buildSpokenSummary(plan));
+    } catch {
+      say(t.talk.scanFailed);
+    }
+  }
 
   // ---------------- phases ----------------
   function begin(answerByVoice = false) {
@@ -532,12 +623,21 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         const auto = autoRef.current;
         if (auto) {
           // While waiting for the wai the robot keeps its eyes lowered; afterwards it follows the person.
-          if (auto.stage !== "baseline" && auto.stage !== "greet" && auto.stage !== "returning_wai") lookAtVisitor();
+          const looking = auto.stage !== "baseline" && auto.stage !== "greet" && auto.stage !== "returning_wai";
+          if (looking) lookAtVisitor();
+          // Conversation mode: eye contact is read over the whole chat (lean-backs are the calibrator's here).
+          if (talkRef.current) talkAnalyzer.current.frame(tMs, landmarks, looking, false);
           setAutoPerson(!!landmarks && people === 1);
           for (const event of auto.update({ tMs, landmarks, people, luma: frame.luma })) applyAutoEvent(event);
           return;
         }
 
+        // Conversation mode after the calibrator: keep reading eye contact, and step back on a lean-back.
+        if (talkRef.current && phaseRef.current === "auto") {
+          lookAtVisitor();
+          if (talkAnalyzer.current.frame(tMs, landmarks, true, true)) talkStepBack();
+          return;
+        }
         if (!landmarks) return;
         if (phaseRef.current === "approach" || phaseRef.current === "done") lookAtVisitor();
         if (phaseRef.current === "greet") {
@@ -624,6 +724,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     setAskingPermission(false);
     talkState.current = { asked: 0, answered: 0, awaiting: false, sensingDone: false, closing: false };
     talkResult.current = null;
+    talkAnalyzer.current = new TalkAnalyzer();
+    talkAi.current = null; talkHistory.current = []; talkUpdates.current = {};
     talkRef.current = true; setTalk(true);
     await startAuto();
     if (!autoRef.current) {
@@ -635,35 +737,112 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     if (findSpeechRecognition(window)) setVoiceSafety(true);
   }
 
-  // Ask the next everyday question; if nobody answers, move on kindly.
-  function askNext() {
+  // The camera's view of the person so far, as neutral counts (the same facts the interview may see).
+  function talkCamera() {
+    const done = talkResult.current?.evidence;
+    return {
+      waiDetected: done?.waiDetected ?? false,
+      leanBacks: Math.min(50, counters.current.leanBack),
+      tooFast: Math.min(50, counters.current.tooFast),
+      voiceCorrections: 0,
+      leanIn: done?.leanIn ?? false,
+      gazeMeasured: done?.gazeMeasured ?? false,
+      avertShare: done?.avertShare ?? null
+    };
+  }
+
+  // One turn of Gemini small talk. Returns false when the AI cannot answer (the script takes over).
+  async function aiTurn(text: string | null): Promise<boolean> {
+    if (talkAi.current === false) return false;
+    try {
+      const response = await fetch("/api/hri/interview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          lang, mode: "talk", opening: text === null, text: text ?? "",
+          history: talkHistory.current.slice(-10), pending: [],
+          state: toState(autoValuesRef.current ?? { ...TALK_START_VALUES, language: lang }), camera: talkCamera()
+        })
+      });
+      if (!response.ok) { talkAi.current = false; return false; }
+      const reply = (await response.json()) as InterviewReply;
+      if (!talkRef.current || talkState.current.closing) return true;
+      talkAi.current = true;
+      if (text) talkHistory.current.push({ role: "user", text: text.slice(0, 300) });
+      talkHistory.current.push({ role: "robot", text: reply.say.slice(0, 300) });
+      talkHistory.current = talkHistory.current.slice(-10);
+      if (Object.keys(reply.updates).length) {
+        talkUpdates.current = { ...talkUpdates.current, ...reply.updates };
+        robotRef.current?.nod(1);
+        human("talk_update", { fields: Object.keys(reply.updates).join(",") });
+      }
+      return speakTurn(reply.say);
+    } catch {
+      talkAi.current = false;
+      return false;
+    }
+  }
+
+  // The robot says a line that ends in a question and waits for a reply; silence moves the chat on.
+  function speakTurn(line: string): true {
     const c = talkState.current;
-    if (!talkRef.current || c.closing) return;
-    if (c.sensingDone && c.asked >= MIN_TALK_QUESTIONS) { closeTalk(); return; }
-    if (c.asked >= t.talk.questions.length) { if (c.sensingDone) closeTalk(); return; }
     const asked = c.asked + 1;
     c.asked = asked; c.awaiting = true;
     robotRef.current?.expression("happy");
-    say(t.talk.questions[asked - 1]);
-    human("talk_question", { index: asked });
+    say(line);
+    human("talk_question", { index: asked, ai: talkAi.current === true });
     later(TALK_ANSWER_MS, () => {
       const now = talkState.current;
       if (!talkRef.current || now.closing || !now.awaiting || now.asked !== asked) return;
       now.awaiting = false;
-      say(t.talk.noAnswer);
-      later(2600, askNext);
+      if (talkAi.current) void aiTurn(lang === "th" ? "(ไม่ได้ตอบ)" : "(no answer)").then((ok) => { if (!ok) { say(t.talk.noAnswer); later(2600, askNext); } });
+      else { say(t.talk.noAnswer); later(2600, askNext); }
     });
+    return true;
   }
 
-  // Something was said in reply. Only the fact that it was said is used; the words are not kept.
-  function heardInTalk() {
+  // Ask the next question: Gemini's, or the script's when the AI is unavailable.
+  async function askNext(reply?: string) {
+    const c = talkState.current;
+    if (!talkRef.current || c.closing) return;
+    if ((c.sensingDone && c.asked >= MIN_TALK_QUESTIONS) || c.asked >= MAX_TALK_TURNS) { closeTalk(); return; }
+    robotRef.current?.expression("calm");
+    if (await aiTurn(reply ?? (c.asked === 0 ? null : lang === "th" ? "(คุยต่อ)" : "(continue)"))) return;
+    const scripted = t.talk.questions.slice(0, MAX_TALK_TURNS);
+    if (c.asked >= scripted.length) { if (c.sensingDone) closeTalk(); return; }
+    speakTurn(scripted[c.asked]);
+  }
+
+  // A reply was heard. Its timing is measured; the words go to the AI (if on) for the next turn and are
+  // never stored by this site.
+  function heardInTalk(transcript: string, waitedMs: number) {
     const c = talkState.current;
     if (!talkRef.current || !c.awaiting || c.closing) return;
     c.awaiting = false; c.answered += 1;
+    talkAnalyzer.current.answer(transcript, waitedMs);
     robotRef.current?.nod(1);
-    say(t.talk.acks[(c.answered - 1) % t.talk.acks.length]);
     human("talk_answer", { index: c.asked });
-    later(2400, askNext);
+    if (talkAi.current) {
+      if ((c.sensingDone && c.asked >= MIN_TALK_QUESTIONS) || c.asked >= MAX_TALK_TURNS) { say(t.talk.acks[0]); later(1800, closeTalk); return; }
+      void askNext(transcript);
+      return;
+    }
+    say(t.talk.acks[(c.answered - 1) % t.talk.acks.length]);
+    later(2400, () => { void askNext(); });
+  }
+
+  // A lean-back during the chat (after the calibrator): one step farther, kept for the passport.
+  function talkStepBack() {
+    const robot = robotRef.current;
+    const values = autoValuesRef.current;
+    if (!robot || !values || talkState.current.closing) return;
+    const farther = applyInterviewUpdates(values, autoSourcesRef.current ?? initialReview(talkResult.current!.result, talkResult.current!.evidence).sources, { distance: "farther" }, { allowClosest: false });
+    autoValuesRef.current = farther.values;
+    if (autoSourcesRef.current) autoSourcesRef.current = { ...farther.sources, distance: "camera" };
+    counters.current.leanBack++; counters.current.tooClose++;
+    robot.setDistance(farther.values.comfortDistance); robot.expression("sorry"); robot.lean("back");
+    later(1500, () => robot.lean("upright"));
+    human("too_close", { source: "talk", distance: farther.values.comfortDistance });
   }
 
   function closeTalk() {
@@ -671,6 +850,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     if (c.closing) return;
     c.closing = true; c.awaiting = false;
     setVoiceSafety(false);
+    stopCam();
     const robot = robotRef.current;
     if (robot) {
       robot.expression("happy"); robot.bothArms("wai");
@@ -686,7 +866,13 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     const measured = talkResult.current;
     if (!measured || !talkRef.current) return;
     talkRef.current = false;
-    const v = autoValuesRef.current ?? initialReview(measured.result, measured.evidence).values;
+    let v = autoValuesRef.current ?? initialReview(measured.result, measured.evidence).values;
+    // Eye contact over the whole conversation, when there was enough of it, refines the 5-second check.
+    const talkGaze = talkAnalyzer.current.gaze();
+    if (talkGaze) v = { ...v, gaze: talkGaze };
+    // What the person asked for in their own words wins over what the camera inferred.
+    v = applyInterviewUpdates(v, autoSourcesRef.current ?? initialReview(measured.result, measured.evidence).sources, talkUpdates.current, { allowClosest: measured.evidence.leanIn }).values;
+    const analysis = talkAnalyzer.current.summary();
     await savePassport(
       {
         greeting: v.greeting, comfortDistance: v.comfortDistance, speed: v.speed, gaze: v.gaze, voice: v.voice,
@@ -701,8 +887,14 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         finalSpeed: v.speed,
         // Counts only. No words from the conversation are saved.
         conversation: true,
+        talkAi: talkAi.current === true,
         talkQuestions: talkState.current.asked,
-        talkAnswers: talkState.current.answered
+        talkAnswers: talkState.current.answered,
+        talkMeanResponseMs: analysis.meanResponseMs,
+        talkGazeFrames: analysis.gazeFrames,
+        talkAvertShare: analysis.avertShare,
+        talkLeanBacks: analysis.leanBacks,
+        talkPreferencesNamed: Object.keys(talkUpdates.current).length
       },
       "auto"
     );
@@ -741,7 +933,7 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         say(talkRef.current ? t.talk.niceToMeet : seen ? t.waiSpeech : t.autoNoWai);
         later(500, () => robot.bow(0.36, 1.7));
         // The first everyday question follows the greeting; the measuring carries on underneath.
-        if (talkRef.current) later(3200, askNext);
+        if (talkRef.current) later(3200, () => { void askNext(); });
         later(2600, () => { robot.bothArms("relaxed"); robot.expression("happy"); robot.setGlow(0.7, "teal"); });
         break;
       }
@@ -786,7 +978,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
         break;
       case "complete":
         autoRef.current = null;
-        stopCam(); // sensing ends as soon as it is no longer needed
+        // Sensing ends as soon as it is no longer needed; in a conversation, when the conversation ends.
+        if (!talkRef.current) stopCam();
         setGaze(e.result.gaze);
         setAutoResult({ result: e.result, evidence: e.evidence });
         {
@@ -929,7 +1122,8 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             human("voice_cue", { cue });
             calibrator.applyVoice(cue).forEach(applyAutoEvent);
           }
-          if (talkRef.current && alternatives.some((a) => a.trim())) heardInTalk();
+          const reply = alternatives.find((a) => a.trim());
+          if (talkRef.current && reply) heardInTalk(reply, Date.now() - startedAt);
         }
         timer = window.setTimeout(loop, 150);
       });
@@ -953,13 +1147,23 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
     source === "camera" ? t.interview.sourceCamera : source === "voice" ? t.interview.sourceVoice : t.interview.sourceDefault;
   const Src = ({ of }: { of: Source }) => <em className={`ll-src ll-src-${of}`}>{sourceLabel(of)}</em>;
 
-  return (
-    <main className="ll">
+  if (call && !portal) return <main className="ll ll-call-pending" aria-busy="true" />;
+  const room = (
+    <main className={call ? "ll ll-call" : "ll"} data-testid={call ? "call" : undefined}>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
+      {scanning && <PassportScanner lang={lang} onClose={() => setScanning(false)} onToken={(token) => void readScanned(token)} />}
+
+      {call && (
+        <div className="ll-call-top">
+          <span className="ll-call-name">Atlas</span>
+          <span className="ll-call-sim">{t.talk.simulated}</span>
+          <Link className="ll-call-about" href="/living-lab/about"><Info size={15} aria-hidden="true" /> {t.talk.about}</Link>
+        </div>
+      )}
 
       <div className="lab-section" id="calibrate-wrap">
-      <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />
-      <CreationStages label={t.ready.stagesLabel} stages={t.ready.stages} current={stageOf(phase)} />
+      {!call && <SectionHead id="calibrate" eyebrow={labCopy[lang].calibrate.eyebrow} title={labCopy[lang].calibrate.title} lead={labCopy[lang].calibrate.lead} />}
+      {!call && <CreationStages label={t.ready.stagesLabel} stages={t.ready.stages} current={stageOf(phase)} />}
       <section className={phase === "intro" ? "ll-grid is-intro" : "ll-grid"}>
         <div className="ll-stage-card">
           <div className="ll-bubble" aria-live="polite">{speech}</div>
@@ -969,11 +1173,12 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
           <div className="ll-chip" role="status">{status}</div>
           <div className={`ll-cam ${cameraState === "on" ? "is-on" : ""}`}>
             <video ref={videoRef} playsInline muted aria-label={t.cameraPreview} />
-            {cameraState !== "off" && !talk && <span>{cameraState === "loading" ? t.cameraLoading : cameraInfo}</span>}
+            {cameraState !== "off" && !talk && !call && <span>{cameraState === "loading" ? t.cameraLoading : cameraInfo}</span>}
+            {call && cameraState !== "on" && <b className="ll-self-off" aria-hidden="true">{t.talk.you}</b>}
           </div>
         </div>
 
-        <div className="ll-side">
+        <div className={`ll-side${call ? ` is-${phase === "intro" ? (sheet ? "sheet" : "hidden") : phase === "auto" && talk ? "pill" : "sheet"}` : ""}`}>
         <div className="ll-panel" ref={panelRef}>
           {!talk && <CalibrationProgress lang={lang} phase={phase} auto={inputMode === "auto"} />}
           {phase === "intro" && !manual && (
@@ -991,7 +1196,10 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
               <button className="ll-btn primary big ll-talk-start" onClick={startTalk} disabled={!ready || !consent || !identityOk || cameraState === "loading" || askingPermission} data-testid="talk-start">
                 <Mic size={18} aria-hidden="true" /> {ready ? t.talk.start : t.loadingRobot}
               </button>
-              <button type="button" className="ll-linkbtn" onClick={() => { setManual(true); setAutoNotice(null); }} data-testid="talk-fallback">{t.talk.fallback}</button>
+              {call
+                ? <a className="ll-linkbtn" href="/living-lab/create?manual=1" data-testid="talk-fallback">{t.talk.fallback}</a>
+                : <button type="button" className="ll-linkbtn" onClick={() => { setManual(true); setAutoNotice(null); }} data-testid="talk-fallback">{t.talk.fallback}</button>}
+              {call && <button type="button" className="ll-linkbtn" onClick={() => setSheet(false)}>{t.talk.notNow}</button>}
             </div>
           )}
 
@@ -1339,6 +1547,15 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
                 meta={t.cardVersion(1)}
                 prefs={cardPrefs()}
               />
+              <PassportSave
+                lang={lang}
+                saveUrl={`${window.location.origin}/living-lab/passport/${accessToken}?save=1`}
+                data={{
+                  heading: "HRI PASSPORT", motto: t.cardMotto, codeLabel: t.codeLabel, code: passportCode,
+                  cardUrl: `${window.location.origin}/living-lab/passport/${accessToken}`,
+                  prefs: cardPrefs(), scanNote: lang === "th" ? "ยกรูปนี้ให้หุ่นยนต์สแกน" : "Show this to a robot to scan", mrz: passportMrz(passportCode, lang, 1)
+                }}
+              />
               <p className="ll-q">{t.moreTitle}</p>
               <ul className="ll-facts ll-more">
                 <li><span>{t.factGreeting}</span><strong>{t.greetingLabels[greeting]}</strong></li>
@@ -1388,14 +1605,37 @@ export default function LivingLabClient({ lang, initialIdentity, identityRequire
             </div>
           </details>}
         </div>
-        <IdentityCard lang={lang} identity={identity} onChange={setIdentity} locked={phase !== "intro" && phase !== "done"} required={identityRequired} consent={consent} />
+        {(!call || (identityRequired && phase === "intro" && sheet)) && <IdentityCard lang={lang} identity={identity} onChange={setIdentity} locked={phase !== "intro" && phase !== "done"} required={identityRequired} consent={consent} />}
         </div>
       </section>
 
       </div>
 
+      {call && (
+        <div className="ll-callbar" role="toolbar" aria-label={t.talk.controls}>
+          <span className={`ll-callbar-ind${talk ? " is-on" : ""}`} title={talk ? t.talk.micOn : t.talk.micOffNow}>
+            {talk ? <Mic size={20} aria-hidden="true" /> : <MicOff size={20} aria-hidden="true" />}
+            <span className="visually-hidden">{talk ? t.talk.micOn : t.talk.micOffNow}</span>
+          </span>
+          <span className={`ll-callbar-ind${cameraState === "on" ? " is-on" : ""}`} title={cameraState === "on" ? t.talk.camOn : t.talk.camOffNow}>
+            {cameraState === "on" ? <Camera size={20} aria-hidden="true" /> : <CameraOff size={20} aria-hidden="true" />}
+            <span className="visually-hidden">{cameraState === "on" ? t.talk.camOn : t.talk.camOffNow}</span>
+          </span>
+          {phase === "intro" && (
+            <button type="button" className="ll-callbar-btn is-primary" onClick={() => setSheet(true)} data-testid="call-create">
+              <UserPlus size={20} aria-hidden="true" /> {t.talk.create}
+            </button>
+          )}
+          {(phase === "intro" || phase === "done") && (
+            <button type="button" className="ll-callbar-btn" onClick={() => setScanning(true)} data-testid="call-scan">
+              <ScanLine size={20} aria-hidden="true" /> <span className="ll-callbar-label">{t.talk.scan}</span>
+            </button>
+          )}
+        </div>
+      )}
     </main>
   );
+  return call && portal ? createPortal(<div className="lab ll-portal">{room}</div>, portal) : room;
 }
 
 const styles = `

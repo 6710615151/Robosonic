@@ -59,7 +59,7 @@ export default function LabShell({ lang, aiConfigured }: { lang: Lang; aiConfigu
   const under = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
   // The four stages of one experiment, in order. Routes are unchanged; only how they are presented.
   const items: NavItem[] = [
-    { key: "overview", href: "/living-lab", icon: Compass, active: pathname === "/living-lab", label: st.home },
+    { key: "overview", href: "/living-lab/about", icon: Compass, active: pathname === "/living-lab/about", label: st.home },
     { key: "create", href: "/living-lab/create", icon: UserPlus, active: under("/living-lab/create"), num: st.create.num, label: st.create.name },
     { key: "experience", href: "/living-lab/robot", icon: Bot, active: under("/living-lab/robot"), num: st.experience.num, label: st.experience.name },
     { key: "compare", href: "/living-lab/meet", icon: Hospital, active: under("/living-lab/meet"), num: st.compare.num, label: st.compare.name },

@@ -195,7 +195,7 @@ export const copy = {
       points: [
         "Your camera and microphone turn on, and the robot chats with you about everyday things. Answer however you like; there are no wrong answers.",
         "While you talk, the robot notices how close is comfortable for you, how fast it may move and where you look, and uses that for your Care Passport. It does not show these readings during the chat.",
-        "Nothing is recorded. Video is processed on this device only. Your browser’s speech service may process what you say; this site keeps no words and no audio."
+        "Nothing is recorded. Video is processed on this device only. Your browser’s speech service turns what you say into text, and when the AI assistant is on, that text is sent to Google Gemini so the robot can reply. This site keeps no words, audio or video."
       ],
       start: "Start talking with the robot",
       fallback: "Can’t use a camera or microphone? Answer with buttons instead",
@@ -222,7 +222,21 @@ export const copy = {
       ],
       acks: ["That sounds nice.", "Oh, interesting.", "Thanks for telling me.", "I see."],
       noAnswer: "That’s alright. Let me ask something else.",
-      closing: "I really enjoyed talking with you. Thank you! I have learned how you like me to be, so I will make your passport now."
+      closing: "I really enjoyed talking with you. Thank you! I have learned how you like me to be, so I will make your passport now.",
+      // The call page (the Living Lab front door).
+      welcome: "Hello, I'm Atlas. Press Create passport below and let's have a chat.",
+      simulated: "Simulated robot",
+      about: "About the lab",
+      you: "You",
+      notNow: "Not now",
+      controls: "Call controls",
+      micOn: "Microphone on",
+      micOffNow: "Microphone off",
+      camOn: "Camera on",
+      camOffNow: "Camera off",
+      create: "Create passport",
+      scan: "Scan passport",
+      scanFailed: "I could not read that passport. It may have been deleted or replaced. Please try another one."
     },
     autoStart: "Auto: just stand in front of the camera",
     autoHint: "One tap and you're done. The robot watches for your wai, how you react as it comes closer, and where you look. The camera runs on this device only. Feelings are never guessed from your face.",
@@ -534,7 +548,7 @@ export const copy = {
       points: [
         "กล้องและไมค์จะเปิด แล้วหุ่นจะชวนคุยเรื่องทั่วไป ตอบได้ตามสบาย ไม่มีคำตอบผิด",
         "ระหว่างคุย หุ่นจะสังเกตว่าระยะไหนที่คุณสบายใจ หุ่นควรเคลื่อนเร็วแค่ไหน และคุณมองไปทางไหน แล้วนำไปทำ Care Passport ของคุณ โดยจะไม่แสดงผลการสังเกตระหว่างคุย",
-        "ไม่มีการบันทึกภาพหรือเสียง วิดีโอประมวลผลในเครื่องนี้เท่านั้น บริการรู้จำเสียงของเบราว์เซอร์อาจประมวลผลสิ่งที่คุณพูด แต่เว็บไซต์นี้ไม่เก็บคำพูดหรือเสียงใด ๆ"
+        "ไม่มีการบันทึกภาพหรือเสียง วิดีโอประมวลผลในเครื่องนี้เท่านั้น บริการรู้จำเสียงของเบราว์เซอร์จะแปลงสิ่งที่คุณพูดเป็นข้อความ และเมื่อเปิดผู้ช่วย AI ข้อความนั้นจะถูกส่งไปยัง Google Gemini เพื่อให้หุ่นตอบได้ เว็บไซต์นี้ไม่เก็บคำพูด เสียง หรือวิดีโอใด ๆ"
       ],
       start: "เริ่มคุยกับหุ่นยนต์",
       fallback: "ใช้กล้องหรือไมค์ไม่ได้? ตอบด้วยปุ่มแทน",
@@ -561,7 +575,20 @@ export const copy = {
       ],
       acks: ["ฟังดูดีจังเลยครับ", "อ๋อ น่าสนใจครับ", "ขอบคุณที่เล่าให้ฟังนะครับ", "เข้าใจแล้วครับ"],
       noAnswer: "ไม่เป็นไรครับ งั้นผมถามเรื่องอื่นนะครับ",
-      closing: "คุยสนุกมากเลยครับ ขอบคุณนะครับ ผมจำได้แล้วว่าคุณชอบให้ผมดูแลแบบไหน เดี๋ยวผมทำพาสปอร์ตให้นะครับ"
+      closing: "คุยสนุกมากเลยครับ ขอบคุณนะครับ ผมจำได้แล้วว่าคุณชอบให้ผมดูแลแบบไหน เดี๋ยวผมทำพาสปอร์ตให้นะครับ",
+      welcome: "สวัสดีครับ ผมชื่อ Atlas กดปุ่ม สร้าง Passport ด้านล่าง แล้วมาคุยกันนะครับ",
+      simulated: "หุ่นยนต์จำลอง",
+      about: "เกี่ยวกับแล็บ",
+      you: "คุณ",
+      notNow: "ไว้ก่อน",
+      controls: "ปุ่มควบคุมการคุย",
+      micOn: "ไมค์เปิดอยู่",
+      micOffNow: "ไมค์ปิดอยู่",
+      camOn: "กล้องเปิดอยู่",
+      camOffNow: "กล้องปิดอยู่",
+      create: "สร้าง Passport",
+      scan: "สแกน Passport",
+      scanFailed: "ผมอ่านพาสปอร์ตใบนี้ไม่ได้ครับ อาจถูกลบหรือเปลี่ยนไปแล้ว ลองใบอื่นนะครับ"
     },
     autoStart: "อัตโนมัติ: แค่ยืนหน้ากล้อง",
     autoHint: "กดครั้งเดียวจบ หุ่นจะสังเกตการไหว้ ปฏิกิริยาของคุณเมื่อหุ่นเข้าใกล้ และทิศที่คุณมอง กล้องประมวลผลในเครื่องนี้เท่านั้น และระบบไม่เดาความรู้สึกจากใบหน้า",

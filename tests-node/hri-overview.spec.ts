@@ -1,4 +1,4 @@
-// The Living Lab overview (/living-lab): it must say what is real, offer a way to continue only when
+// The Living Lab overview (/living-lab/about; /living-lab itself is the call room): it must say what is real, offer a way to continue only when
 // this browser really holds a passport, and keep old links working. Read-only: writes nothing.
 import { expect, test } from "@playwright/test";
 
@@ -8,7 +8,7 @@ test.beforeEach(async ({ context }) => {
 });
 
 test("the overview says what this is, where to start, and that no physical robot is connected", async ({ page }) => {
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/about");
   await expect(page.getByRole("heading", { level: 1, name: "Can robots understand you?" })).toBeVisible();
   // One dominant action, in the hero (the closing invitation repeats it).
   await expect(page.getByRole("link", { name: /Begin your experiment/ }).first()).toHaveAttribute("href", "/living-lab/create");
@@ -22,7 +22,7 @@ test("the overview says what this is, where to start, and that no physical robot
 });
 
 test("'continue' appears only when this browser holds a passport's edit key", async ({ page }) => {
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/about");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByTestId("overview-resume")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "My Passport", exact: true })).toHaveCount(0);
@@ -45,7 +45,7 @@ test("links to the old single-page sections still land on the right page", async
 
 test("the overview has no horizontal overflow at phone width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/living-lab");
+  await page.goto("/living-lab/about");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

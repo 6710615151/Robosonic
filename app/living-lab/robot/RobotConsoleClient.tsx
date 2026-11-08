@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Copy, Eye, EyeOff, Hospital, IdCard, Minus, Play, Radio, UserPlus, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, Check, Copy, Eye, EyeOff, Hospital, IdCard, Minus, Play, Radio, ScanLine, UserPlus, Volume2, VolumeX } from "lucide-react";
 import RobotStage from "@/app/components/robot/RobotStage";
 import { adapt, DEFAULT_PLAN, explainPlan, type BehaviourPlan, type PreferenceKey, type SafetyRule } from "@/lib/hri/adapt";
 import type { RobotBehavior } from "@/lib/hri/behavior-engine";
@@ -17,6 +17,7 @@ import {
   type VoiceIntent
 } from "@/lib/hri/voice-commands";
 import { findOwnPassport } from "../components/lab-env";
+import PassportScanner from "../components/PassportScanner";
 import { startJourneyFromToken } from "./actions";
 import { robotCopy, type RobotLang } from "./copy";
 import VoiceControl, { type VoiceLogEntry } from "./VoiceControl";
@@ -118,6 +119,7 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
   // A passport this browser created (it holds the edit key): offered as a one-tap start.
   const [ownToken, setOwnToken] = useState<string | null>(null);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+  const [scanning, setScanning] = useState(false);
   const [speaking, setSpeaking] = useState<string | null>(null);
   const [ward, setWard] = useState(false);
   const rulesRef = useRef<SafetyRule[]>([]);
@@ -552,6 +554,13 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
 
   return (
     <main className={styles.page}>
+      {scanning && (
+        <PassportScanner
+          lang={lang}
+          onClose={() => setScanning(false)}
+          onToken={(token) => { setScanning(false); void loadToken(token); }}
+        />
+      )}
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>{t.eyebrow}</p>
@@ -582,6 +591,7 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
               <button type="button" className={styles.btn} onClick={copyToken}>
                 <Copy size={16} aria-hidden /> {copied ? t.next.copied : t.next.copy}
               </button>
+              <button type="button" className={styles.btn} onClick={() => setScanning(true)}><ScanLine size={16} aria-hidden /> {t.next.scanOther}</button>
               <button type="button" className={styles.linkBtn} onClick={() => setChanging(true)}>{t.next.change}</button>
               <a className={styles.linkBtn} href="#robot-next-title">{t.next.jump}</a>
             </div>
@@ -627,6 +637,9 @@ export default function RobotConsoleClient({ lang }: { lang: RobotLang }) {
                 />
                 <button type="submit" className={`${styles.btn} ${styles.primary}`} disabled={busy}>
                   {busy ? t.reading : t.read}
+                </button>
+                <button type="button" className={styles.btn} onClick={() => setScanning(true)} data-testid="console-scan">
+                  <ScanLine size={16} aria-hidden /> {t.next.scan}
                 </button>
               </div>
               <p className={styles.hint}>{t.tokenHelp}</p>
